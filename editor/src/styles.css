@@ -82,7 +82,9 @@
 .compact-controls .save-destination .text-button{margin:0;padding:0;min-height:24px;font-size:10px}.save-destination .save-as{width:100%;min-height:28px;margin:2px 0}
 @media(max-width:650px){.canvas-toolbar{gap:4px;padding:0 5px}.photo-navigation{font-size:9px}.photo-navigation button{width:20px}.canvas-tools{gap:0}.canvas-tools button{min-width:23px}.canvas-toolbar .tool-separator{margin:0 2px}}
 .save-dialog{gap:12px;align-items:stretch}.save-dialog h2{margin:0 0 5px}.save-dialog label{display:grid;gap:7px;font-size:11px;color:#a9bfb9}.save-dialog input{background:#19292d;color:#e0f1e7;border:1px solid #456052;border-radius:4px;padding:9px;min-width:0}.save-dialog p{line-height:1.5}
-.adjustments-toggle{display:none}
+.compact-controls .controls-top>.adjustments-toggle{display:none}
+.compact-controls .controls-top{min-height:32px;padding:5px 12px;gap:7px}
+.compact-controls .controls-top>button:last-child{padding:3px;margin-left:auto}
 .expanded-photo{position:fixed;inset:0;z-index:10;background:#10191d}
 .expanded-photo .topbar,.expanded-photo .library{display:none}
 .expanded-photo .studio{height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr) 260px;grid-template-rows:minmax(0,1fr)}
@@ -91,11 +93,11 @@
 .expanded-photo .controls{max-height:100dvh;overflow:auto}
 @media(max-width:650px){
  .expanded-photo .studio{display:flex;height:100dvh;overflow:hidden}
- .expanded-photo .workspace{height:calc(100dvh - 44px);flex:none;width:100%;padding:4px}
+ .expanded-photo .workspace{height:calc(100dvh - 36px);flex:none;width:100%;padding:4px}
  .expanded-photo .controls{position:absolute;bottom:0;left:0;right:0;max-height:65dvh;z-index:3;background:var(--panel);border-top:1px solid #56766b;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
- .expanded-photo .controls-top{position:sticky;top:0;min-height:44px;padding:4px 12px}
+ .expanded-photo .controls-top{position:sticky;top:0;min-height:36px;padding:2px 12px}
  .expanded-photo .controls-top>svg,.expanded-photo .adjustments-label{display:none}
- .expanded-photo .adjustments-toggle{display:flex;align-items:center;gap:8px;margin:0 auto 0 0;padding:8px 0;font-size:12px}
+ .expanded-photo .compact-controls .controls-top>.adjustments-toggle{display:flex;align-items:center;gap:8px;margin:0 auto 0 0;padding:4px 0;font-size:12px}
  .expanded-photo .control-body{display:none}
  .expanded-photo.adjustments-open .control-body{display:block}
  .expanded-photo.adjustments-open .adjustments-toggle>svg:last-child{transform:rotate(180deg)}

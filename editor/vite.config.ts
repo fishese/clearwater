@@ -23,4 +23,4 @@ function localSamples():Plugin {
     });
   }};
 }
-export default defineConfig({base:process.env.VITE_BASE_PATH || '/',plugins:[react(),localSamples()],worker:{format:'es'},server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{strict:true}},build:{target:'es2022'}});
+export default defineConfig({base:process.env.VITE_BASE_PATH || '/',plugins:[react(),localSamples()],worker:{format:'es'},server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{strict:true},watch:{ignored:['**/android/**']}},build:{target:'es2022'}});

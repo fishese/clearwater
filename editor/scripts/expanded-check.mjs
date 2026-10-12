@@ -6,6 +6,9 @@ try {
  const context=await browser.newContext({viewport:{width:1440,height:900}});
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);
+ assert.equal(await page.getByRole('button',{name:'Toggle adjustments'}).isVisible(),false);
+ assert.equal(await page.locator('.controls-top').innerText(),'Adjustments');
+ assert.ok((await page.locator('.controls-top').boundingBox()).height<=36);
  const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.fillStyle='#28778c';x.fillRect(0,0,640,480);return c.toDataURL().split(',')[1];});
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'test.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);

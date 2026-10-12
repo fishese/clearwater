@@ -3,8 +3,9 @@ export interface LocalDirectoryHandle {name:string;getFileHandle(name:string,opt
 type PickerWindow=Window&{
   showDirectoryPicker?:(options:{mode:'readwrite'})=>Promise<LocalDirectoryHandle>;
 };
-export const supportsFolder=()=>typeof (window as PickerWindow).showDirectoryPicker==='function';
-export const chooseFolder=()=> (window as PickerWindow).showDirectoryPicker!({mode:'readwrite'});
+import {isAndroid,chooseAndroidFolder} from './native';
+export const supportsFolder=()=>isAndroid()||typeof (window as PickerWindow).showDirectoryPicker==='function';
+export const chooseFolder=()=>isAndroid()?chooseAndroidFolder():(window as PickerWindow).showDirectoryPicker!({mode:'readwrite'});
 export function restoredName(original:string,format:'jpg'|'png',addRestore=true) {
   const stem=original.replace(/\.[^.]+$/,'').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/,'').slice(0,180)||'photo';
   return `${stem}${addRestore?'-restore':''}.${format}`;

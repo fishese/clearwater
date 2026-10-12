@@ -4,6 +4,7 @@ import { clamp, makeRecipe, parseRecipe, suggest } from './core/engine';
 import { DEFAULT_MANUAL, type Analysis, type Adjustments, type Hints, type Recipe, type CustomModel } from './core/types';
 import { deletePhoto, listPhotos, savePhoto, type StoredPhoto } from './storage';
 import {supportsFolder,chooseFolder,restoredName,createUniqueFile,writeFile,type LocalDirectoryHandle} from './file-save';
+import {isAndroid,receiveAndroidPhotos} from './native';
 
 interface Photo extends StoredPhoto { url:string; past:Recipe[]; future:Recipe[] }
 type Sample = { name:string; label:string };
@@ -20,7 +21,7 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
 function RadioGroup<T extends string>({label,name,value,options,onChange}:{label:string;name:string;value:T;options:[T,string][];onChange:(value:T)=>void}) {
   return <fieldset className="radio-group"><legend>{label}</legend><div>{options.map(([key,text])=><label key={key}><input type="radio" name={name} value={key} checked={value===key} onChange={()=>onChange(key)}/><span>{text}</span></label>)}</div></fieldset>;
 }
-function download(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert('Could not save this file. Please choose a writable folder.');});return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 
 export default function App() {
   const [expanded,setExpanded]=useState(false),[adjustmentsOpen,setAdjustmentsOpen]=useState(false);
@@ -70,7 +71,7 @@ export default function App() {
       if(target.folder){const file=await createUniqueFile(target.folder,target.name);await writeFile(file.handle,blob);target.name=file.name;}
       else download(blob,target.name);
       notify(target.folder?`Saved ${target.name}.`:`Downloaded ${target.name}.`);
-    }catch{download(blob,target.name);notify('Could not save to the chosen destination. Downloaded the restored photo instead.');}
+    }catch{if(isAndroid())notify('Could not save to this folder. Choose another output folder and try again.');else{download(blob,target.name);notify('Could not save to the chosen destination. Downloaded the restored photo instead.');}}
     finally{exportTarget.current=null;setSaving(false);setExporting(false);setProgress(100);}
   }
   function update(fn:(r:Recipe)=>Recipe,record=true) {
@@ -96,6 +97,7 @@ export default function App() {
     const items:Photo[]=accepted.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000,url:URL.createObjectURL(file),past:[],future:[]}));
     if(items.length){setPhotos(all=>[...all,...items]);setActive(items[0].id);items.forEach(persist);}
   }
+  useEffect(()=>{if(!isAndroid())return;let dispose:(()=>void)|undefined,cancelled=false;receiveAndroidPhotos(addFiles,notify).then(cleanup=>{if(cancelled)cleanup();else dispose=cleanup;}).catch(()=>notify('Could not enable Android photo sharing.'));return()=>{cancelled=true;dispose?.();};},[]);
   useEffect(()=>{
     if(initialized.current)return;initialized.current=true;
     listPhotos().then(items=>{setPhotos(all=>[...items.map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]})),...all]);if(items.length){const shared=new URLSearchParams(location.search).get('shared');setActive(current=>current??items.find(p=>p.id===shared)?.id??items[0].id);}}).catch(()=>setStorageWarning(true));
@@ -248,7 +250,7 @@ export default function App() {
           </div></details>
           <div className="manual-actions"><button className="text-button" onClick={()=>update(r=>({...r,manual:clone(DEFAULT_MANUAL)}))}><RotateCcw size={12}/> Reset manual edits</button></div>
 
-          <details className="settings-group" open><summary>Export <span className="summary-meta">Full resolution</span><ChevronDown size={14}/></summary><div className="group-content export-section"><div className="export-options"><label>File format<select aria-label="File format" value={format} onChange={e=>setFormat(e.target.value as 'jpg'|'png')}><option value="jpg">JPEG · High quality</option><option value="png">PNG · Lossless</option></select></label><button className="icon-button" title="Save edit recipe" aria-label="Save recipe" onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),'clearwater-recipe.json')}><FileJson size={17}/></button><button className="icon-button" title="Load edit recipe" aria-label="Load recipe" onClick={()=>recipeInput.current?.click()}><Upload size={16}/></button></div><div className="save-destination"><span title={outputFolder?.name??sourceFolder?.name}>{outputFolder?`Output: ${outputFolder.name}`:sourceFolder?`Source folder: ${sourceFolder.name}`:supportsFolder()?'Output: source folder (choose on save)':'Output: Downloads'}</span>{supportsFolder()&&<><button className="text-button" onClick={selectOutputFolder}><FolderOpen size={12}/>{outputFolder?'Change output folder':'Choose output folder'}</button>{outputFolder?<button className="text-button" onClick={()=>setOutputFolder(null)}>Use source folder</button>:<button className="text-button" onClick={selectSourceFolder}>{sourceFolder?'Change source folder':'Choose source folder'}</button>}</>}<button className="button secondary save-as" disabled={rendering} onClick={()=>exportPhoto(true)}><Download size={13}/>{supportsFolder()?'Save as…':'Download restored photo'}</button>{supportsFolder()&&!outputFolder&&<button className="text-button" disabled={rendering} onClick={()=>exportPhoto(false,false,true)}>Download instead</button>}<small>{photo?restoredName(photo.file.name,format,!outputFolder):'original-filename-restore.jpg'}</small>{!supportsFolder()&&<small>Your browser chooses the download location and handles existing filenames.</small>}</div></div></details>
+          <details className="settings-group" open><summary>Export <span className="summary-meta">Full resolution</span><ChevronDown size={14}/></summary><div className="group-content export-section"><div className="export-options"><label>File format<select aria-label="File format" value={format} onChange={e=>setFormat(e.target.value as 'jpg'|'png')}><option value="jpg">JPEG · High quality</option><option value="png">PNG · Lossless</option></select></label><button className="icon-button" title="Save edit recipe" aria-label="Save recipe" onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),'clearwater-recipe.json')}><FileJson size={17}/></button><button className="icon-button" title="Load edit recipe" aria-label="Load recipe" onClick={()=>recipeInput.current?.click()}><Upload size={16}/></button></div><div className="save-destination"><span title={outputFolder?.name??sourceFolder?.name}>{outputFolder?`Output: ${outputFolder.name}`:sourceFolder?`Source folder: ${sourceFolder.name}`:supportsFolder()?'Output: source folder (choose on save)':'Output: Downloads'}</span>{supportsFolder()&&<><button className="text-button" onClick={selectOutputFolder}><FolderOpen size={12}/>{outputFolder?'Change output folder':'Choose output folder'}</button>{outputFolder?<button className="text-button" onClick={()=>setOutputFolder(null)}>Use source folder</button>:<button className="text-button" onClick={selectSourceFolder}>{sourceFolder?'Change source folder':'Choose source folder'}</button>}</>}<button className="button secondary save-as" disabled={rendering} onClick={()=>exportPhoto(true)}><Download size={13}/>{supportsFolder()?'Save as…':'Download restored photo'}</button>{supportsFolder()&&!isAndroid()&&!outputFolder&&<button className="text-button" disabled={rendering} onClick={()=>exportPhoto(false,false,true)}>Download instead</button>}<small>{photo?restoredName(photo.file.name,format,!outputFolder):'original-filename-restore.jpg'}</small>{!supportsFolder()&&<small>Your browser chooses the download location and handles existing filenames.</small>}</div></div></details>
         </fieldset>
       </aside>
     </main>

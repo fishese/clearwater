@@ -11,3 +11,5 @@ The expanded photo button hides the gallery and header. Wide screens retain a na
 Use Node.js 24. In `editor`, run `npm ci`, then `npm run dev`. Run `npm test` and `npm run build` to verify changes. GitHub Actions builds and deploys the web editor on pushes to main, using `/clearwater/` as the base path.
 
 Personal samples, reference documents, research-only model weights, and conversion environments are excluded from Git. Bundled model licences and provenance are in `editor/public/models`.
+
+The Android project is in `editor/android`. Run `npm run android:sync` from `editor` to bundle the editor for Android, then follow [the Android build instructions](editor/android/README.md). The first build is unsigned; native sharing and folder access require on-device testing.
