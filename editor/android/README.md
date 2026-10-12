@@ -5,6 +5,7 @@ Capacitor 8 app, package `com.fishese.clearwater`, Android 7.0/API 24 or newer. 
 Native features in this first build:
 
 - Android gallery/document selection through Open photos, including multiple files.
+- Open folder lists JPEG, PNG and HEIC/HEIF photos directly inside a selected folder, sorted by filename with natural numbering. Next/Previous opens each photo on demand. Subfolders and photos over 60 MB are excluded. The selected folder is automatically available for source-folder exports. Folder browsing lasts for the current session; opened photos and edits remain in the local library.
 - Receive single/multiple images from other apps through Android Share.
 - Select source/output folders with Android's Storage Access Framework; save copies without overwriting existing files. Large exports cross the bridge in 256 KB chunks.
 - Same photo navigation, expanded view, manual adjustments and AI engines as the web editor.

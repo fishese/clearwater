@@ -2,9 +2,12 @@ import {Capacitor,registerPlugin,type PluginListenerHandle} from '@capacitor/cor
 import type {LocalDirectoryHandle,LocalFileHandle} from './file-save';
 
 type SharedPhoto={id:string;path:string;name:string;type:string};
+export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
+export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
  chooseFolder():Promise<{uri:string;name:string}>;
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string}>;
+ listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
  beginWrite(options:{uri:string}):Promise<{id:string}>;
  writeChunk(options:{id:string;data:string}):Promise<void>;
@@ -22,8 +25,7 @@ function fileHandle(uri:string,name:string,created=false):LocalFileHandle {
    return {async write(blob){for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);await files.writeChunk({id,data:btoa(binary)});}},async close(){await files.finishWrite({id,abort:false});},async abort(){await files.finishWrite({id,abort:true});}};
  }};
 }
-export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{
- const folder=await files.chooseFolder();
+function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
  return {name:folder.name,async getFileHandle(name,options){
    if(options?.create){const created=await files.create({folder:folder.uri,name});return fileHandle(created.uri,created.name,true);}
    const entry=await files.stat({folder:folder.uri,name});
@@ -31,6 +33,22 @@ export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{
    if(entry.directory)throw new DOMException('Name belongs to a folder','TypeMismatchError');
    return fileHandle(entry.uri!,entry.name!);
  }};
+}
+async function pickFolder(){try{return await files.chooseFolder();}catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Folder selection cancelled.','AbortError');throw error;}}
+export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{return directoryHandle(await pickFolder());}
+export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{
+ const folder=await pickFolder(),result=await files.listPhotos({folder:folder.uri});
+ const photos=result.photos.filter(photo=>/\.(jpe?g|png|heic|heif)$/i.test(photo.name)&&photo.size<=60*1024*1024)
+  .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'})||a.uri.localeCompare(b.uri));
+ return {name:folder.name,directory:directoryHandle(folder),photos};
+}
+export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto):Promise<File>{
+ const response=await fetch(Capacitor.convertFileSrc(photo.uri));if(!response.ok)throw new Error('Could not read this photo. It may have been moved or deleted.');
+ const reader=response.body?.getReader();let blob:Blob;
+ if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>60*1024*1024)throw new Error('Photos over 60 MB cannot be opened.');chunks.push(new Uint8Array(part.value));}}catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
+ else blob=await response.blob();
+ if(blob.size>60*1024*1024)throw new Error('Photos over 60 MB cannot be opened.');
+ return new File([blob],photo.name,{type:photo.type});
 }
 export async function receiveAndroidPhotos(onFiles:(photos:File[])=>void,onError:(message:string)=>void){
  let running=false,pending=false,stopped=false;

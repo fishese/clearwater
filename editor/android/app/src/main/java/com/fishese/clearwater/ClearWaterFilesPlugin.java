@@ -68,6 +68,20 @@ public class ClearWaterFilesPlugin extends Plugin {
         JSObject entry=new JSObject();entry.put("exists",false);return entry;
     }
     @PluginMethod public void stat(PluginCall call) { io.execute(()->{try{call.resolve(find(folder(call),filename(call)));}catch(Exception error){call.reject("Could not read this folder.",error);}}); }
+    @PluginMethod public void listPhotos(PluginCall call) { io.execute(()->{try {
+        Uri tree=folder(call),children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
+        JSArray photos=new JSArray();
+        String[] columns={DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE};
+        try(Cursor cursor=getContext().getContentResolver().query(children,columns,null,null,null)) {
+            if(cursor==null)throw new IOException("Could not list this folder.");
+            while(cursor.moveToNext()) {
+                String name=cursor.getString(1),type=cursor.getString(2);long size=cursor.isNull(3)?-1:cursor.getLong(3);
+                if(DocumentsContract.Document.MIME_TYPE_DIR.equals(type)||name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif)$")||size>60L*1024*1024)continue;
+                JSObject photo=new JSObject();photo.put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,cursor.getString(0)).toString());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);photo.put("size",size);photos.put(photo);
+            }
+        }
+        JSObject result=new JSObject();result.put("photos",photos);call.resolve(result);
+    }catch(Exception error){call.reject("Could not list photos in this folder.",error);}}); }
     @PluginMethod public void create(PluginCall call) { io.execute(()->{try {
         Uri tree=folder(call);String name=filename(call);
         if(Boolean.TRUE.equals(find(tree,name).getBool("exists")))throw new IOException("Filename already exists. Please save again.");

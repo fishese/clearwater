@@ -4,9 +4,10 @@ import { clamp, makeRecipe, parseRecipe, suggest } from './core/engine';
 import { DEFAULT_MANUAL, type Analysis, type Adjustments, type Hints, type Recipe, type CustomModel } from './core/types';
 import { deletePhoto, listPhotos, savePhoto, type StoredPhoto } from './storage';
 import {supportsFolder,chooseFolder,restoredName,createUniqueFile,writeFile,type LocalDirectoryHandle} from './file-save';
-import {isAndroid,receiveAndroidPhotos} from './native';
+import {isAndroid,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,type AndroidPhotoFolder} from './native';
 
 interface Photo extends StoredPhoto { url:string; past:Recipe[]; future:Recipe[] }
+type FolderBrowser=AndroidPhotoFolder&{index:number;loaded:Map<number,string>};
 type Sample = { name:string; label:string };
 const labelFor=(name:string)=>name.replace(/^IMG_\w+-/,'').replace(/\.[^.]+$/,'');
 const clone=<T,>(x:T):T=>structuredClone(x);
@@ -27,6 +28,8 @@ export default function App() {
   const [expanded,setExpanded]=useState(false),[adjustmentsOpen,setAdjustmentsOpen]=useState(false);
   useEffect(()=>{if(!expanded)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[expanded]);
   const [photos,setPhotos]=useState<Photo[]>([]),[active,setActive]=useState<string|null>(null);
+  const [folderBrowser,setFolderBrowser]=useState<FolderBrowser|null>(null),[folderLoading,setFolderLoading]=useState(false);
+  const folderRequest=useRef(0);
   const [samples,setSamples]=useState<Sample[]>([]),[analysis,setAnalysis]=useState<Analysis|null>(null);
   const [dimensions,setDimensions]=useState<[number,number]>([1,1]);
   const [modelStatus,setModelStatus]=useState('');
@@ -47,14 +50,37 @@ export default function App() {
   const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
   photoRef.current=photos;activeRef.current=active;
   const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
-  const photoIndex=photos.findIndex(p=>p.id===active);
+  const photoIndex=folderBrowser?folderBrowser.index:photos.findIndex(p=>p.id===active);
+  const photoCount=folderBrowser?folderBrowser.photos.length:photos.length;
   const sourceFolder=active?sourceFolders.get(active):undefined;
-  const canEdit=!!recipe && ready && !busy && !exporting;
+  const canEdit=!!recipe && ready && !busy && !exporting && !folderLoading;
   const aspect=dimensions[0]/dimensions[1];
   const fitWidth=Math.min(stageSize.width-48,(stageSize.height-48)*aspect);
   const persist=(p:Photo)=>{const {id,file,recipe,thumbnail,addedAt}=p;savePhoto({id,file,recipe,thumbnail,addedAt}).catch(()=>setStorageWarning(true));};
   const notify=(message:string)=>setNotice(message);
-  function navigatePhoto(direction:number){if(busy||exporting||customOpen)return;const next=photos[photoIndex+direction];if(next){setReady(false);setActive(next.id);}}
+  function navigatePhoto(direction:number){if(busy||exporting||customOpen||folderLoading)return;if(folderBrowser){void browseFolderPhoto(folderBrowser,photoIndex+direction);return;}const next=photos[photoIndex+direction];if(next){setReady(false);setActive(next.id);}}
+  function selectPhoto(id:string){folderRequest.current++;setFolderLoading(false);const entry=folderBrowser&&[...folderBrowser.loaded].find(([,value])=>value===id);setFolderBrowser(entry&&folderBrowser?{...folderBrowser,index:entry[0]}:null);setActive(id);}
+  async function browseFolderPhoto(folder:FolderBrowser,index:number){
+    if(index<0||index>=folder.photos.length)return;
+    const token=++folderRequest.current;setFolderLoading(true);
+    try {
+      let id=folder.loaded.get(index);
+      if(!id||!photoRef.current.some(p=>p.id===id)){
+        const file=await readAndroidFolderPhoto(folder.photos[index]);if(token!==folderRequest.current)return;
+        id=addFiles([file],true)[0];if(!id)throw new Error('This photo could not be opened.');folder.loaded.set(index,id);
+      }else {setReady(false);setActive(id);}
+      const photoId=id;setSourceFolders(previous=>new Map(previous).set(photoId,folder.directory));
+      setFolderBrowser({...folder,index});
+    }catch(error){if(token===folderRequest.current){setFolderBrowser({...folder,index});setReady(false);setActive(null);notify(error instanceof Error?error.message:'Could not open this photo. Use Next or Previous to continue.');}}
+    finally{if(token===folderRequest.current)setFolderLoading(false);}
+  }
+  async function openPhotoFolder(){
+    if(folderLoading||busy||exporting||customOpen)return;
+    const token=++folderRequest.current;setFolderLoading(true);
+    try{const folder=await openAndroidPhotoFolder();if(token!==folderRequest.current)return;if(!folder.photos.length){notify('No supported photos under 60 MB were found in this folder.');return;}await browseFolderPhoto({...folder,index:0,loaded:new Map()},0);}
+    catch(error){if(token===folderRequest.current&&!(error instanceof DOMException&&error.name==='AbortError'))notify(error instanceof Error?error.message:'Could not open this folder.');}
+    finally{if(token===folderRequest.current)setFolderLoading(false);}
+  }
   async function selectOutputFolder(){try{setOutputFolder(await chooseFolder());}catch(error){if(!(error instanceof DOMException&&error.name==='AbortError'))notify('Could not open the output folder. You can still download or use Save as.');}}
   async function rememberSourceFolder(folder:LocalDirectoryHandle){
     const matches: string[]=[];
@@ -88,14 +114,15 @@ export default function App() {
       return p;
     }));
   }
-  function addFiles(files:File[]) {
+  function addFiles(files:File[],fromFolder=false) {
     const valid=files.filter(f=>/\.(jpe?g|png|heic|heif)$/i.test(f.name)||['image/jpeg','image/png','image/heic','image/heif'].includes(f.type));
     if(valid.length!==files.length)notify('Choose JPEG, PNG, HEIC or HEIF photos. Video editing is coming later.');
     const accepted=valid.filter(f=>f.size<=60*1024*1024);
     if(accepted.length!==valid.length)notify('Photos over 60 MB were skipped to protect device memory.');
     const addedAt=Date.now();
     const items:Photo[]=accepted.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000,url:URL.createObjectURL(file),past:[],future:[]}));
-    if(items.length){setPhotos(all=>[...all,...items]);setActive(items[0].id);items.forEach(persist);}
+    if(items.length){if(!fromFolder){folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);}setReady(false);setPhotos(all=>[...all,...items]);setActive(items[0].id);items.forEach(persist);}
+    return items.map(item=>item.id);
   }
   useEffect(()=>{if(!isAndroid())return;let dispose:(()=>void)|undefined,cancelled=false;receiveAndroidPhotos(addFiles,notify).then(cleanup=>{if(cancelled)cleanup();else dispose=cleanup;}).catch(()=>notify('Could not enable Android photo sharing.'));return()=>{cancelled=true;dispose?.();};},[]);
   useEffect(()=>{
@@ -199,20 +226,21 @@ export default function App() {
     setEyedropper(false);notify('Neutral point applied. Undo if the selected area was not white or grey.');
   }
   async function readRecipe(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];e.target.value='';if(!file)return;try{if(file.size>20000)throw new Error('Recipe file is too large.');const next=parseRecipe(JSON.parse(await file.text()));update(()=>next);notify('Recipe applied.');}catch(err){notify(err instanceof Error?err.message:'Could not read the recipe.');}}
-  async function removePhoto(p:Photo){if(exporting)return;await deletePhoto(p.id).catch(()=>setStorageWarning(true));URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(p.id===active){setActive(photos.find(x=>x.id!==p.id)?.id??null);setReady(false);}}
-  return <div className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting)addFiles(Array.from(e.dataTransfer.files));}}>
+  async function removePhoto(p:Photo){if(exporting||folderLoading)return;if(folderBrowser)setFolderBrowser(null);await deletePhoto(p.id).catch(()=>setStorageWarning(true));URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(p.id===active){setActive(photos.find(x=>x.id!==p.id)?.id??null);setReady(false);}}
+  return <div className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
     <header className="topbar"><a className="brand" href={import.meta.env.BASE_URL} aria-label="ClearWater home"><span className="brand-icon"><Waves size={23}/></span><span>clearwater<span className="brand-dot">.</span></span></a><span className="edition">PHOTO STUDIO <span>01</span></span>
-      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> Stays on your device</span><button className="button secondary" disabled={exporting} onClick={()=>importInput.current?.click()}><Plus size={16}/> Open photos</button><button className="button primary" disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/> Export photo</button></div></header>
+      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> Stays on your device</span><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> Open photos</button>{isAndroid()&&<button className="button secondary" aria-label="Open folder" title="Open folder" disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> Open folder</button>}<button className="button primary" disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/> Export photo</button></div></header>
     <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" aria-label="Choose photos" onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
     <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Choose recipe" onChange={readRecipe}/>
     <main className="studio">
       <aside className="library"><div className="section-title"><span>YOUR PHOTOS</span><span className="count">{photos.length.toString().padStart(2,'0')}</span></div>
-        <button className="import-tile" disabled={exporting} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>Add to your collection</span><small>JPEG, PNG & HEIC</small></button>
-        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||busy!==''} onClick={()=>setActive(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting} title="Remove local copy" aria-label={`Remove ${p.file.name}`} onClick={()=>removePhoto(p)}><X size={12}/></button></div>)}</div>
+        <button className="import-tile" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>Add to your collection</span><small>JPEG, PNG & HEIC</small></button>
+        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||folderLoading||busy!==''} onClick={()=>selectPhoto(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting} title="Remove local copy" aria-label={`Remove ${p.file.name}`} onClick={()=>removePhoto(p)}><X size={12}/></button></div>)}</div>
         {samples.length>0&&<><div className="section-title sample-heading"><span>YOUR DIVE SAMPLES</span><span className="count">09</span></div><div className="sample-list">{samples.map((s,i)=><button key={s.name} disabled={exporting||sampleBusy||busy!==''} onClick={()=>sample(s.name)}><img src={'/__thumb/'+encodeURIComponent(s.name)} alt=""/><span><strong>{s.label}</strong><small>Dive study {String(i+1).padStart(2,'0')}</small></span><Plus size={13}/></button>)}</div></>}
       </aside>
       <section className="workspace">
-        <div className="canvas-toolbar"><div className="photo-navigation"><button aria-label="Previous photo" title="Previous photo" disabled={photoIndex<=0||!!busy||exporting||customOpen} onClick={()=>navigatePhoto(-1)}><ChevronLeft size={16}/></button><span aria-label="Photo position">{photoIndex<0?'0 / 0':`${photoIndex+1} / ${photos.length}`}</span><button aria-label="Next photo" title="Next photo" disabled={photoIndex<0||photoIndex>=photos.length-1||!!busy||exporting||customOpen} onClick={()=>navigatePhoto(1)}><ChevronRight size={16}/></button></div><div className="filename"><span className="file-dot"/>{photo?.file.name??'No photo selected'}</div><div className="canvas-tools"><button disabled={!photo} aria-label={expanded?"Exit expanded view":"Expand photo"} title={expanded?"Exit expanded view (Esc)":"Expand photo"} aria-pressed={expanded} onClick={()=>{setExpanded(!expanded);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button><button disabled={!canEdit||!photo?.past.length} aria-label="Undo" title="Undo (Ctrl+Z)" onClick={()=>history('undo')}><Undo2 size={16}/></button><button disabled={!canEdit||!photo?.future.length} aria-label="Redo" title="Redo" onClick={()=>history('redo')}><Redo2 size={16}/></button><span className="tool-separator"/><button className={compare?'active':''} disabled={!ready} onClick={()=>{setCompare(!compare);setEyedropper(false);}} title="Before / after comparison" aria-label="Toggle comparison"><ArrowLeftRight size={16}/></button><button className={eyedropper?'active':''} disabled={!canEdit} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}} title="Pick a white or grey point" aria-label="Pick neutral point"><Pipette size={16}/></button></div></div>
+        {folderBrowser&&<div className="folder-browser"><FolderOpen size={12}/><span title={folderBrowser.name}>{folderBrowser.name}</span><button disabled={folderLoading||exporting||!!busy} aria-label="Close folder browser" title="Return to imported photos" onClick={()=>setFolderBrowser(null)}><X size={13}/></button></div>}
+        <div className="canvas-toolbar"><div className="photo-navigation"><button aria-label="Previous photo" title="Previous photo" disabled={photoIndex<=0||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(-1)}><ChevronLeft size={16}/></button><span aria-label="Photo position">{photoIndex<0?'0 / 0':`${photoIndex+1} / ${photoCount}`}</span><button aria-label="Next photo" title="Next photo" disabled={photoIndex<0||photoIndex>=photoCount-1||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(1)}><ChevronRight size={16}/></button></div><div className="filename"><span className="file-dot"/>{photo?.file.name??'No photo selected'}</div><div className="canvas-tools"><button disabled={!photo} aria-label={expanded?"Exit expanded view":"Expand photo"} title={expanded?"Exit expanded view (Esc)":"Expand photo"} aria-pressed={expanded} onClick={()=>{setExpanded(!expanded);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button><button disabled={!canEdit||!photo?.past.length} aria-label="Undo" title="Undo (Ctrl+Z)" onClick={()=>history('undo')}><Undo2 size={16}/></button><button disabled={!canEdit||!photo?.future.length} aria-label="Redo" title="Redo" onClick={()=>history('redo')}><Redo2 size={16}/></button><span className="tool-separator"/><button className={compare?'active':''} disabled={!ready} onClick={()=>{setCompare(!compare);setEyedropper(false);}} title="Before / after comparison" aria-label="Toggle comparison"><ArrowLeftRight size={16}/></button><button className={eyedropper?'active':''} disabled={!canEdit} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}} title="Pick a white or grey point" aria-label="Pick neutral point"><Pipette size={16}/></button></div></div>
         <div className={`stage ${eyedropper?'picking':''}`} ref={stage}>
           {!photo&&<div className="empty-state"><h1>Photo editor</h1><p>Open a photo or choose a sample to start.</p><button className="button primary" onClick={()=>importInput.current?.click()}><Upload size={16}/> Choose your first photo</button><small>Or drop photos anywhere in the studio</small></div>}
           {photo&&<div className="image-frame" onPointerDown={pickNeutral} style={{width:Math.max(1,fitWidth)*zoom,height:Math.max(1,fitWidth)/aspect*zoom,visibility:ready?'visible':'hidden'}}>
@@ -220,7 +248,7 @@ export default function App() {
             {compare&&!showOriginal&&<><span className="image-label before">ORIGINAL</span><span className="image-label after">RESTORED</span><div className="divider-line" style={{left:`${divider}%`}}><span><ArrowLeftRight size={16}/></span></div><input className="comparison-input" aria-label="Before and after divider" type="range" min="0" max="100" value={divider} onChange={e=>setDivider(Number(e.target.value))}/></>}
             {eyedropper&&<span className="picker-hint">Click a white or grey area</span>}
           </div>}
-          {busy&&<div className="processing-overlay" role="status"><LoaderCircle className="spin" size={25}/><span>{busy}</span><small>Your photo stays on this device.</small></div>}
+          {(busy||folderLoading)&&<div className="processing-overlay" role="status"><LoaderCircle className="spin" size={25}/><span>{folderLoading?'Opening folder photo…':busy}</span><small>Your photo stays on this device.</small></div>}
         </div>
         <div className="workspace-bottom"><span>{ready?`${dimensions[0]} × ${dimensions[1]} · ${(dimensions[0]*dimensions[1]/1e6).toFixed(1)} MP`:'No photo selected'}</span><div><button disabled={!ready} onPointerDown={()=>setShowOriginal(true)} onPointerUp={()=>setShowOriginal(false)} onPointerLeave={()=>setShowOriginal(false)} onKeyDown={e=>{if(e.key===' ')setShowOriginal(true);}} onKeyUp={()=>setShowOriginal(false)}>Hold for original</button><span className="tool-separator"/><button disabled={!ready} aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={15}/></button><button disabled={!ready} onClick={()=>setZoom(1)}>{zoom===1?'Fit':`${Math.round(zoom*100)}%`}</button><button disabled={!ready} aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(3,z+.5))}><ZoomIn size={15}/></button></div></div>
       </section>
