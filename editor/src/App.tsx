@@ -232,7 +232,7 @@ export default function App() {
             {recipe&&<details className="analysis-note"><summary>Analysis <ChevronDown size={12}/></summary><p className="suggestion">{recipe.auto.explanation}</p></details>}
           </div></details>
           <details className="settings-group"><summary>Dive conditions <ChevronDown size={14}/></summary><div className="group-content dive-options">
-            <RadioGroup label="Environment" name="environment" value={recipe?.hints.scene??'auto'} options={[['auto','Auto'],['underwater','Underwater'],['surface','Surface']]} onChange={scene=>hints({scene})}/>
+            <RadioGroup label="Environment" name="environment" value={recipe?.hints.scene??'auto'} options={[['auto','Auto'],['underwater','Diving'],['surface','Surface']]} onChange={scene=>hints({scene})}/>
             <RadioGroup label="Red filter" name="red-filter" value={recipe?.hints.filter??'auto'} options={[['auto','Auto'],['yes','Yes'],['no','No']]} onChange={filter=>hints({filter})}/>
             <RadioGroup label="Water colour" name="water-colour" value={recipe?.hints.water??'auto'} options={[['auto','Auto'],['blue','Blue'],['green','Green']]} onChange={water=>hints({water})}/>
             <div className="depth-control"><Range label="Approx. depth" value={recipe?.hints.depth??0} min={0} max={100} unit=" m" displayValue={recipe?.hints.depth==null?'Not sure':`${recipe.hints.depth} m`} onStart={checkpoint} onChange={depth=>hints({depth},false)}/><button className="text-button" disabled={recipe?.hints.depth==null} onClick={()=>hints({depth:null})}>Not sure</button></div>

@@ -73,7 +73,7 @@
 .compact-controls .depth-control .range-field>span{font-size:10px;gap:4px;margin-bottom:12px}
 .depth-control output{font-size:9px;padding:1px 3px;min-width:0;white-space:nowrap}
 .compact-controls .depth-control .text-button{font-size:9px;min-height:20px}
-@media(max-width:650px){.dive-options{gap:12px 14px}.dive-options .radio-group label{font-size:10px;min-height:29px}.dive-options .radio-group legend{font-size:11px}}
+@media(max-width:650px){.dive-options{gap:12px 14px}.dive-options .radio-group label{font-size:9px;min-height:29px}.dive-options .radio-group legend{font-size:11px}}
 .photo-navigation{display:flex;align-items:center;gap:2px;flex:none;font-size:10px;font-variant-numeric:tabular-nums;color:#a9bfb9}
 .photo-navigation button{display:grid;place-items:center;width:24px;height:26px;border-radius:4px;color:#a9bfb9}.photo-navigation button:hover:not(:disabled){background:#293e42}
 .canvas-toolbar .filename{min-width:0;flex:1}.canvas-tools{flex:none}
