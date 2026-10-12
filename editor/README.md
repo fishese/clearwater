@@ -17,8 +17,10 @@ Open http://127.0.0.1:5173. The server binds to loopback only. The local develop
 ## Included
 
 - JPEG, PNG, HEIC and HEIF import; multi-photo library and local IndexedDB persistence.
+- Select multiple images in one file-picker operation; Previous/Next controls browse the imported library with a position counter and retain each photo's edits. Import order is preserved after reload (older library entries without timestamps fall back to filename order).
 - Automatic, adjustable classical colour correction, including severe red deficiency, red/magenta filter casts and conservative haze/contrast treatment.
 - Original RGB-average heuristic as an alternative engine for comparison.
+- Shallow-UWnet and FUnIE-GAN local ONNX inference as independent alternatives, plus a generic ONNX adapter requiring the user's own compatible local model.
 - Surface/underwater, red-filter, blue/green water and approximate-depth hints.
 - Before/after divider, hold for original, zoom, undo, redo and reset.
 - Warmth, green/magenta tint, signed red correction, vibrance, exposure, highlights, shadows, contrast and haze controls.
@@ -46,13 +48,31 @@ npm test
 npm run build
 ```
 
-Eleven engine tests cover missing red, red and magenta filter casts, surface override, green water, strength zero, manual exposure, strip/full-buffer equivalence, recipe validation, baseline bounds and transparent input.
+Twenty-six tests cover classical correction, neural strength/manual finishing, source-detail transfer, strip/full-buffer equivalence, recipe validation, transparent input and safe export naming/writing.
 
 The scripts `scripts/browser-check.mjs` and `scripts/pwa-check.mjs` run integration checks against the local dev/production servers, using Playwright and installed Microsoft Edge. Browser checks use this project's private sample folder. Set `CLEARWATER_PROJECT_ROOT` to relocate the project or `CLEARWATER_BROWSER` to choose a Playwright browser channel (default `msedge`). Screenshots, exported checks and results are stored under `analysis/browser-check`, which is ignored by Git.
 
 Verified on desktop Edge: all nine supplied photos decode and render; keyboard undo/redo/reset; strength-zero comparison; full-resolution 4284x5712 JPEG export; mobile-width layout without horizontal page overflow; photo-library restoration after reload; production sample exclusion; offline HEIC restoration; share-target POST intake and local persistence.
 
+`node scripts/models-check.mjs` additionally checks all three models on all nine photos, the custom-model permission/file prompt and reloading the model after a page reload, manual edits, source-resolution neural export and offline Shallow-UWnet/FUnIE-GAN reuse. It requires the privately prepared Deep WaveNet ONNX file. All checks passed in desktop Edge with no external inference requests or page errors. Warm runs were roughly 0.6 s for FUnIE-GAN, 1.6 s for Shallow-UWnet and 2.6 s for Deep WaveNet on this computer; these are not mobile performance guarantees or image-quality scores.
+
 ## Processing contract and limits
+
+With an output folder selected, exports use `[original stem].jpg` or `.png`. Without an output folder, exports default to the source folder and use `[original stem]-restore.jpg` or `.png`. Browser file inputs do not expose parent directories: choose the source folder once (or at first export). The app remembers it for other imported photos found there with the same name and file size. Folder access lasts for the current session. **Use source folder** clears the output-folder override.
+
+All app-managed folder saves, including **Save as…**, add ` (1)`, ` (2)` etc. when a filename exists. Save As uses an editable filename and a folder picker so the app can avoid overwriting existing files; it no longer uses the native save-file picker, which cannot choose a numbered sibling without parent-folder access. When directory pickers are unavailable, or when **Download instead** is chosen, the browser controls download location and disk-level collision handling. The app cannot inspect existing files in Downloads without folder access. Write failures fall back to downloading the rendered image. Picker cancellation stops before rendering.
+
+`node scripts/browsing-check.mjs` verifies multi-file import, Previous/Next boundaries, per-photo edits and reload ordering, source-resolution exports, collision naming, Save As, cancellation and failed-write fallback. The test emulates native picker handles; real OS picker dialogs and Android storage still require device testing. Browser/OS support controls whether folder and Save As options appear. The planned Android host needs native document-tree/MediaStore storage adapters; no native APK or Android output-folder implementation is claimed here.
+
+Choose a model under **Correction Engine**. Each model runs directly on the original, independently of classical correction. Inference runs once per photo/model in a worker using ONNX Runtime Web WASM; strength and manual changes reuse its result. Shallow-UWnet is about 0.9 MB, FUnIE-GAN 28.1 MB, and the shared WASM runtime 14.2 MB (uncompressed). Production caches these on first use, rather than during initial installation. Run each model once while online to make it available offline. No model or image requests go to third-party inference services.
+
+AI currently predicts a 256×256 image. Its RGB residual is interpolated and added to the source, then strength blends in linear light before manual finishing. This preserves source resolution/detail but is an experimental colour-transfer approach, **not full-resolution neural dehazing, denoising or super-resolution**. Preview and striped export use the same field and coordinates. Dive hints affect Balanced restoration, not these pretrained networks. For surface red-filter photos, prefer Balanced restoration; underwater networks can worsen the cast.
+
+**Load other ONNX model** accepts self-contained models up to 64 MB with one RGB float32 NCHW image input and output compatible with `[1,3,256,256]`. Symbolic dimensions are allowed, then validated by a trial run. Models using BGR, NHWC, mean/std normalization, extra inputs/outputs, external weight files, or different output sizes need additional adapters. Choose the author's documented input and output ranges independently (`0..1` or `-1..1`). Invalid shapes, types or non-finite output are rejected with an error in the loader. The loaded model filename, SHA-256 and range settings are stored in recipes; model bytes remain in worker memory and must be supplied again on reload. The historical `wave` recipe ID now denotes this custom slot, preserving compatibility with earlier recipes.
+
+Users must have permission to use their chosen model and comply with its licence; a generic loader does not alter licence terms. The privately prepared Deep WaveNet model is compatible with both ranges set to `0..1`; it retains the authors' academic-only statement and CC BY-NC-ND restrictions. Its weights are still excluded from Git and builds. See [model provenance and local conversion instructions](public/models/README.md).
+
+Dive conditions use compact radio buttons in two columns, plus a `0..100 m` depth slider and a Not sure reset. Correction Engine is first and collapsed; Auto restore sits beside strength. `node scripts/controls-check.mjs` checks these controls, undo, mobile overflow, incompatible files, generic loading with unit/signed model ranges, and prompting for the file after reload.
 
 This is an SDR, 8-bit prototype, not a physically calibrated restoration tool. RGB correction is tuned in display-encoded sRGB; automatic strength blending and exposure use linear-light conversion. Preview and export share `src/core/engine.ts`. A reduced preview is used for analysis; the original decoded bitmap is retained for export. Exports use bounded strips for working pixels, but still need a full output canvas. Device memory matters for large images.
 
@@ -67,7 +87,7 @@ Red reconstruction estimates plausible appearance from the remaining channels; i
 1. Review sample results and tune correction strength/foreground behaviour with the user.
 2. Validate full-resolution colour/noise on representative Android hardware.
 3. Add the Capacitor Android host, native picker/share intents, durable content-URI handling and MediaStore export.
-4. Benchmark licensed, reproducible Shallow-UWnet / FUnIE-GAN checkpoints independently; consider ADCCA-GAN if verified artifacts become available. No AI model is bundled or run here.
+4. Review the three model results, benchmark Android performance, and evaluate full-resolution/tiled inference or improved colour transfer. Consider ADCCA-GAN if verified artifacts become available.
 5. Add native video processing with temporal smoothing after the photo workflow is validated.
 
 The parent `IMPLEMENTATION_PLAN.md` and `analysis/ADCCA_GAN_REVIEW.md` contain the research and longer-term architecture.

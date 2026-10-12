@@ -1,0 +1,35 @@
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+const url=process.env.CHECK_URL || 'http://127.0.0.1:4173/clearwater/';
+const browser=await chromium.launch({channel:'msedge',headless:true});
+try {
+ const context=await browser.newContext({viewport:{width:1440,height:900}});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(url);
+ const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=640;c.height=480;const x=c.getContext('2d');x.fillStyle='#28778c';x.fillRect(0,0,640,480);return c.toDataURL().split(',')[1];});
+ await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'test.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+ await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
+ await page.getByRole('button',{name:'Expand photo',exact:true}).click();
+ assert.equal(await page.locator('.topbar').isVisible(),false);
+ assert.equal(await page.locator('.library').isVisible(),false);
+ assert.equal(Math.round((await page.locator('.controls').boundingBox()).width),260);
+ assert.ok((await page.locator('.stage').boundingBox()).height>700);
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.locator('.control-body').isVisible(),false);
+ assert.ok((await page.locator('.stage').boundingBox()).height>700);
+ await page.getByRole('button',{name:'Toggle adjustments'}).click();
+ assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).isVisible(),true);
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.getByRole('button',{name:'Exit expanded view'}).click();
+ assert.equal(await page.locator('.topbar').isVisible(),true);
+ await page.setViewportSize({width:1440,height:900});
+ await page.getByRole('button',{name:'Expand photo',exact:true}).click();await page.keyboard.press('Escape');
+ assert.equal(await page.locator('.topbar').isVisible(),true);
+ await page.locator('.settings-group').filter({has:page.locator('summary',{hasText:'Correction Engine'})}).locator('summary').click();
+ await page.getByLabel('Correction engine',{exact:true}).selectOption('shallow');
+ await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
+ await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();
+ await context.setOffline(true);await page.reload();
+ await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
+ assert.deepEqual(errors,[]);console.log('Expanded desktop/mobile layout, Pages model loading, and offline reload passed.');
+} finally {await browser.close();}

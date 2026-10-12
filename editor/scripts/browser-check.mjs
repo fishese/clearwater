@@ -21,10 +21,10 @@ for(const name of names){
   const stats=await page.evaluate(()=>{
     const result={};for(const label of ['Original photo','Edited photo']){const c=document.querySelector(`canvas[aria-label="${label}"]`),d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let r=0,g=0,b=0,n=0;for(let i=0;i<d.length;i+=64){r+=d[i];g+=d[i+1];b+=d[i+2];n++;}result[label]={width:c.width,height:c.height,mean:[r/n,g/n,b/n].map(v=>Math.round(v))};}return result;
   });
-  const result={name,ms:Date.now()-start,stats,suggestion:await page.locator('.suggestion').innerText()};results.push(result);console.log(JSON.stringify(result));
+  const result={name,ms:Date.now()-start,stats,suggestion:await page.locator('.suggestion').textContent()};results.push(result);console.log(JSON.stringify(result));
   if(name==='IMG_6085-blue.HEIC'){
     await page.screenshot({path:root+'/analysis/browser-check/editor-blue.png',fullPage:true});
-    const downloadPromise=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'Export photo',exact:true}).click();
+    const downloadPromise=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'Download instead',exact:true}).click();
     const download=await downloadPromise;await download.saveAs(root+'/analysis/browser-check/export-blue.jpg');
     await page.waitForFunction(()=>!document.querySelector('.modal-shade'));
     console.log('EXPORT '+download.suggestedFilename());

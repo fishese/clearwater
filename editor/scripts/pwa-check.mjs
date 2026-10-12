@@ -18,7 +18,7 @@ await context.setOffline(true);await page.reload();
 await page.getByRole('heading',{name:'Photo editor'}).waitFor({timeout:10000}).catch(async error=>{console.log('OFFLINE BODY '+await page.locator('body').innerText());console.log('URL '+page.url());await page.screenshot({path:root+'/analysis/browser-check/pwa-failure.png',fullPage:true});await browser.close();throw error;});
 await page.getByLabel('Choose photos',{exact:true}).setInputFiles(root+'/Sample photos/IMG_6788-red filter.HEIC');
 await page.waitForFunction(()=>!document.querySelector('.top-actions .primary').disabled,{timeout:30000}).catch(async error=>{console.log(await page.locator('body').innerText());await page.screenshot({path:root+'/analysis/browser-check/pwa-failure.png',fullPage:true});await browser.close();throw error;});
-assert.ok((await page.locator('.suggestion').innerText()).includes('magenta'));console.log('OFFLINE HEIC import and correction passed');
+assert.ok((await page.locator('.suggestion').textContent()).includes('magenta'));console.log('OFFLINE HEIC import and correction passed');
 const share=await page.evaluate(async()=>{
   const canvas=new OffscreenCanvas(64,64);const c=canvas.getContext('2d');c.fillStyle='#a0b4c2';c.fillRect(0,0,64,64);
   const file=new File([await canvas.convertToBlob({type:'image/png'})],'shared-test.png',{type:'image/png'});

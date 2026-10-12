@@ -21,9 +21,12 @@ export interface Adjustments {
   neutral: [number, number, number];
 }
 export interface Recipe {
-  version: 1; engine: 'balanced' | 'baseline'; strength: number;
+  version: 1; engine: 'balanced' | 'baseline' | 'shallow' | 'funie' | 'wave'; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
+  customModel?: CustomModel;
 }
+// 'wave' remains the on-disk engine ID for compatibility with earlier recipes.
+export interface CustomModel {sha256:string;name:string;inputRange:'unit'|'signed';outputRange:'unit'|'signed'}
 export const DEFAULT_HINTS: Hints = { scene: 'auto', water: 'auto', filter: 'auto', depth: null };
 export const DEFAULT_MANUAL: Adjustments = {
   warmth: 0, tint: 0, red: 0, exposure: 0, highlights: 0,

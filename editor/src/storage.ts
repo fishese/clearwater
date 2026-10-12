@@ -1,5 +1,5 @@
 import type { Recipe } from './core/types';
-export interface StoredPhoto { id:string; file:File; recipe?:Recipe; thumbnail?:string }
+export interface StoredPhoto { id:string; file:File; recipe?:Recipe; thumbnail?:string;addedAt?:number }
 const DB='clearwater-library';
 export function openDB():Promise<IDBDatabase> {
   return new Promise((resolve,reject)=>{
@@ -16,6 +16,6 @@ async function transaction<T>(mode:IDBTransactionMode,run:(store:IDBObjectStore)
     t.onerror=()=>{db.close();reject(t.error);};t.onabort=()=>{db.close();reject(t.error);};
   });
 }
-export const listPhotos=()=>transaction('readonly',s=>s.getAll()) as Promise<StoredPhoto[]>;
+export const listPhotos=async()=>((await transaction('readonly',s=>s.getAll())) as StoredPhoto[]).sort((a,b)=>(a.addedAt??0)-(b.addedAt??0)||a.file.name.localeCompare(b.file.name));
 export const savePhoto=(photo:StoredPhoto)=>transaction('readwrite',s=>s.put(photo));
 export const deletePhoto=(id:string)=>transaction('readwrite',s=>s.delete(id));

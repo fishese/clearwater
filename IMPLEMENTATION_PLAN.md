@@ -1,6 +1,6 @@
 # ClearWater implementation plan
 
-Prepared 12 October 2026. Updated after implementation of the first local classical photo editor in editor/. See editor/README.md for run instructions, verified behaviour and remaining milestones. No neural model benchmark has been implemented.
+Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a gated, user-loaded Deep WaveNet research adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
 ## Recommendation
 

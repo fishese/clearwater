@@ -1,4 +1,8 @@
 .analysis-deps/
+.model-tools/
+model-tools/weights/
+model-tools/upstream/
+editor/*.tsbuildinfo
 Sample photos/
 reference/
 analysis/*.jpg

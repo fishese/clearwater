@@ -1,0 +1,40 @@
+import {chromium} from 'playwright';
+import {resolve} from 'node:path';
+import assert from 'node:assert/strict';
+const root=resolve(import.meta.dirname,'../..');
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:5173');
+await page.getByLabel('Choose photos',{exact:true}).setInputFiles(root+'/Sample photos/IMG_7386-green tint.JPG');
+const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,{timeout:120000});
+await ready();
+const engine=page.locator('.settings-group').first();
+assert.equal(await engine.locator('summary').innerText(),'Correction Engine');assert.equal(await engine.getAttribute('open'),null);
+assert.equal(await page.locator('label').filter({hasText:/^Correction engine$/}).count(),0);
+const dive=page.locator('.settings-group').filter({has:page.locator('summary',{hasText:'Dive conditions'})});await dive.locator('summary').click();
+await page.getByRole('group',{name:'Environment',exact:true}).getByRole('radio',{name:'Surface',exact:true}).check();
+await page.getByRole('group',{name:'Red filter',exact:true}).getByRole('radio',{name:'Yes',exact:true}).check();
+await page.getByRole('group',{name:'Water colour',exact:true}).getByRole('radio',{name:'Green',exact:true}).check();
+const depth=page.getByRole('slider',{name:'Approx. depth',exact:true});await depth.focus();await depth.press('ArrowRight');
+assert.equal(await depth.inputValue(),'1');await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await depth.getAttribute('aria-valuetext'),'Not sure');
+await depth.fill('24');await page.getByRole('button',{name:'Not sure',exact:true}).click();assert.equal(await depth.getAttribute('aria-valuetext'),'Not sure');
+const button=await page.getByRole('button',{name:'Auto restore',exact:true}).boundingBox(),slider=await page.getByRole('slider',{name:'Restoration strength',exact:true}).boundingBox();assert.ok(button.x>slider.x+slider.width);
+await page.screenshot({path:root+'/analysis/browser-check/controls-radios.png'});
+await engine.locator('summary').click();await page.getByLabel('Correction engine',{exact:true}).selectOption('wave');
+const load=page.getByRole('button',{name:'Load model',exact:true});assert.equal(await load.isDisabled(),true);
+await page.getByLabel('ONNX model file',{exact:true}).setInputFiles({name:'invalid.onnx',mimeType:'application/octet-stream',buffer:Buffer.from('invalid')});
+await page.getByRole('checkbox').check();await load.click();await page.getByRole('alert').waitFor({timeout:30000});
+assert.equal(await page.getByRole('dialog').count(),1);
+// The same generic adapter handles a unit-range model and a signed-range model.
+for(const [file,range] of [['model-tools/weights/deep-wavenet-research.onnx','unit'],['editor/public/models/funie.onnx','signed']]){
+  await page.getByLabel('ONNX model file',{exact:true}).setInputFiles(root+'/'+file);
+  await page.getByLabel('Model input range',{exact:true}).selectOption(range);await page.getByLabel('Model output range',{exact:true}).selectOption(range);
+  await load.click();await page.getByRole('dialog').waitFor({state:'hidden',timeout:120000});await ready();
+  if(range==='unit')await page.getByRole('button',{name:'Load another ONNX model',exact:true}).click();
+}
+await page.waitForTimeout(500);await page.reload();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Cancel',exact:true}).click();await ready();
+await page.setViewportSize({width:390,height:844});await dive.locator('summary').click();
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+await page.screenshot({path:root+'/analysis/browser-check/controls-mobile.png',fullPage:true});
+assert.deepEqual(errors,[]);console.log('PASS radios, depth undo/unknown, compact layout, generic models, invalid file, reload and mobile');await browser.close();

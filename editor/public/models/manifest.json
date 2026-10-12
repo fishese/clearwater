@@ -1,0 +1,14 @@
+{
+  "shallow": {
+    "sha256": "93a7b77d11fb20574b4174b43cbc1134b142760d678b70ba0a7e5e1eabb7130f",
+    "bytes": 882093,
+    "max_abs_parity_error": 1.7881393432617188e-07,
+    "checkpoint_sha256": "16c090a847e990bfd56a6466fd36f5595cc3a4c514a5ce941caa1a1806441835"
+  },
+  "funie": {
+    "sha256": "802078db2a823f7ad7b756f0b62dbde67dd2ea94be8a9b083e1bbfbdbc96afb9",
+    "bytes": 28090193,
+    "max_abs_parity_error": 9.953975677490234e-06,
+    "checkpoint_sha256": "e4fcb50e03868f1683c244b1c125def30df335ec43d9bb001b8700c03b8f2bd6"
+  }
+}
