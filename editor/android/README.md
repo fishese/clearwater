@@ -4,9 +4,9 @@ Capacitor 8 app, package `com.fishese.clearwater`, Android 7.0/API 24 or newer. 
 
 Native features in this first build:
 
-- Android gallery/document selection through Open photos, including multiple files.
-- Open folder lists JPEG, PNG and HEIC/HEIF photos directly inside a selected folder, sorted by filename with natural numbering. Next/Previous opens each photo on demand. Subfolders and photos over 60 MB are excluded. The selected folder is automatically available for source-folder exports. Folder browsing lasts for the current session; opened photos and edits remain in the local library.
-- Receive single/multiple images from other apps through Android Share.
+- Android gallery/document selection through Open files, including multiple files.
+- Open folder lists JPEG, PNG, HEIC/HEIF, MP4 and MOV files directly inside a selected folder, sorted by filename with natural numbering. Next/Previous opens each file on demand. Subfolders, photos over 60 MB and videos over 512 MB are excluded. The selected folder is automatically available for source-folder exports. Folder browsing lasts for the current session; opened files and edits remain in the local library.
+- Receive single/multiple images and videos from other apps through Android Share.
 - Select source/output folders with Android's Storage Access Framework; save copies without overwriting existing files. Large exports cross the bridge in 256 KB chunks.
 - Same photo navigation, expanded view, manual adjustments and AI engines as the web editor.
 
@@ -20,4 +20,6 @@ For an **unsigned** APK, run `gradlew.bat assembleRelease` from this directory. 
 
 For local phone testing, run `gradlew.bat assembleDebug`. This build disables debugger attachment to enable full R8 optimization, minification and resource shrinking and uses the standard Android debug keystore at `${user.home}/.android/debug.keystore`. It is installable with `adb install -r app/build/outputs/apk/debug/app-debug.apk`. Debug signing uses Android's public test credentials and is unsuitable for production distribution.
 
-This first native integration still needs on-device verification of provider-specific folder access, gallery selection, sharing on cold/warm launch, large-photo memory use and exports. Video editing is not implemented.
+Video uses the same local WebCodecs pipeline as the web editor: MP4/MOV frame scrubbing, Balanced/RGB correction and manual adjustments, H.264 MP4 export up to 1080p/30 fps, with primary audio when supported. Input is limited to 3 minutes and 512 MB. HEVC requires a compatible device/WebView; HDR/Dolby Vision and neural video correction are not yet supported. See the parent README for the full contract.
+
+Provider-specific folder access, sharing on cold/warm launch, large-file memory use and video codec support still need verification across Android devices. Desktop browser codec availability does not guarantee the same support in a phone's WebView.

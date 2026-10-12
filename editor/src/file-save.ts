@@ -1,4 +1,4 @@
-export interface LocalFileHandle {name?:string;getFile?():Promise<File>;createWritable():Promise<{write(data:Blob):Promise<void>;close():Promise<void>;abort():Promise<void>}>}
+export interface LocalFileHandle {name?:string;size?:number;getFile?():Promise<File>;createWritable():Promise<{write(data:Blob):Promise<void>;close():Promise<void>;abort():Promise<void>}>}
 export interface LocalDirectoryHandle {name:string;getFileHandle(name:string,options?:{create?:boolean}):Promise<LocalFileHandle>}
 type PickerWindow=Window&{
   showDirectoryPicker?:(options:{mode:'readwrite'})=>Promise<LocalDirectoryHandle>;
@@ -6,7 +6,7 @@ type PickerWindow=Window&{
 import {isAndroid,chooseAndroidFolder} from './native';
 export const supportsFolder=()=>isAndroid()||typeof (window as PickerWindow).showDirectoryPicker==='function';
 export const chooseFolder=()=>isAndroid()?chooseAndroidFolder():(window as PickerWindow).showDirectoryPicker!({mode:'readwrite'});
-export function restoredName(original:string,format:'jpg'|'png',addRestore=true) {
+export function restoredName(original:string,format:'jpg'|'png'|'mp4',addRestore=true) {
   const stem=original.replace(/\.[^.]+$/,'').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/,'').slice(0,180)||'photo';
   return `${stem}${addRestore?'-restore':''}.${format}`;
 }

@@ -1,0 +1,11 @@
+export const MAX_VIDEO_BYTES=512*1024*1024;
+export const MAX_VIDEO_SECONDS=180;
+export function isVideo(file:{name:string;type?:string}){return /\.(mp4|mov)$/i.test(file.name)||['video/mp4','video/quicktime'].includes(file.type??'');}
+export function supportedMedia(file:{name:string;type?:string}){return isVideo(file)||/\.(jpe?g|png|heic|heif)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif'].includes(file.type??'');}
+export function mediaLimit(file:{name:string;type?:string}){return isVideo(file)?MAX_VIDEO_BYTES:60*1024*1024;}
+export function videoSize(width:number,height:number,maxLong=1920,maxShort=1080):[number,number]{
+ const scale=Math.min(1,maxLong/Math.max(width,height),maxShort/Math.min(width,height));
+ return [Math.max(2,Math.floor(width*scale/2)*2),Math.max(2,Math.floor(height*scale/2)*2)];
+}
+export function videoTime(seconds:number){const whole=Math.max(0,Math.floor(seconds));return `${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')}`;}
+export interface VideoInfo {duration:number;codec:string;hasAudio:boolean;outputWidth:number;outputHeight:number;frameRate:number}

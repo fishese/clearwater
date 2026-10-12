@@ -1,6 +1,6 @@
-# ClearWater photo editor
+# ClearWater photo and video editor
 
-A working local-first photo prototype built with React, TypeScript and Vite. The correction engine is independent of the UI and runs in a dedicated worker. This project has not been published or packaged as an Android APK.
+A local-first photo and video editor built with React, TypeScript and Vite, available as a web/PWA app and a Capacitor Android app. Correction and video processing run in dedicated workers.
 
 ## Run locally
 
@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The server binds to loopback only. The local development server offers the nine original samples from the adjacent `Sample photos` directory, with thumbnails from `analysis/previews`. These files are not copied into the app or production build. You can also import files with Open photos or drag and drop.
+Open http://127.0.0.1:5173. The server binds to loopback only. The local development server offers the nine original samples from the adjacent `Sample photos` directory, with thumbnails from `analysis/previews`. These files are not copied into the app or production build. You can also import files with Open files or drag and drop.
 
 ## Included
 
@@ -48,7 +48,7 @@ npm test
 npm run build
 ```
 
-Twenty-six tests cover classical correction, neural strength/manual finishing, source-detail transfer, strip/full-buffer equivalence, recipe validation, transparent input and safe export naming/writing.
+Tests cover classical correction, neural strength/manual finishing, source-detail transfer, strip/full-buffer equivalence, recipe validation, transparent input and safe export naming/writing.
 
 The scripts `scripts/browser-check.mjs` and `scripts/pwa-check.mjs` run integration checks against the local dev/production servers, using Playwright and installed Microsoft Edge. Browser checks use this project's private sample folder. Set `CLEARWATER_PROJECT_ROOT` to relocate the project or `CLEARWATER_BROWSER` to choose a Playwright browser channel (default `msedge`). Screenshots, exported checks and results are stored under `analysis/browser-check`, which is ignored by Git.
 
@@ -62,7 +62,7 @@ With an output folder selected, exports use `[original stem].jpg` or `.png`. Wit
 
 All app-managed folder saves, including **Save as…**, add ` (1)`, ` (2)` etc. when a filename exists. Save As uses an editable filename and a folder picker so the app can avoid overwriting existing files; it no longer uses the native save-file picker, which cannot choose a numbered sibling without parent-folder access. When directory pickers are unavailable, or when **Download instead** is chosen, the browser controls download location and disk-level collision handling. The app cannot inspect existing files in Downloads without folder access. Write failures fall back to downloading the rendered image. Picker cancellation stops before rendering.
 
-`node scripts/browsing-check.mjs` verifies multi-file import, Previous/Next boundaries, per-photo edits and reload ordering, source-resolution exports, collision naming, Save As, cancellation and failed-write fallback. The test emulates native picker handles; real OS picker dialogs and Android storage still require device testing. Browser/OS support controls whether folder and Save As options appear. The planned Android host needs native document-tree/MediaStore storage adapters; no native APK or Android output-folder implementation is claimed here.
+`node scripts/browsing-check.mjs` verifies multi-file import, Previous/Next boundaries, per-photo edits and reload ordering, source-resolution exports, collision naming, Save As, cancellation and failed-write fallback. The test emulates native picker handles; real OS picker dialogs and Android storage still require device testing. Browser/OS support controls whether folder and Save As options appear. The Android host uses native Storage Access Framework document-tree handles for folder browsing and exports.
 
 Choose a model under **Correction Engine**. Each model runs directly on the original, independently of classical correction. Inference runs once per photo/model in a worker using ONNX Runtime Web WASM; strength and manual changes reuse its result. Shallow-UWnet is about 0.9 MB, FUnIE-GAN 28.1 MB, and the shared WASM runtime 14.2 MB (uncompressed). Production caches these on first use, rather than during initial installation. Run each model once while online to make it available offline. No model or image requests go to third-party inference services.
 
@@ -78,7 +78,7 @@ This is an SDR, 8-bit prototype, not a physically calibrated restoration tool. R
 
 Native browser decoding requests normal orientation and colour-space conversion. Unsupported HEIC falls back to libheif through `heic-to/next` inside the worker. The seven supplied HEIC files have been tested; arbitrary HDR HEIC, gain maps, unusual profiles, RAW and multiple-image HEIF sequences have not. Explicit HDR tone mapping and full colour-profile conformance remain future work. JPEG/PNG exports do not preserve source EXIF/GPS metadata. Transparent PNG retains alpha; JPEG output has no alpha.
 
-Import is limited to 60 MB per file and 45 MP after decoding. These are guards, not a promise that all devices can handle the maximum. Mobile memory, thermal behaviour, browser compatibility and quality require real-device testing.
+Photo import is limited to 60 MB per file and 45 MP after decoding. These are guards, not a promise that all devices can handle the maximum. Mobile memory, thermal behaviour, browser compatibility and quality require real-device testing.
 
 Red reconstruction estimates plausible appearance from the remaining channels; it cannot recover physically missing colour information. Haze control is bounded global veil/contrast reduction, not depth-based Sea-Thru reconstruction or learned dehazing. Depth is a weak suggestion hint, not camera-to-subject range. Review the suggested edit visually, especially for sunsets, strobes and naturally red subjects.
 
@@ -86,9 +86,22 @@ Red reconstruction estimates plausible appearance from the remaining channels; i
 
 1. Review sample results and tune correction strength/foreground behaviour with the user.
 2. Validate full-resolution colour/noise on representative Android hardware.
-3. Add the Capacitor Android host, native picker/share intents, durable content-URI handling and MediaStore export.
+3. Validate Android folder and share workflows on additional devices.
 4. Review the three model results, benchmark Android performance, and evaluate full-resolution/tiled inference or improved colour transfer. Consider ADCCA-GAN if verified artifacts become available.
-5. Add native video processing with temporal smoothing after the photo workflow is validated.
+5. Add HDR tone mapping, video playback, longer clips and temporally stable neural video restoration.
 
 The parent `IMPLEMENTATION_PLAN.md` and `analysis/ADCCA_GAN_REVIEW.md` contain the research and longer-term architecture.
 
+
+## Video (first version)
+
+Open MP4 or MOV from the file picker, Android folder browser, or Android share menu. Scrub the timeline to choose a frame, use Auto restore or manual adjustments, and export an MP4. One fixed correction recipe is applied to every frame to avoid colour changes caused by independent frame-by-frame analysis. Use a representative frame for Auto restore. There is frame preview, but no continuous playback yet.
+
+- SDR H.264 and HEVC input work when the browser/device has the matching WebCodecs decoder. MOV is a container; it does not guarantee codec support. iPhone rotation is baked into the exported pixels.
+- HDR/PQ/HLG and Dolby Vision clips are rejected pending proper tone mapping. For now, record with iPhone HDR Video disabled or supply an SDR copy.
+- Input: up to 3 minutes, 512 MB and 34 megapixels per frame. Output: H.264 MP4, up to 1080p (portrait or landscape) and 30 fps, maximum 256 MB. Originals are preserved.
+- Primary audio is retained as compatible AAC or converted when supported. Unsupported audio prompts the user to turn off Keep audio; it is never silently dropped. Additional audio tracks, subtitles and descriptive/GPS metadata are not exported.
+- Balanced restoration and the RGB heuristic are supported; neural models are disabled for video until temporal stability and mobile performance are addressed. Long exports can take time; keep the app open. Export can be cancelled.
+- All decoding/correction/encoding runs locally. Large clips are stored in the local library, and encoded output is buffered in memory. These limits do not guarantee every phone can process the largest clip.
+
+Video uses unmodified Mediabunny (MPL-2.0); licence and corresponding source links are included under `public/licenses/`. To reproduce the integration check, install `imageio-ffmpeg` in an optional Python environment, run `python scripts/create-video-fixtures.py`, start the app, then run `node scripts/video-check.mjs`. Fixtures and exported test clips are ignored by Git. `CHECK_URL` selects a production/Pages preview. The check covers MP4/MOV, rotation, audio, seeking, correction, cancellation, HDR rejection, codec availability, mobile fit and returning to photos.

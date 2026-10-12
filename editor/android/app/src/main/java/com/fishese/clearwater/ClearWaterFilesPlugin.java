@@ -59,10 +59,10 @@ public class ClearWaterFilesPlugin extends Plugin {
     }
     private JSObject find(Uri tree,String name) throws IOException {
         Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-        try(Cursor cursor=getContext().getContentResolver().query(children,new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE},null,null,null)) {
+        try(Cursor cursor=getContext().getContentResolver().query(children,new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,DocumentsContract.Document.COLUMN_DISPLAY_NAME,DocumentsContract.Document.COLUMN_MIME_TYPE,DocumentsContract.Document.COLUMN_SIZE},null,null,null)) {
             if(cursor==null)throw new IOException("Could not read this folder.");
             while(cursor.moveToNext())if(name.equalsIgnoreCase(cursor.getString(1))) {
-                JSObject entry=new JSObject();entry.put("exists",true);entry.put("name",cursor.getString(1));entry.put("directory",DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2)));entry.put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,cursor.getString(0)).toString());return entry;
+                JSObject entry=new JSObject();entry.put("exists",true);if(!cursor.isNull(3))entry.put("size",cursor.getLong(3));entry.put("name",cursor.getString(1));entry.put("directory",DocumentsContract.Document.MIME_TYPE_DIR.equals(cursor.getString(2)));entry.put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,cursor.getString(0)).toString());return entry;
             }
         }
         JSObject entry=new JSObject();entry.put("exists",false);return entry;
@@ -76,7 +76,7 @@ public class ClearWaterFilesPlugin extends Plugin {
             if(cursor==null)throw new IOException("Could not list this folder.");
             while(cursor.moveToNext()) {
                 String name=cursor.getString(1),type=cursor.getString(2);long size=cursor.isNull(3)?-1:cursor.getLong(3);
-                if(DocumentsContract.Document.MIME_TYPE_DIR.equals(type)||name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif)$")||size>60L*1024*1024)continue;
+                if(DocumentsContract.Document.MIME_TYPE_DIR.equals(type)||name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|mp4|mov)$")||size>(isVideoName(name)?512L:60L)*1024*1024)continue;
                 JSObject photo=new JSObject();photo.put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,cursor.getString(0)).toString());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);photo.put("size",size);photos.put(photo);
             }
         }
@@ -86,7 +86,7 @@ public class ClearWaterFilesPlugin extends Plugin {
         Uri tree=folder(call);String name=filename(call);
         if(Boolean.TRUE.equals(find(tree,name).getBool("exists")))throw new IOException("Filename already exists. Please save again.");
         Uri parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":"image/jpeg",name);
+        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":name.toLowerCase(Locale.ROOT).endsWith(".mp4")?"video/mp4":"image/jpeg",name);
         if(document==null)throw new IOException("Could not create photo.");
         created.add(document.toString());JSObject value=new JSObject();value.put("uri",document.toString());value.put("name",displayName(document,name));call.resolve(value);
     }catch(Exception error){call.reject("Could not create a new photo.",error);}}); }
@@ -118,21 +118,22 @@ public class ClearWaterFilesPlugin extends Plugin {
         else {Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)uris.add(uri);}
         if(uris.isEmpty() && intent.getClipData()!=null)for(int i=0;i<intent.getClipData().getItemCount();i++)uris.add(intent.getClipData().getItemAt(i).getUri());
         io.execute(()->{
-            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){shareError="Some shared photos could not be imported. Choose JPEG, PNG or HEIC files under 60 MB.";}
+            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){shareError="Some shared files could not be imported. Photo limit: 60 MB. MP4/MOV limit: 512 MB.";}
             notifyListeners("sharesAvailable",new JSObject(),true);
         });
     }
+    private boolean isVideoName(String name) {return name.toLowerCase(Locale.ROOT).matches(".*\\.(mp4|mov)$");}
     private void copyShare(Uri uri) throws IOException {
         if(uri==null || !"content".equals(uri.getScheme()))throw new IOException("Invalid shared photo.");
         String name=displayName(uri,"photo.jpg").replaceAll("[\\\\/\\p{Cntrl}]","_");
         String type=getContext().getContentResolver().getType(uri);
-        if(!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif)$"))throw new IOException("Unsupported image.");
+        if(!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|mp4|mov)$"))throw new IOException("Unsupported image.");
         String id=UUID.randomUUID().toString();File dir=new File(getContext().getCacheDir(),"shared-photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("No cache space.");
         File file=new File(dir,id);
         try(InputStream input=getContext().getContentResolver().openInputStream(uri);OutputStream output=new FileOutputStream(file)) {
             if(input==null)throw new IOException("Cannot read photo.");
             byte[] buffer=new byte[65536];long total=0;int count;
-            while((count=input.read(buffer))!=-1){total+=count;if(total>60L*1024*1024)throw new IOException("Photo too large.");output.write(buffer,0,count);}
+            while((count=input.read(buffer))!=-1){total+=count;if(total>(isVideoName(name)?512L:60L)*1024*1024)throw new IOException("Photo too large.");output.write(buffer,0,count);}
         }catch(Exception error){file.delete();throw new IOException(error);}
         sharedFiles.put(id,file);JSObject photo=new JSObject();photo.put("id",id);photo.put("path",file.getAbsolutePath());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);shares.add(photo);
     }

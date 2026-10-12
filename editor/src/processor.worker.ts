@@ -88,6 +88,7 @@ ctx.onmessage=async({data})=>{
       send({type:'exported',gen,request,blob});
       canvas.width=1;canvas.height=1;
     } else if(type==='cancel') {generation=gen;}
+    else if(type==='unload'){generation=gen;source?.close();source=null;pixels=null;fields=new Map();}
   } catch(error) {
     send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.'});
   }

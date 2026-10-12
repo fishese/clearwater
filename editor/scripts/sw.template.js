@@ -6,7 +6,7 @@ self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith(CACHE.slice(0,20))&&name!==CACHE)await caches.delete(name);await self.clients.claim();})());});
 async function acceptShare(request){
   const form=await request.formData();
-  const files=form.getAll('photos').filter(file=>file instanceof File && file.size<=60*1024*1024 && (/\.(jpe?g|png|heic|heif)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif'].includes(file.type)));
+  const files=form.getAll('photos').filter(file=>file instanceof File && file.size<=(/\.(mp4|mov)$/i.test(file.name)||file.type.startsWith('video/')?512:60)*1024*1024 && (/\.(jpe?g|png|heic|heif|mp4|mov)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif','video/mp4','video/quicktime'].includes(file.type)));
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   const addedAt=Date.now();
   const records=files.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000}));
@@ -17,7 +17,7 @@ async function acceptShare(request){
 self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(url.origin!==self.location.origin)return;
-  if(event.request.method==='POST'&&url.pathname===BASE+'share') {event.respondWith(acceptShare(event.request).catch(()=>new Response('Could not save the shared photos. Reopen ClearWater and choose Open photos.',{status:507,headers:{'Content-Type':'text/plain'}})));return;}
+  if(event.request.method==='POST'&&url.pathname===BASE+'share') {event.respondWith(acceptShare(event.request).catch(()=>new Response('Could not save the shared files. Reopen ClearWater and choose Open files.',{status:507,headers:{'Content-Type':'text/plain'}})));return;}
   if(event.request.method!=='GET')return;
   // Only application assets are cached; personal photo URLs and API requests never are.
   if(ASSETS.includes(url.pathname)||OPTIONAL.includes(url.pathname)||(event.request.mode==='navigate'&&url.pathname.startsWith(BASE))) event.respondWith((async()=>{

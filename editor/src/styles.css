@@ -109,3 +109,5 @@
 .image-label.before{left:0}.image-label.after{right:0}
 .folder-browser{display:flex;align-items:center;gap:6px;min-height:26px;flex:none;font-size:10px;color:#a9bfb9;padding:2px 6px}
 .folder-browser>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.folder-browser>button{display:grid;place-items:center;min-width:24px;min-height:24px}
+
+.video-timeline{padding:7px 10px;background:#142025;border:1px solid var(--border);border-top:0;flex:none}.video-timeline label{display:grid;gap:6px;font-size:10px;color:#adc7bd}.video-timeline label>span{display:flex;justify-content:space-between}.video-timeline output{font-variant-numeric:tabular-nums}.video-timeline input{width:100%;margin:0;accent-color:var(--jade)}.video-timeline small{display:block;margin-top:5px;font-size:9px;color:#819d96}.video-export-options{display:grid;gap:7px;font-size:10px;flex:1}.video-export-options label{display:flex;gap:5px;align-items:center}.video-export-options input{accent-color:var(--jade)}.video-export-options small{font-size:9px;line-height:1.4;color:#819d96}.video-export-options a{font-size:9px;color:#a9dfcc}
