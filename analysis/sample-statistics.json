@@ -1,0 +1,137 @@
+[
+  {
+    "file": "IMG_6085-blue.HEIC",
+    "size": [
+      4284,
+      5712
+    ],
+    "sample_mean_rgb": [
+      2.0,
+      136.39999389648438,
+      178.1999969482422
+    ],
+    "red_relative_to_gb": 0.01,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.18
+  },
+  {
+    "file": "IMG_6459-red filter.HEIC",
+    "size": [
+      5712,
+      4284
+    ],
+    "sample_mean_rgb": [
+      160.3000030517578,
+      49.20000076293945,
+      52.0
+    ],
+    "red_relative_to_gb": 3.17,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.82
+  },
+  {
+    "file": "IMG_6729-blue and hazy.HEIC",
+    "size": [
+      5712,
+      4284
+    ],
+    "sample_mean_rgb": [
+      33.5,
+      100.80000305175781,
+      149.10000610351562
+    ],
+    "red_relative_to_gb": 0.27,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.03
+  },
+  {
+    "file": "IMG_6730-blue.HEIC",
+    "size": [
+      5712,
+      4284
+    ],
+    "sample_mean_rgb": [
+      10.600000381469727,
+      80.69999694824219,
+      177.5
+    ],
+    "red_relative_to_gb": 0.08,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.0
+  },
+  {
+    "file": "IMG_6788-red filter.HEIC",
+    "size": [
+      4284,
+      5712
+    ],
+    "sample_mean_rgb": [
+      154.6999969482422,
+      73.4000015258789,
+      166.39999389648438
+    ],
+    "red_relative_to_gb": 1.29,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 1.4
+  },
+  {
+    "file": "IMG_6832-blue green and hazy.HEIC",
+    "size": [
+      3024,
+      4032
+    ],
+    "sample_mean_rgb": [
+      67.19999694824219,
+      123.19999694824219,
+      129.8000030517578
+    ],
+    "red_relative_to_gb": 0.53,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.13
+  },
+  {
+    "file": "IMG_7165-hazy.HEIC",
+    "size": [
+      4032,
+      3024
+    ],
+    "sample_mean_rgb": [
+      119.19999694824219,
+      142.1999969482422,
+      143.6999969482422
+    ],
+    "red_relative_to_gb": 0.83,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.01
+  },
+  {
+    "file": "IMG_7386-green tint.JPG",
+    "size": [
+      4284,
+      5712
+    ],
+    "sample_mean_rgb": [
+      7.199999809265137,
+      137.5,
+      117.0
+    ],
+    "red_relative_to_gb": 0.06,
+    "near_white_all_channels_pct": 0.0,
+    "any_channel_near_clip_pct": 0.11
+  },
+  {
+    "file": "IMG_E7433-too bright.JPG",
+    "size": [
+      4032,
+      3024
+    ],
+    "sample_mean_rgb": [
+      118.0,
+      105.9000015258789,
+      94.4000015258789
+    ],
+    "red_relative_to_gb": 1.18,
+    "near_white_all_channels_pct": 0.1,
+    "any_channel_near_clip_pct": 1.74
+  }
+]

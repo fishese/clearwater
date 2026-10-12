@@ -1,0 +1,25 @@
+import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({channel:'msedge',headless:true});
+const page=await browser.newPage({viewport:{width:1440,height:900}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:5173/');
+await page.getByLabel('Choose photos',{exact:true}).setInputFiles('D:/Projects/ClearWater/Sample photos/IMG_E7433-too bright.JPG');
+await page.waitForFunction(()=>!document.querySelector('.top-actions .primary').disabled);
+const warmth=page.getByRole('slider',{name:'Warmth',exact:true});
+assert.equal(await warmth.getAttribute('aria-orientation'),'vertical');
+await warmth.focus();await warmth.press('ArrowUp');assert.equal(await warmth.inputValue(),'1');
+await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await warmth.inputValue(),'0');
+const colour=page.locator('.settings-group').filter({has:page.locator('summary',{hasText:/Colour/})});
+await colour.locator('summary').click();assert.equal(await colour.getAttribute('open'),null);
+await colour.locator('summary').click();await warmth.waitFor({state:'visible'});
+await page.locator('.settings-group>summary').filter({hasText:/Clarity/}).click();
+await page.getByRole('slider',{name:'Haze reduction',exact:true}).focus();await page.keyboard.press('ArrowUp');assert.equal(await page.getByRole('slider',{name:'Haze reduction',exact:true}).inputValue(),'1');
+const measures=await page.evaluate(()=>({body:document.body.scrollHeight,viewport:innerHeight,controls:document.querySelector('.controls').scrollHeight,panel:document.querySelector('.controls').clientHeight,faders:document.querySelectorAll('[aria-orientation="vertical"]').length}));console.log(measures);
+assert.equal(measures.faders,9);assert.ok(measures.body<=measures.viewport,'Desktop workspace should fit the viewport');
+await page.screenshot({path:'D:/Projects/ClearWater/analysis/browser-check/compact-desktop.png',fullPage:true});
+await page.setViewportSize({width:390,height:844});await page.screenshot({path:'D:/Projects/ClearWater/analysis/browser-check/compact-mobile.png',fullPage:true});
+assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+assert.equal(await page.getByText('YOUR EYE. YOUR EDIT.',{exact:true}).count(),0);
+assert.deepEqual(errors,[]);await browser.close();console.log('Compact layout, group toggles, vertical sliders, undo and mobile width passed.');
+

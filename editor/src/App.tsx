@@ -1,0 +1,198 @@
+import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Waves, Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut } from 'lucide-react';
+import { clamp, makeRecipe, parseRecipe, suggest } from './core/engine';
+import { DEFAULT_MANUAL, type Analysis, type Adjustments, type Hints, type Recipe } from './core/types';
+import { deletePhoto, listPhotos, savePhoto, type StoredPhoto } from './storage';
+
+interface Photo extends StoredPhoto { url:string; past:Recipe[]; future:Recipe[] }
+type Sample = { name:string; label:string };
+const labelFor=(name:string)=>name.replace(/^IMG_\w+-/,'').replace(/\.[^.]+$/,'');
+const clone=<T,>(x:T):T=>structuredClone(x);
+function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hint,vertical=false}: {
+  label:string;value:number;onChange:(v:number)=>void;onStart:()=>void;min?:number;max?:number;step?:number;unit?:string;hint?:string;vertical?:boolean
+}) {
+  const percent=(value-min)/(max-min)*100;
+  return <label className={`range-field ${vertical?'vertical-range':''}`} title={hint}><span><span>{label}</span><output>{value>0&&min<0?'+':''}{Number(value.toFixed(2))}{unit}</output></span>
+    <input aria-label={label} aria-orientation={vertical?'vertical':'horizontal'} type="range" min={min} max={max} step={step} value={value} style={{'--fill':`${percent}%`} as React.CSSProperties}
+      onPointerDown={onStart} onKeyDown={e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))onStart();}} onChange={e=>onChange(Number(e.target.value))}/></label>;
+}
+function download(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+
+export default function App() {
+  const [photos,setPhotos]=useState<Photo[]>([]),[active,setActive]=useState<string|null>(null);
+  const [samples,setSamples]=useState<Sample[]>([]),[analysis,setAnalysis]=useState<Analysis|null>(null);
+  const [dimensions,setDimensions]=useState<[number,number]>([1,1]);
+  const [busy,setBusy]=useState(''),[notice,setNotice]=useState(''),[storageWarning,setStorageWarning]=useState(false);
+  const [compare,setCompare]=useState(true),[divider,setDivider]=useState(50),[showOriginal,setShowOriginal]=useState(false);
+  const [exporting,setExporting]=useState(false),[progress,setProgress]=useState(0),[format,setFormat]=useState<'jpg'|'png'>('jpg');
+  const [eyedropper,setEyedropper]=useState(false),[zoom,setZoom]=useState(1);
+  const [stageSize,setStageSize]=useState({width:700,height:600}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
+  const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null);
+  const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
+  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0);
+  const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
+  photoRef.current=photos;activeRef.current=active;
+  const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
+  const canEdit=!!recipe && ready && !busy && !exporting;
+  const aspect=dimensions[0]/dimensions[1];
+  const fitWidth=Math.min(stageSize.width-48,(stageSize.height-48)*aspect);
+  const persist=(p:Photo)=>{const {id,file,recipe,thumbnail}=p;savePhoto({id,file,recipe,thumbnail}).catch(()=>setStorageWarning(true));};
+  const notify=(message:string)=>setNotice(message);
+  function update(fn:(r:Recipe)=>Recipe,record=true) {
+    setPhotos(all=>all.map(p=>p.id!==active||!p.recipe?p:{...p,recipe:fn(clone(p.recipe)),past:record?[...p.past.slice(-59),clone(p.recipe)]:p.past,future:[]}));
+  }
+  function checkpoint(){if(canEdit)setPhotos(all=>all.map(p=>p.id===active&&p.recipe?{...p,past:[...p.past.slice(-59),clone(p.recipe)],future:[]}:p));}
+  function manual(key:keyof Omit<Adjustments,'neutral'>,value:number){update(r=>({...r,manual:{...r.manual,[key]:value}}),false);}
+  function hints(change:Partial<Hints>){if(!analysis)return;update(r=>{const next={...r.hints,...change};return {...r,hints:next,auto:suggest(analysis,next,r.engine)};});}
+  function history(direction:'undo'|'redo') {
+    setPhotos(all=>all.map(p=>{
+      if(p.id!==active||!p.recipe)return p;
+      if(direction==='undo'&&p.past.length)return {...p,recipe:p.past.at(-1),past:p.past.slice(0,-1),future:[clone(p.recipe),...p.future]};
+      if(direction==='redo'&&p.future.length)return {...p,recipe:p.future[0],past:[...p.past,clone(p.recipe)],future:p.future.slice(1)};
+      return p;
+    }));
+  }
+  function addFiles(files:File[]) {
+    const valid=files.filter(f=>/\.(jpe?g|png|heic|heif)$/i.test(f.name)||['image/jpeg','image/png','image/heic','image/heif'].includes(f.type));
+    if(valid.length!==files.length)notify('Choose JPEG, PNG, HEIC or HEIF photos. Video editing is coming later.');
+    const accepted=valid.filter(f=>f.size<=60*1024*1024);
+    if(accepted.length!==valid.length)notify('Photos over 60 MB were skipped to protect device memory.');
+    const items:Photo[]=accepted.map(file=>({id:crypto.randomUUID(),file,url:URL.createObjectURL(file),past:[],future:[]}));
+    if(items.length){setPhotos(all=>[...all,...items]);setActive(items[0].id);items.forEach(persist);}
+  }
+  useEffect(()=>{
+    if(initialized.current)return;initialized.current=true;
+    listPhotos().then(items=>{setPhotos(all=>[...items.map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]})),...all]);if(items.length){const shared=new URLSearchParams(location.search).get('shared');setActive(current=>current??items.find(p=>p.id===shared)?.id??items[0].id);}}).catch(()=>setStorageWarning(true));
+    if(import.meta.env.DEV) fetch('/__samples').then(r=>r.json()).then((names:string[])=>setSamples(names.map(name=>({name,label:labelFor(name)})))).catch(()=>{});
+    const receive=(event:MessageEvent)=>{if(event.data?.type!=='shared-photos')return;listPhotos().then(items=>{const ids=new Set(photoRef.current.map(p=>p.id)),added=items.filter(p=>!ids.has(p.id));setPhotos(all=>[...all,...added.map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}))]);if(event.data.id&&items.some(p=>p.id===event.data.id))setActive(event.data.id);}).catch(()=>setStorageWarning(true));};
+    navigator.serviceWorker?.addEventListener('message',receive);
+    return ()=>navigator.serviceWorker?.removeEventListener('message',receive);
+  },[]);
+  useEffect(()=>{
+    const w=new Worker(new URL('./processor.worker.ts',import.meta.url),{type:'module'});worker.current=w;
+    w.onmessage=({data})=>{
+      if(data.gen!==generation.current){data.bitmap?.close();data.original?.close();return;}
+      if(data.type==='loaded') {
+        setAnalysis(data.analysis);setDimensions([data.width,data.height]);setBusy('');setReady(true);setZoom(1);
+        const c=originalCanvas.current;
+        if(c){c.width=data.original.width;c.height=data.original.height;c.getContext('2d')!.drawImage(data.original,0,0);
+          const edited=editedCanvas.current;if(edited){edited.width=c.width;edited.height=c.height;edited.getContext('2d')!.drawImage(c,0,0);}}
+        else {pendingBitmap.current?.close();pendingBitmap.current=data.original;}
+        if(c)data.original.close();
+        const thumbnailCanvas=document.createElement('canvas');thumbnailCanvas.width=160;thumbnailCanvas.height=Math.round(160*data.height/data.width);
+        if(c)thumbnailCanvas.getContext('2d')!.drawImage(c,0,0,thumbnailCanvas.width,thumbnailCanvas.height);
+        const thumbnail=c?thumbnailCanvas.toDataURL('image/jpeg',.75):undefined;
+        setPhotos(all=>all.map(p=>p.id===activeRef.current?{...p,recipe:p.recipe??makeRecipe(data.analysis),thumbnail:thumbnail??p.thumbnail}:p));
+      } else if(data.type==='rendered') {
+        if(data.request===latest.current){const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);}setRendering(false);}
+        data.bitmap.close();
+      } else if(data.type==='progress'&&data.request===exportRequest.current) setProgress(data.progress);
+      else if(data.type==='exported'&&data.request===exportRequest.current) {
+        const current=photoRef.current.find(p=>p.id===activeRef.current);
+        download(data.blob,`${current?.file.name.replace(/\.[^.]+$/,'')??'dive'}-clearwater.${data.blob.type==='image/png'?'png':'jpg'}`);
+        setExporting(false);setProgress(100);notify('Full-resolution photo exported. Your original is untouched.');
+      } else if(data.type==='error') {
+        setBusy('');setExporting(false);setRendering(false);
+        if(data.operation==='load')setReady(false);
+        notify(data.message);
+      }
+    };
+    w.onerror=()=>{setBusy('');setExporting(false);setReady(false);notify('The image worker stopped. Reopen the photo, or refresh and try a smaller image.');};
+    return ()=>{w.terminate();worker.current=null;pendingBitmap.current?.close();};
+  },[]);
+  useEffect(()=>{
+    if(!active)return;
+    const p=photoRef.current.find(p=>p.id===active);if(!p)return;
+    generation.current++;setReady(false);setRendering(true);setAnalysis(null);setBusy(/\.hei[cf]$/i.test(p.file.name)?'Decoding HEIC locally…':'Opening photo…');setEyedropper(false);
+    worker.current?.postMessage({type:'load',gen:generation.current,blob:p.file});
+  },[active]);
+  useEffect(()=>{
+    if(ready&&pendingBitmap.current&&originalCanvas.current){const b=pendingBitmap.current,c=originalCanvas.current;c.width=b.width;c.height=b.height;c.getContext('2d')!.drawImage(b,0,0);b.close();pendingBitmap.current=null;}
+  },[ready]);
+  useEffect(()=>{
+    if(!recipe||!ready||exporting)return;
+    const id=++request.current;latest.current=id;setRendering(true);
+    const timer=setTimeout(()=>worker.current?.postMessage({type:'render',gen:generation.current,request:id,recipe}),40);
+    return ()=>clearTimeout(timer);
+  },[recipe,ready,exporting]);
+  useEffect(()=>{if(!photo?.recipe)return;const timer=setTimeout(()=>persist(photo),400);return ()=>clearTimeout(timer);},[photo?.recipe,photo?.thumbnail]);
+  useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),6500);return ()=>clearTimeout(timer);},[notice]);
+  useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(entries=>{const {width,height}=entries[0].contentRect;setStageSize({width,height});});observer.observe(stage.current);return ()=>observer.disconnect();},[]);
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();if(canEdit)history(e.shiftKey?'redo':'undo');}};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[active,canEdit]);
+  async function sample(name:string){
+    if(exporting||sampleBusy)return;setSampleBusy(true);
+    try{const response=await fetch('/__sample/'+encodeURIComponent(name));if(!response.ok)throw new Error('Sample unavailable.');const blob=await response.blob();addFiles([new File([blob],name,{type:blob.type})]);}
+    catch{notify('Could not open this local sample. Use Open photos instead.');}finally{setSampleBusy(false);}
+  }
+  function reset(){if(analysis)update(()=>makeRecipe(analysis));setEyedropper(false);}
+  function exportPhoto(){if(!canEdit||rendering)return;setExporting(true);setProgress(0);exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format});}
+  function cancelExport(){generation.current++;worker.current?.postMessage({type:'cancel',gen:generation.current});setExporting(false);notify('Export cancelled.');}
+  function pickNeutral(e:ReactPointerEvent<HTMLDivElement>){
+    if(!eyedropper||!canEdit||!editedCanvas.current)return;
+    const c=editedCanvas.current,rect=e.currentTarget.getBoundingClientRect();
+    const x=clamp(Math.floor((e.clientX-rect.left)/rect.width*c.width),0,c.width-1),y=clamp(Math.floor((e.clientY-rect.top)/rect.height*c.height),0,c.height-1);
+    const pixel=c.getContext('2d')!.getImageData(Math.max(0,x-1),Math.max(0,y-1),Math.min(3,c.width-x),Math.min(3,c.height-y)).data;
+    const rgb=[0,0,0];for(let i=0;i<pixel.length;i+=4){rgb[0]+=pixel[i];rgb[1]+=pixel[i+1];rgb[2]+=pixel[i+2];}rgb.forEach((_,i)=>rgb[i]/=pixel.length/4);
+    if(Math.min(...rgb)<12||Math.max(...rgb)>245){notify('Choose a midtone white or grey area, away from deep shadows and bright highlights.');return;}
+    const target=(rgb[0]+rgb[1]+rgb[2])/3;
+    update(r=>({...r,manual:{...r.manual,neutral:r.manual.neutral.map((v,i)=>clamp(v*target/rgb[i],.25,4)) as [number,number,number]}}));
+    setEyedropper(false);notify('Neutral point applied. Undo if the selected area was not white or grey.');
+  }
+  async function readRecipe(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];e.target.value='';if(!file)return;try{if(file.size>20000)throw new Error('Recipe file is too large.');const next=parseRecipe(JSON.parse(await file.text()));update(()=>next);notify('Recipe applied.');}catch(err){notify(err instanceof Error?err.message:'Could not read the recipe.');}}
+  async function removePhoto(p:Photo){if(exporting)return;await deletePhoto(p.id).catch(()=>setStorageWarning(true));URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(p.id===active){setActive(photos.find(x=>x.id!==p.id)?.id??null);setReady(false);}}
+  return <div className="app-shell" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting)addFiles(Array.from(e.dataTransfer.files));}}>
+    <header className="topbar"><a className="brand" href="/" aria-label="ClearWater home"><span className="brand-icon"><Waves size={23}/></span><span>clearwater<span className="brand-dot">.</span></span></a><span className="edition">PHOTO STUDIO <span>01</span></span>
+      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> Stays on your device</span><button className="button secondary" disabled={exporting} onClick={()=>importInput.current?.click()}><Plus size={16}/> Open photos</button><button className="button primary" disabled={!canEdit||rendering} onClick={exportPhoto}><Download size={16}/> Export photo</button></div></header>
+    <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,.heic,.heif" aria-label="Choose photos" onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
+    <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label="Choose recipe" onChange={readRecipe}/>
+    <main className="studio">
+      <aside className="library"><div className="section-title"><span>YOUR PHOTOS</span><span className="count">{photos.length.toString().padStart(2,'0')}</span></div>
+        <button className="import-tile" disabled={exporting} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>Add to your collection</span><small>JPEG, PNG & HEIC</small></button>
+        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||busy!==''} onClick={()=>setActive(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting} title="Remove local copy" aria-label={`Remove ${p.file.name}`} onClick={()=>removePhoto(p)}><X size={12}/></button></div>)}</div>
+        {samples.length>0&&<><div className="section-title sample-heading"><span>YOUR DIVE SAMPLES</span><span className="count">09</span></div><div className="sample-list">{samples.map((s,i)=><button key={s.name} disabled={exporting||sampleBusy||busy!==''} onClick={()=>sample(s.name)}><img src={'/__thumb/'+encodeURIComponent(s.name)} alt=""/><span><strong>{s.label}</strong><small>Dive study {String(i+1).padStart(2,'0')}</small></span><Plus size={13}/></button>)}</div></>}
+      </aside>
+      <section className="workspace">
+        <div className="canvas-toolbar"><div className="filename"><span className="file-dot"/>{photo?.file.name??'No photo selected'}</div><div className="canvas-tools"><button disabled={!canEdit||!photo?.past.length} aria-label="Undo" title="Undo (Ctrl+Z)" onClick={()=>history('undo')}><Undo2 size={16}/></button><button disabled={!canEdit||!photo?.future.length} aria-label="Redo" title="Redo" onClick={()=>history('redo')}><Redo2 size={16}/></button><span className="tool-separator"/><button className={compare?'active':''} disabled={!ready} onClick={()=>{setCompare(!compare);setEyedropper(false);}} title="Before / after comparison" aria-label="Toggle comparison"><ArrowLeftRight size={16}/></button><button className={eyedropper?'active':''} disabled={!canEdit} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}} title="Pick a white or grey point" aria-label="Pick neutral point"><Pipette size={16}/></button></div></div>
+        <div className={`stage ${eyedropper?'picking':''}`} ref={stage}>
+          {!photo&&<div className="empty-state"><h1>Photo editor</h1><p>Open a photo or choose a sample to start.</p><button className="button primary" onClick={()=>importInput.current?.click()}><Upload size={16}/> Choose your first photo</button><small>Or drop photos anywhere in the studio</small></div>}
+          {photo&&<div className="image-frame" onPointerDown={pickNeutral} style={{width:Math.max(1,fitWidth)*zoom,height:Math.max(1,fitWidth)/aspect*zoom,visibility:ready?'visible':'hidden'}}>
+            <canvas ref={editedCanvas} aria-label="Edited photo"/><canvas ref={originalCanvas} className="original-canvas" aria-label="Original photo" style={{clipPath:showOriginal?'none':compare?`inset(0 ${100-divider}% 0 0)`:'inset(0 100% 0 0)'}}/>
+            {compare&&!showOriginal&&<><span className="image-label before">ORIGINAL</span><span className="image-label after">RESTORED</span><div className="divider-line" style={{left:`${divider}%`}}><span><ArrowLeftRight size={16}/></span></div><input className="comparison-input" aria-label="Before and after divider" type="range" min="0" max="100" value={divider} onChange={e=>setDivider(Number(e.target.value))}/></>}
+            {eyedropper&&<span className="picker-hint">Click a white or grey area</span>}
+          </div>}
+          {busy&&<div className="processing-overlay" role="status"><LoaderCircle className="spin" size={25}/><span>{busy}</span><small>Your photo stays on this device.</small></div>}
+        </div>
+        <div className="workspace-bottom"><span>{ready?`${dimensions[0]} × ${dimensions[1]} · ${(dimensions[0]*dimensions[1]/1e6).toFixed(1)} MP`:'No photo selected'}</span><div><button disabled={!ready} onPointerDown={()=>setShowOriginal(true)} onPointerUp={()=>setShowOriginal(false)} onPointerLeave={()=>setShowOriginal(false)} onKeyDown={e=>{if(e.key===' ')setShowOriginal(true);}} onKeyUp={()=>setShowOriginal(false)}>Hold for original</button><span className="tool-separator"/><button disabled={!ready} aria-label="Zoom out" onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={15}/></button><button disabled={!ready} onClick={()=>setZoom(1)}>{zoom===1?'Fit':`${Math.round(zoom*100)}%`}</button><button disabled={!ready} aria-label="Zoom in" onClick={()=>setZoom(z=>Math.min(3,z+.5))}><ZoomIn size={15}/></button></div></div>
+      </section>
+      <aside className="controls compact-controls"><div className="controls-top"><SlidersHorizontal size={16}/><span>Adjustments</span><button disabled={!canEdit} onClick={reset} title="Reset all edits" aria-label="Reset all edits"><RotateCcw size={15}/></button></div>
+        <fieldset className="control-body" disabled={!canEdit}>
+          <details className="settings-group" open><summary>Restoration <ChevronDown size={14}/></summary><div className="group-content">
+            <button className="button primary auto-button" onClick={()=>{if(analysis)update(r=>({...r,auto:suggest(analysis,r.hints,r.engine),strength:.8,manual:clone(DEFAULT_MANUAL)}));}}><Sparkles size={14}/> Auto restore</button>
+            <Range label="Restoration strength" value={Math.round((recipe?.strength??.8)*100)} min={0} max={100} unit="%" onStart={checkpoint} onChange={v=>update(r=>({...r,strength:v/100}),false)}/>
+            {recipe&&<details className="analysis-note"><summary>Analysis <ChevronDown size={12}/></summary><p className="suggestion">{recipe.auto.explanation}</p></details>}
+          </div></details>
+          <details className="settings-group"><summary>Dive conditions <ChevronDown size={14}/></summary><div className="group-content"><div className="context-grid"><label>Environment<select aria-label="Environment" value={recipe?.hints.scene??'auto'} onChange={e=>hints({scene:e.target.value as Hints['scene']})}><option value="auto">Auto detect</option><option value="underwater">Underwater</option><option value="surface">Surface / above water</option></select></label><label>Red filter<select aria-label="Red filter" value={recipe?.hints.filter??'auto'} onChange={e=>hints({filter:e.target.value as Hints['filter']})}><option value="auto">Auto detect</option><option value="yes">Yes, filter on</option><option value="no">No filter</option></select></label><label>Water colour<select aria-label="Water colour" value={recipe?.hints.water??'auto'} onChange={e=>hints({water:e.target.value as Hints['water']})}><option value="auto">Auto detect</option><option value="blue">Blue water</option><option value="green">Green water</option></select></label><label>Approx. depth<select aria-label="Approx. depth" value={recipe?.hints.depth??'unknown'} onChange={e=>hints({depth:e.target.value==='unknown'?null:Number(e.target.value)})}><option value="unknown">Not sure</option>{[0,5,10,15,20,30,40].map(n=><option key={n} value={n}>{n===0?'Surface':`${n} metres`}</option>)}</select></label></div></div></details>
+          <details className="settings-group" open><summary>Colour <ChevronDown size={14}/></summary><div className="group-content">
+            <div className="fader-grid">{(['warmth','tint','red','vibrance'] as const).map(k=><Range vertical key={k} label={{warmth:'Warmth',tint:'Green / magenta',red:'Red correction',vibrance:'Vibrance'}[k]} value={recipe?.manual[k]??0} onStart={checkpoint} onChange={v=>manual(k,v)}/>)}</div>
+            <button className={`neutral-button ${eyedropper?'active':''}`} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}}><Pipette size={13}/>{eyedropper?'Cancel picker':'Pick neutral point'}</button>
+          </div></details>
+          <details className="settings-group" open><summary>Light <ChevronDown size={14}/></summary><div className="group-content"><div className="fader-grid">
+            <Range vertical label="Exposure" value={recipe?.manual.exposure??0} min={-2} max={2} step={.05} unit=" EV" onStart={checkpoint} onChange={v=>manual('exposure',v)}/>
+            {(['highlights','shadows'] as const).map(k=><Range vertical key={k} label={{highlights:'Highlights',shadows:'Shadows'}[k]} value={recipe?.manual[k]??0} onStart={checkpoint} onChange={v=>manual(k,v)}/>)}</div>
+          </div></details>
+          <details className="settings-group"><summary>Clarity <ChevronDown size={14}/></summary><div className="group-content"><div className="fader-grid">
+            {(['contrast','haze'] as const).map(k=><Range vertical key={k} label={{contrast:'Contrast',haze:'Haze reduction'}[k]} value={recipe?.manual[k]??0} onStart={checkpoint} onChange={v=>manual(k,v)}/>)}</div>
+          </div></details>
+          <div className="manual-actions"><button className="text-button" onClick={()=>update(r=>({...r,manual:clone(DEFAULT_MANUAL)}))}><RotateCcw size={12}/> Reset manual edits</button></div>
+          <details className="settings-group"><summary>Correction method <ChevronDown size={14}/></summary><div className="group-content engine-details"><label>Correction engine<select aria-label="Correction engine" value={recipe?.engine??'balanced'} onChange={e=>{if(analysis)update(r=>({...r,engine:e.target.value as Recipe['engine'],auto:suggest(analysis,r.hints,e.target.value as Recipe['engine'])}));}}><option value="balanced">Balanced restoration</option><option value="baseline">Original RGB heuristic</option></select></label><p>The original heuristic is included for testing. AI models are not enabled in this prototype.</p>{analysis&&<p>Sample RGB: {analysis.mean.map(n=>Math.round(n)).join(' / ')} · Colour confidence: {analysis.confidence}</p>}</div></details>
+          <details className="settings-group" open><summary>Export <span className="summary-meta">Full resolution</span><ChevronDown size={14}/></summary><div className="group-content export-section"><div className="export-options"><label>File format<select aria-label="File format" value={format} onChange={e=>setFormat(e.target.value as 'jpg'|'png')}><option value="jpg">JPEG · High quality</option><option value="png">PNG · Lossless</option></select></label><button className="icon-button" title="Save edit recipe" aria-label="Save recipe" onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),'clearwater-recipe.json')}><FileJson size={17}/></button><button className="icon-button" title="Load edit recipe" aria-label="Load recipe" onClick={()=>recipeInput.current?.click()}><Upload size={16}/></button></div></div></details>
+        </fieldset>
+      </aside>
+    </main>
+    {storageWarning&&<div className="storage-warning" role="status">Local storage is unavailable or full. Export your edits before closing.<button aria-label="Dismiss storage warning" onClick={()=>setStorageWarning(false)}><X size={14}/></button></div>}
+    {notice&&<div className="toast" role="status"><span>{notice}</span><button aria-label="Dismiss message" onClick={()=>setNotice('')}><X size={15}/></button></div>}
+    {exporting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><span className="brand-icon"><Waves size={25}/></span><h2 id="export-title">Exporting photo</h2><p>Rendering your full-resolution photo.</p><progress max="100" value={progress}/><span>{progress}%</span><button className="button secondary" onClick={cancelExport}>Cancel export</button></div></div>}
+  </div>;
+}
+
+
