@@ -42,13 +42,14 @@ function blur(luminance:Float32Array,pixels:Uint8ClampedArray,width:number,heigh
 
 /** Photo-only finishing after the shared renderer. Pass neighbouring rows for strips. */
 export function enhancePixels(input:Uint8ClampedArray,width:number,height:number,settings?:PhotoEnhancement,referenceWidth=width,referenceHeight=height):Uint8ClampedArray {
- if(!settings||!(settings.contrast||settings.clarity||settings.sharpness))return input;
+ if(!settings||!(settings.contrast||settings.clarity||settings.sharpness||settings.brightness))return input;
  if(input.length!==width*height*4)throw new Error('Photo enhancement dimensions do not match.');
- const tone=new Float32Array(width*height),amount=settings.contrast/100;
+ const tone=new Float32Array(width*height),amount=settings.contrast/100,gamma=2**(-(settings.brightness??0)/100);
  const gain=Math.min(1.7,1/Math.max(.4,settings.white-settings.black));
  for(let i=0;i<tone.length;i++){
   const at=i*4,y=luma(input[at],input[at+1],input[at+2]);
-  tone[i]=y+(clamp((y-settings.black)*gain)-y)*amount;
+  const contrasted=y+(clamp((y-settings.black)*gain)-y)*amount;
+  tone[i]=gamma===1?contrasted:Math.pow(contrasted,gamma);
  }
  const radii=enhancementRadii(width,height,referenceWidth,referenceHeight);
  const local=settings.clarity?blur(tone,input,width,height,radii.clarity):undefined;

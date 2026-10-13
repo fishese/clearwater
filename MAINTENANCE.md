@@ -12,6 +12,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Navigation / saving | browsing-check.mjs |
 | Async UI state | ui-state-check.mjs (synthetic fixtures) |
 | Compact touch layout | touch-target-check.mjs (CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
+| Layered mobile controls | layered-controls-check.mjs (synthetic input; CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
 | Saved custom model | custom-model-check.mjs (bundled model as the test input) |
 | Controls / adapter | controls-check.mjs |
 | Video / AI video | video-check.mjs, video-ai-check.mjs |
@@ -19,7 +20,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 62 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 64 tests.
 
 ## Languages
 
@@ -65,6 +66,8 @@ Keep public handoff/maintenance concise; editor README holds the detailed featur
 Check git status/staged paths and diff whitespace before committing. Create checkpoints before major processing changes. Prefer revert commits for published regressions, rebuilding both platforms. Never discard unrelated edits or reset user data. Diagnose colour ranges, orientation, preview/export parity, generation IDs and buffer lifetime before changing algorithms.
 
 Photo finishing: preserve old recipe defaults, global preview-derived tonal endpoints, luminance-based colour ratios, alpha weights and export halo rows. Never analyse black/white points independently per strip. Test portrait and landscape halo-strip parity, low-noise flat regions, transparent pixels and neural-engine finishing. Spatial finishing is deliberately unavailable for video pending temporal/performance work.
+
+Responsive tabs change control visibility only: retain a single set of inputs, canvases, object URLs and workers. Test the 650px breakpoint in both directions, all tab groups, keyboard focus, expanded mode and the photo-to-video Effects fallback. Unknown depth is stored as null (Balanced extra-red depth factor 1.0), distinct from explicit zero metres (factor 0.75); its checkbox must be undoable. Effects brightness is optional in version-1 recipes, defaults to zero and uses the existing photo luminance pass. Keep its preview/export parity and old-recipe identity checks.
 
 ## Reliability review (October 2026)
 

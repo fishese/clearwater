@@ -20,8 +20,9 @@ try{
   await page.getByRole('button',{name:back,exact:true}).click();assert.equal(await page.getByRole('slider',{name:warmth,exact:true}).inputValue(),'100');
   await page.reload();await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);assert.equal(await page.locator('.brand-cluster .language-select').inputValue(),locale);
  }
- await page.locator('.brand-cluster .language-select').selectOption('zh-HK');await page.setViewportSize({width:390,height:844});await page.screenshot({path:'../analysis/photo-check/i18n-zh-HK.png'});
- await page.locator('.brand-cluster .language-select').selectOption('ja');await page.screenshot({path:'../analysis/photo-check/i18n-ja.png'});
+ await page.setViewportSize({width:390,height:844});await page.locator('[data-control-tab="enhancement"]').click();await page.locator('[data-control-subtab="colour"]').click();
+ await page.locator('.brand-cluster .language-select').selectOption('zh-HK');assert.equal(await page.getByRole('slider',{name:'色溫',exact:true}).inputValue(),'100');await page.screenshot({path:'../analysis/photo-check/i18n-zh-HK.png'});
+ await page.locator('.brand-cluster .language-select').selectOption('ja');assert.equal(await page.getByRole('slider',{name:'色温度',exact:true}).inputValue(),'100');await page.screenshot({path:'../analysis/photo-check/i18n-ja.png'});
  // Worker-originated user guidance is translated at presentation.
  await page.getByLabel('写真を選択',{exact:true}).setInputFiles({name:'broken.mov',mimeType:'video/quicktime',buffer:Buffer.from('not a movie')});
  await page.locator('.toast').waitFor();

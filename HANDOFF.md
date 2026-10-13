@@ -37,7 +37,9 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 - Preserve generation/request guards and buffer cleanup. RAW uses disposable workers; large export buffers are released after saving.
 - Web models cache after first use; APK bundles supplied models. Never package locally supplied weights or personal fixtures.
 
-Photo enhancement is an optional finishing pass after any engine: Auto enhance plus Auto contrast, Local contrast and Sharpness. Existing edits remain unchanged until enabled. Settings use the optional version-1 recipe enhancement field. Photo export needs halo rows for spatial filters; video ignores this photo-only field. Auto restore and manual reset clear it.
+Effects is an optional photo finishing pass after any engine: Auto enhance plus Brightness, Auto contrast, Local contrast and Sharpness. Existing edits remain unchanged until enabled. Settings use the optional version-1 recipe enhancement field; omitted brightness is zero for legacy recipes. Brightness adjusts midtones in the existing luminance pass. Photo export needs halo rows for spatial filters; video ignores this photo-only field. Auto restore and manual reset clear it.
+
+Narrow screens use Correction / Enhancement / Export tabs with one settings group visible at a time; the wide layout keeps collapsible groups and combined Light & clarity controls. Tab changes only change control visibility and do not recreate image/video workers. Analysis remains visible below Restoration strength. Unknown depth is distinct from zero in Balanced restoration and is selected with Unsure of depth beneath the slider.
 
 ## Gaps and priorities
 

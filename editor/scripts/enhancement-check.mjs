@@ -13,7 +13,9 @@ try{
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'enhancement-test.png',mimeType:'image/png',buffer:Buffer.from(data)});await ready();const before=await hash();
  await action('Auto enhance');const after=await hash();assert.notEqual(after,before);assert.equal(await page.getByRole('slider',{name:'Auto contrast',exact:true}).inputValue(),'80');
  await action('Undo');assert.equal(await hash(),before);await action('Redo');assert.equal(await hash(),after);
- // PNG export should match a same-size preview, including rows at strip boundaries.
+ const brightness=page.getByRole('slider',{name:'Brightness',exact:true});await brightness.focus();await page.keyboard.press('End');await page.waitForFunction(()=>document.querySelector('input[aria-label="Brightness"]')?.value==='100');await ready();
+ const brightAfter=await hash();assert.notEqual(brightAfter,after);await action('Undo');assert.equal(await hash(),after);await action('Redo');assert.equal(await hash(),brightAfter);
+ // PNG export should match a same-size preview, including rows at strip boundaries and the brightness adjustment.
  await page.getByRole('combobox',{name:'File format'}).selectOption('png');const wait=page.waitForEvent('download');await page.getByRole('button',{name:'Download instead',exact:true}).click();const d=await wait,bytes=await readFile(await d.path());
  const diff=await page.evaluate(async bytes=>{const b=await createImageBitmap(new Blob([new Uint8Array(bytes)])),canvas=new OffscreenCanvas(b.width,b.height),ctx=canvas.getContext('2d');ctx.drawImage(b,0,0);const output=ctx.getImageData(0,0,b.width,b.height).data,preview=document.querySelector('canvas[aria-label="Edited photo"]').getContext('2d').getImageData(0,0,b.width,b.height).data;let max=0;for(let i=0;i<output.length;i++)max=Math.max(max,Math.abs(output[i]-preview[i]));return max;},Array.from(bytes));assert.equal(diff,0);
  await action('Clear enhancement');assert.equal(await hash(),before);

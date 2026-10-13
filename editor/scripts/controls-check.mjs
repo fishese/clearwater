@@ -17,8 +17,9 @@ await page.getByRole('group',{name:'Environment',exact:true}).getByRole('radio',
 await page.getByRole('group',{name:'Red filter',exact:true}).getByRole('radio',{name:'Yes',exact:true}).check();
 await page.getByRole('group',{name:'Water colour',exact:true}).getByRole('radio',{name:'Green',exact:true}).check();
 const depth=page.getByRole('slider',{name:'Approx. depth',exact:true});await depth.focus();await depth.press('ArrowRight');
-assert.equal(await depth.inputValue(),'1');await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await depth.getAttribute('aria-valuetext'),'Not sure');
-await depth.fill('24');await page.getByRole('button',{name:'Not sure',exact:true}).click();assert.equal(await depth.getAttribute('aria-valuetext'),'Not sure');
+assert.equal(await depth.inputValue(),'1');await page.getByRole('button',{name:'Undo',exact:true}).click();assert.equal(await depth.getAttribute('aria-valuetext'),'Unsure of depth');
+await depth.fill('24');const unsure=page.getByRole('checkbox',{name:'Unsure of depth',exact:true});await unsure.check();assert.equal(await depth.inputValue(),'0');assert.equal(await depth.getAttribute('aria-valuetext'),'Unsure of depth');
+await unsure.uncheck();assert.equal(await depth.inputValue(),'0');assert.equal(await depth.getAttribute('aria-valuetext'),'0 m');
 const button=await page.getByRole('button',{name:'Auto restore',exact:true}).boundingBox(),slider=await page.getByRole('slider',{name:'Restoration strength',exact:true}).boundingBox();assert.ok(button.x>slider.x+slider.width);
 await page.screenshot({path:root+'/analysis/browser-check/controls-radios.png'});
 await engine.locator('summary').click();await page.getByLabel('Correction engine',{exact:true}).selectOption('wave');
@@ -33,8 +34,14 @@ for(const [file,range] of [['editor/public/models/shallow.onnx','unit'],['editor
   await load.click();await page.getByRole('dialog').waitFor({state:'hidden',timeout:120000});await ready();
   if(range==='unit')await page.getByRole('button',{name:'Load another ONNX model',exact:true}).click();
 }
-await page.waitForTimeout(500);await page.reload();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Cancel',exact:true}).click();await ready();
-await page.setViewportSize({width:390,height:844});await dive.locator('summary').click();
+await page.waitForTimeout(500);await page.reload();await ready();assert.equal(await page.getByRole('dialog').count(),0);
+await engine.locator('summary').click();assert.equal(await page.getByLabel('Correction engine').inputValue(),'wave');
+assert.match(await page.getByLabel('Correction engine').locator('option:checked').innerText(),/funie\.onnx/i);
+await page.getByRole('button',{name:'Load another ONNX model',exact:true}).click();await page.getByRole('dialog').waitFor();
+assert.equal(await page.getByLabel('Model input range').inputValue(),'signed');assert.equal(await page.getByLabel('Model output range').inputValue(),'signed');
+await page.getByRole('button',{name:'Cancel',exact:true}).click();
+await page.setViewportSize({width:390,height:844});await page.locator('[data-control-tab="correction"]').click();await page.locator('[data-control-subtab="dive"]').click();
+assert.equal(await page.getByRole('group',{name:'Environment',exact:true}).isVisible(),true);
 assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
 await page.screenshot({path:root+'/analysis/browser-check/controls-mobile.png',fullPage:true});
 assert.deepEqual(errors,[]);console.log('PASS radios, depth undo/unknown, compact layout, generic models, invalid file, reload and mobile');await browser.close();

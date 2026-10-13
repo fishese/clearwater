@@ -21,6 +21,7 @@ try {
  assert.equal(await page.locator('.control-body').isVisible(),false);
  assert.ok((await page.locator('.stage').boundingBox()).height>700);
  await page.getByRole('button',{name:'Toggle adjustments'}).click();
+ await page.locator('[data-control-tab="enhancement"]').click();await page.locator('[data-control-subtab="colour"]').click();
  assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).isVisible(),true);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.getByRole('button',{name:'Exit expanded view'}).click();

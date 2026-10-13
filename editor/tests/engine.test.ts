@@ -25,6 +25,11 @@ describe('restoration decisions',()=>{
     const s=suggest(stats(20,100,150),{...DEFAULT_HINTS,scene:'surface',filter:'no'});
     expect(s.redMix).toBe(0);expect(s.gains).toEqual([1,1,1]);
   });
+  it('keeps unknown depth distinct from an explicitly shallow depth',()=>{
+    const analysis=stats(20,100,150),unknown=suggest(analysis,{...DEFAULT_HINTS,depth:null}),shallow=suggest(analysis,{...DEFAULT_HINTS,depth:0});
+    expect(unknown.redMix).toBeGreaterThan(shallow.redMix);
+    expect(shallow.redMix).toBeCloseTo(unknown.redMix*.75);
+  });
   it('has a separate green-water suggestion and does not mutate hints',()=>{
     const hints={...DEFAULT_HINTS,water:'green' as const};const before=structuredClone(hints);
     expect(suggest(stats(7,138,117),hints).gains[1]).toBeLessThan(1);expect(hints).toEqual(before);
