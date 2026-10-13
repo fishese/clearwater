@@ -6,7 +6,8 @@ import { DEFAULT_MANUAL,DEFAULT_ENHANCEMENT, type Analysis, type Adjustments, ty
 import { clearPhotos, deletePhoto, listPhotos, promoteSharedPhotos, savePhoto, type StoredPhoto } from './storage';
 import {forgetCustomModel,loadRememberedCustomModel,rememberCustomModel} from './custom-model-storage';
 import {supportsFolder,chooseFolder,restoredName,createUniqueFile,writeFile,type LocalDirectoryHandle} from './file-save';
-import {isAndroid,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,cancelAndroidHdrWorkingCopy,type AndroidPhotoFolder} from './native';
+import {isAndroid,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,type AndroidPhotoFolder} from './native';
+import {nextBackAction,type BackState} from './back-navigation';
 import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
 import About from './About';
@@ -32,11 +33,11 @@ function RadioGroup<T extends string>({label,name,value,options,onChange}:{label
 }
 function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert(t("Could not save this file. Please choose a writable folder."));});return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 
-const closeAbout=()=>{window.location.hash='';};
 export default function App() {
   useLanguage();
   const [about,setAbout]=useState(()=>window.location.hash.startsWith('#about'));
   useEffect(()=>{const change=()=>setAbout(window.location.hash.startsWith('#about'));window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
+  function closeAbout(){window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);setAbout(false);}
   const [updating,setUpdating]=useState(false);
   const [keepMetadata,setKeepMetadata]=useState(true);
   const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0);
@@ -72,6 +73,7 @@ export default function App() {
   const [stageSize,setStageSize]=useState({width:0,height:0}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
   const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null),controlsPanel=useRef<HTMLElement>(null);
   const [zoomControlPosition,setZoomControlPosition]=useState({right:8,bottom:8});
+  const lastBackAt=useRef(0),exitPromptTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
   const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
@@ -454,6 +456,41 @@ export default function App() {
       if(shareIds.length){const epoch=collectionEpoch.current;promoteSharedPhotos(shareIds).then(()=>listPhotos()).then(items=>{if(epoch!==collectionEpoch.current)return;const added=items.filter(p=>shareIds.includes(p.id)&&!photoRef.current.some(existing=>existing.id===p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}));if(added.length)setPhotos(all=>[...all,...added]);}).catch(()=>setStorageWarning(true));}
     }
   }
+  const backStateRef=useRef<BackState>({activeWork:false,clearDialog:false,customDialog:false,saveDialog:false,folderBrowser:false,neutralPicker:false,about:false,adjustmentsOpen:false,expanded:false,narrowControls:false,controlTab:'correction',correctionTab:'engine',lastBackAt:0,now:0});
+  backStateRef.current={activeWork:!!(busy||exporting||saving||hdrConverting||customLoading||clearingCollection||sampleBusy||rendering||updating||folderLoading),clearDialog:clearCollectionOpen,customDialog:customOpen,saveDialog,folderBrowser:!!folderBrowser,neutralPicker:eyedropper,about,adjustmentsOpen,expanded,narrowControls,controlTab,correctionTab,lastBackAt:lastBackAt.current,now:Date.now()};
+  useEffect(()=>{lastBackAt.current=0;if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;setNotice(current=>current===t('Back again to exit app')?'':current);},[about,clearCollectionOpen,customOpen,saveDialog,eyedropper,expanded,adjustmentsOpen,controlTab,correctionTab,folderBrowser,busy,exporting,saving,hdrConverting,customLoading,clearingCollection,sampleBusy,rendering,updating,folderLoading]);
+  useEffect(()=>{
+    const dispose=listenForAndroidBack(()=>{
+      const now=Date.now(),state={...backStateRef.current,lastBackAt:lastBackAt.current,now};
+      const action=nextBackAction(state);
+      if(action==='confirm-exit'){
+        lastBackAt.current=now;notify(t('Back again to exit app'));
+        if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);
+        exitPromptTimer.current=setTimeout(()=>{lastBackAt.current=0;exitPromptTimer.current=null;setNotice(current=>current===t('Back again to exit app')?'':current);},2000);
+        return;
+      }
+      if(action==='exit'){
+        lastBackAt.current=0;if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;
+        void exitAndroidApp().catch(()=>notify(t('Could not exit the app.')));return;
+      }
+      lastBackAt.current=0;if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;
+      setNotice(current=>current===t('Back again to exit app')?'':current);
+      switch(action){
+        case 'busy':notify(t('Keep the app open while work is active.'));break;
+        case 'about':closeAbout();break;
+        case 'clear-dialog':closeClearCollection();break;
+        case 'custom-dialog':cancelCustom();break;
+        case 'save-dialog':setSaveDialog(false);break;
+        case 'folder-browser':folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);break;
+        case 'neutral-picker':setEyedropper(false);break;
+        case 'adjustments':setAdjustmentsOpen(false);break;
+        case 'expanded':expandedGesture.current.points.clear();setExpanded(false);setZoom(1);break;
+        case 'correction-tab':setControlTab('correction');break;
+        case 'engine-tab':setCorrectionTab('engine');break;
+      }
+    });
+    return ()=>{dispose();if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;lastBackAt.current=0;};
+  },[]);
   return <><div hidden={about} className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
     <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<LanguageSelect/></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
       <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/>{video?t("Export video"):t("Export photo")}</button></div></header>

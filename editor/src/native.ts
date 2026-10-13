@@ -13,6 +13,11 @@ interface NativeHdr {
  deleteHdrWorkingCopy(options:{id:string}):Promise<void>;
  addListener(name:'hdrConversionProgress',listener:(event:{id:string;progress:number})=>void):Promise<PluginListenerHandle>;
 }
+interface NativeBack {
+ setEnabled(options:{enabled:boolean}):Promise<void>;
+ exitApp():Promise<void>;
+ addListener(name:'back',listener:()=>void):Promise<PluginListenerHandle>;
+}
 export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
 export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
@@ -36,6 +41,8 @@ interface NativeFiles {
 }
 const files=registerPlugin<NativeFiles>('ClearWaterFiles');
 const hdr=registerPlugin<NativeHdr>('ClearWaterHdr');
+const back=registerPlugin<NativeBack>('ClearWaterBack');
+let backListeners=0;
 const cancelledHdrJobs=new Set<string>();
 export const isAndroid=()=>Capacitor.getPlatform()==='android';
 function base64Chunk(bytes:Uint8Array){let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);return btoa(binary);}
@@ -81,6 +88,19 @@ export async function saveRememberedAndroidModel(blob:Blob,config:CustomModel){
 }
 export const clearRememberedAndroidModelFile=()=>files.clearRememberedModelFile();
 export const forgetRememberedAndroidModel=()=>files.forgetRememberedModel();
+export function listenForAndroidBack(onBack:()=>void):()=>void{
+ if(!isAndroid())return ()=>{};
+ let stopped=false,listener:PluginListenerHandle|undefined;
+ backListeners++;
+ void back.addListener('back',onBack).then(async handle=>{
+  if(stopped){await handle.remove().catch(()=>{});return;}
+  listener=handle;
+  try{await back.setEnabled({enabled:true});}
+  catch{listener=undefined;await handle.remove().catch(()=>{});if(!stopped){stopped=true;backListeners=Math.max(0,backListeners-1);if(backListeners===0)await back.setEnabled({enabled:false}).catch(()=>{});}}
+ }).catch(()=>{if(!stopped){backListeners=Math.max(0,backListeners-1);if(backListeners===0)void back.setEnabled({enabled:false}).catch(()=>{});}});
+ return ()=>{if(stopped)return;stopped=true;backListeners=Math.max(0,backListeners-1);if(backListeners===0)void back.setEnabled({enabled:false}).catch(()=>{});if(listener)void listener.remove().catch(()=>{});};
+}
+export const exitAndroidApp=()=>back.exitApp();
 function fileHandle(uri:string,name:string,created=false,size?:number):LocalFileHandle {
  return {name,size,getFile:async()=>{const response=await fetch(Capacitor.convertFileSrc(uri));if(!response.ok)throw new Error('Cannot read source file.');return new File([await response.blob()],name);},async createWritable(){
    if(!created)throw new Error('Existing files cannot be overwritten.');

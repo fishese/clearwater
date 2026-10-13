@@ -1,5 +1,19 @@
 apply plugin: 'com.android.application'
 
+// Local signing credentials are never committed or copied into build artifacts.
+def releaseCredentials = new Properties()
+def releaseCredentialsFile = rootProject.file('keystore.properties')
+if (releaseCredentialsFile.exists()) {
+    releaseCredentialsFile.withInputStream { releaseCredentials.load(it) }
+}
+def hasReleaseCredentials = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].every {
+    releaseCredentials.getProperty(it)?.trim()
+}
+if (gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') } && !hasReleaseCredentials) {
+    throw new GradleException('Release signing requires android/keystore.properties with all four signing properties.')
+}
+
+
 android {
     namespace = "com.fishese.clearwater"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -17,6 +31,14 @@ android {
         }
     }
     signingConfigs {
+        if (hasReleaseCredentials) {
+            release {
+                storeFile rootProject.file(releaseCredentials.getProperty('storeFile'))
+                storePassword releaseCredentials.getProperty('storePassword')
+                keyAlias releaseCredentials.getProperty('keyAlias')
+                keyPassword releaseCredentials.getProperty('keyPassword')
+            }
+        }
         debug {
             // Standard public Android test credentials, never used for release signing.
             storeFile file("${System.getProperty('user.home')}/.android/debug.keystore")
@@ -35,8 +57,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseCredentials) signingConfig signingConfigs.release
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

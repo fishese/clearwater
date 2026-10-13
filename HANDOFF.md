@@ -52,3 +52,5 @@ Validate large RAW memory, long-video thermals/audio, cloud-provider folders and
 User prefers compact collapsible controls and minimal flavour text. Do not add prompts to routine files. Keep manual editing, one-click restoration and comparison. Update About when behaviour changes.
 
 See [Maintenance](MAINTENANCE.md) for commands. [Editor reference](editor/README.md) covers details. IMPLEMENTATION_PLAN.md is historical design context. Private fixture/model notes belong only in the ignored local notes.
+
+Android system Back uses the local ClearWaterBack plugin: dismiss safe dialogs and picker, return About to editor, collapse expanded controls/view, return narrow tabs to Correction/engine, and leave folder browsing before exit. Active jobs remain open. At the editor root, two Back presses within two seconds are required to exit; navigation or new work resets the confirmation. About close removes its hash without adding another history entry.

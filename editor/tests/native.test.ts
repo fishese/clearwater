@@ -1,13 +1,20 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
 const hdrBridge=vi.hoisted(()=>({beginHdrInput:vi.fn(),writeHdrInputChunk:vi.fn(),finishHdrInput:vi.fn(),convertHdrToSdr:vi.fn(),cancelHdrConversion:vi.fn(),deleteHdrWorkingCopy:vi.fn(),addListener:vi.fn()}));
-vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:(name:string)=>name==='ClearWaterHdr'?hdrBridge:bridge}));
-import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy} from '../src/native';
+const backBridge=vi.hoisted(()=>({setEnabled:vi.fn(),exitApp:vi.fn(),addListener:vi.fn(),remove:vi.fn()}));
+vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:(name:string)=>name==='ClearWaterHdr'?hdrBridge:name==='ClearWaterBack'?backBridge:bridge}));
+import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp} from '../src/native';
 import {convertHdrImportRequest} from '../src/hdr-import';
 import {writeFile} from '../src/file-save';
 
 describe('Android file bridge',()=>{
- beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});});
+ beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});backBridge.setEnabled.mockResolvedValue(undefined);backBridge.remove.mockResolvedValue(undefined);backBridge.addListener.mockResolvedValue({remove:backBridge.remove});});
+ it('enables the native Back callback while subscribed and disables it on cleanup',async()=>{
+  const onBack=vi.fn(),dispose=listenForAndroidBack(onBack);await vi.waitFor(()=>expect(backBridge.setEnabled).toHaveBeenCalledWith({enabled:true}));
+  const [,listener]=backBridge.addListener.mock.calls[0];listener();expect(onBack).toHaveBeenCalledOnce();dispose();
+  await vi.waitFor(()=>expect(backBridge.setEnabled).toHaveBeenLastCalledWith({enabled:false}));expect(backBridge.remove).toHaveBeenCalledOnce();
+ });
+ it('forwards an intentional root exit to the native activity',async()=>{await exitAndroidApp();expect(backBridge.exitApp).toHaveBeenCalledOnce();});
  it('streams a multi-chunk photo without changing its bytes',async()=>{
   const folder=await chooseAndroidFolder(),handle=await folder.getFileHandle('photo.jpg',{create:true});
   const bytes=Uint8Array.from({length:700000},(_,i)=>i%251);

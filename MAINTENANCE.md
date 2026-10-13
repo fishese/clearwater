@@ -53,7 +53,7 @@ cd android
 
 Output: `editor/android/app/build/outputs/apk/debug/app-debug.apk`. Current debug configuration is minified, resource-shrunk, debug-signed and not debuggable. Verify with SDK `apksigner verify --verbose`. Inspect new assets inside APK; Android rewrites `.gz` asset names, so corresponding-source archives use `.zip`. User installs manually; do not assume ADB or install without a request.
 
-Project configuration explicitly uses the standard Android debug keystore, not production release signing. Follow user restricted-folder rules. Never search unrelated locations for signing credentials. Use only an exact keystore explicitly referenced in project configuration, only for that build; never copy, print, commit or alter keystores/secrets.
+Debug builds use the standard Android test keystore. Release builds load only the four signing properties (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) from gitignored `editor/android/keystore.properties`; use forward slashes in the configured Windows path. Missing configuration fails a requested release build. Run `assembleRelease` after `android:sync` for a minified release-signed APK. Never publish the properties file. Follow user restricted-folder rules. Never search unrelated locations for signing credentials. Use only an exact keystore explicitly referenced in project configuration, only for that build; never copy, print, commit or alter keystores/secrets.
 
 ## Dependencies, licences and data
 

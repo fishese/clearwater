@@ -67,7 +67,7 @@
   "Photo & video editor": "Photo & video editor",
   "Open a photo, MP4 or MOV to start.": "Open a photo, MP4 or MOV to start.",
   "Choose a photo or video": "Choose a photo or video",
-  "Or drop photos anywhere in the studio": "Or drop photos anywhere in the studio",
+  "Or drop photos anywhere in the studio": "Or drop photos anywhere in the editor",
   "Edited photo": "Edited photo",
   "Original photo": "Original photo",
   "ORIGINAL": "ORIGINAL",
@@ -96,7 +96,7 @@
   "Adjustments": "Adjustments",
   "Toggle adjustments": "Toggle adjustments",
   "Reset all edits": "Reset all edits",
-  "Correction Engine": "Correction Engine",
+  "Correction Engine": "Correction engine",
   "Correction engine": "Correction engine",
   "Balanced restoration": "Balanced restoration",
   "Original RGB heuristic": "Original RGB heuristic",
@@ -386,7 +386,7 @@
   "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.": "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.",
   "Could not decode this video frame.": "Could not decode this video frame.",
   "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.": "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.",
-  "This first video version supports clips up to 512 MB.": "This first video version supports clips up to 512 MB.",
+  "This first video version supports clips up to 512 MB.": "Video clips can be up to 512 MB.",
   "No video track was found in this MP4/MOV file.": "No video track was found in this MP4/MOV file.",
   "HDR/Dolby Vision video needs tone mapping, which is not ready yet. Use an SDR copy; on iPhone, record with HDR Video turned off.": "HDR/Dolby Vision video needs tone mapping, which is not ready yet. Use an SDR copy; on iPhone, record with HDR Video turned off.",
   "This device cannot decode {0}. iPhone HEVC/MOV support depends on the device. Try an H.264 SDR copy.": "This device cannot decode {0}. iPhone HEVC/MOV support depends on the device. Try an H.264 SDR copy.",
@@ -453,5 +453,8 @@
   "Could not load WWE-UIE. Check the model files and retry.": "Could not load WWE-UIE. Check the model files and retry.",
   "ClearWater's classical corrections, interface and colour-transfer workflow build on the work credited above. Converted WWE-UIE weights include an Apache-2.0 licence notice; Shallow-UWnet and FUnIE-GAN weights include MIT licence notices. Model source links and detailed conversion provenance are available in the": "ClearWater's classical corrections, interface and colour-transfer workflow build on the work credited above. Converted WWE-UIE weights include an Apache-2.0 licence notice; Shallow-UWnet and FUnIE-GAN weights include MIT licence notices. Model source links and detailed conversion provenance are available in the",
   "supplies the WWE-UIE model described above. Apache-2.0.": "supplies the WWE-UIE model described above. Apache-2.0.",
-  "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences."
+  "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.",
+  "Back again to exit app": "Back again to exit app",
+  "Keep the app open while work is active.": "Keep the app open while work is active.",
+  "Could not exit the app.": "Could not exit the app."
 }

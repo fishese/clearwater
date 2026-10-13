@@ -220,7 +220,7 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
  .engine-subpanel>details:first-child>summary,.engine-subpanel>details:nth-child(2)>summary,.dive-subpanel>details>summary,.enhancement-subpanel>details>summary{display:none}
  .engine-subpanel>details:first-child>.group-content,.engine-subpanel>details:nth-child(2)>.group-content,.dive-subpanel>details>.group-content,.enhancement-subpanel>details>.group-content{display:block}
  .export-panel>details>summary{display:none}
- .export-panel>details>.group-content{display:block}
+ .export-panel>details>.group-content{display:block;padding-top:8px}
  .engine-subpanel .engine-details{padding:3px 0 2px}
  .engine-subpanel .engine-details>p{display:none}
  .engine-subpanel .settings-group{border-bottom:0}
