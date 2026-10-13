@@ -7,19 +7,22 @@ import android.net.Uri;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import android.util.AtomicFile;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.*;
 import com.getcapacitor.annotation.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.*;
+import org.json.JSONObject;
 
-/** User-selected SAF folders only. Existing documents are never opened for writing. */
+/** User-selected SAF folders plus the app-private custom model slots. Existing SAF documents are never overwritten. */
 @CapacitorPlugin(name = "ClearWaterFiles")
 public class ClearWaterFilesPlugin extends Plugin {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Set<String> folders = new HashSet<>(), created = new HashSet<>();
     private final Map<String, WriteSession> writes = new HashMap<>();
+    private final Map<String, ModelWriteSession> modelWrites = new HashMap<>();
     private final Map<String, File> sharedFiles = new HashMap<>();
     private final List<JSObject> shares = new ArrayList<>();
     private String shareError;
@@ -27,6 +30,70 @@ public class ClearWaterFilesPlugin extends Plugin {
         final Uri uri; final OutputStream stream;
         WriteSession(Uri uri, OutputStream stream) { this.uri=uri; this.stream=stream; }
     }
+    private static class ModelWriteSession {
+        final AtomicFile atomic; final File target; final FileOutputStream stream; final long expected; final String slot; long written;
+        ModelWriteSession(AtomicFile atomic, File target, FileOutputStream stream, long expected, String slot) { this.atomic=atomic;this.target=target;this.stream=stream;this.expected=expected;this.slot=slot; }
+    }
+    private File modelFile(String slot) { return new File(getContext().getFilesDir(), "custom-model-"+slot+".onnx"); }
+    private android.content.SharedPreferences modelPreferences() { return getContext().getSharedPreferences("clearwater-custom-model", android.content.Context.MODE_PRIVATE); }
+    private JSONObject modelDescriptor() throws Exception {
+        String value=modelPreferences().getString("descriptor",null);if(value==null)return null;
+        JSONObject descriptor=new JSONObject(value);String sha=descriptor.optString("sha256"),name=descriptor.optString("name"),input=descriptor.optString("inputRange"),output=descriptor.optString("outputRange"),slot=descriptor.optString("slot");long size=descriptor.optLong("size",-1);
+        if(!sha.matches("[a-f0-9]{64}")||name.isEmpty()||name.length()>255||!(input.equals("unit")||input.equals("signed"))||!(output.equals("unit")||output.equals("signed"))||!(slot.equals("a")||slot.equals("b"))||size<=0||size>64L*1024*1024)throw new IOException("Saved model settings are damaged.");
+        return descriptor;
+    }
+    private JSONObject customConfig(JSONObject descriptor) throws Exception {
+        JSONObject result=new JSONObject();result.put("sha256",descriptor.getString("sha256"));result.put("name",descriptor.getString("name"));result.put("inputRange",descriptor.getString("inputRange"));result.put("outputRange",descriptor.getString("outputRange"));return result;
+    }
+    @PluginMethod public void getRememberedModel(PluginCall call) { io.execute(()->{try {
+        JSONObject descriptor=modelDescriptor();JSObject result=new JSObject();result.put("present",descriptor!=null);
+        if(descriptor!=null){File file=modelFile(descriptor.getString("slot"));long size=descriptor.getLong("size");result.put("config",customConfig(descriptor));result.put("size",size);result.put("hasFile",file.isFile()&&file.length()==size);}
+        else result.put("hasFile",false);
+        call.resolve(result);
+    }catch(Exception error){call.reject("Saved custom model settings are damaged.",error);}}); }
+    @PluginMethod public void beginModelWrite(PluginCall call) { io.execute(()->{try {
+        if(!modelWrites.isEmpty())throw new IOException("A custom model save is already in progress.");
+        long size=call.getLong("size",-1L);if(size<=0||size>64L*1024*1024)throw new IOException("Custom model must be under 64 MB.");
+        JSONObject old=modelDescriptor();String active=old==null?"b":old.getString("slot"),slot=active.equals("a")?"b":"a";
+        File target=modelFile(slot);AtomicFile atomic=new AtomicFile(target);FileOutputStream stream=atomic.startWrite();String id=UUID.randomUUID().toString();modelWrites.put(id,new ModelWriteSession(atomic,target,stream,size,slot));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
+    }catch(Exception error){call.reject("Could not prepare private model storage.",error);}}); }
+    @PluginMethod public void writeModelChunk(PluginCall call) { io.execute(()->{try {
+        ModelWriteSession session=modelWrites.get(call.getString("id"));String data=call.getString("data");if(session==null||data==null||data.length()>350000)throw new IOException("Invalid model write session or chunk.");
+        byte[] bytes=Base64.decode(data,Base64.NO_WRAP);if(bytes.length>262144||session.written+bytes.length>session.expected)throw new IOException("Invalid model size.");session.stream.write(bytes);session.written+=bytes.length;call.resolve();
+    }catch(Exception error){call.reject("Could not save the custom model.",error);}}); }
+    @PluginMethod public void finishModelWrite(PluginCall call) { io.execute(()->{
+        String id=call.getString("id");ModelWriteSession session=modelWrites.remove(id);if(session==null){call.reject("Model write session is closed.");return;}
+        if(call.getBoolean("abort",false)){try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}call.resolve();return;}
+        try {
+            if(session.written!=session.expected)throw new IOException("Custom model is incomplete.");
+            JSObject config=call.getObject("config");if(config==null)throw new IOException("Missing model settings.");
+            String sha=config.getString("sha256"),name=config.getString("name"),input=config.getString("inputRange"),output=config.getString("outputRange");
+            if(sha==null||!sha.matches("[a-f0-9]{64}")||name==null||name.isEmpty()||name.length()>255||!("unit".equals(input)||"signed".equals(input))||!("unit".equals(output)||"signed".equals(output)))throw new IOException("Invalid model settings.");
+            session.atomic.finishWrite(session.stream);
+            JSONObject descriptor=new JSONObject();descriptor.put("sha256",sha);descriptor.put("name",name);descriptor.put("inputRange",input);descriptor.put("outputRange",output);descriptor.put("slot",session.slot);descriptor.put("size",session.expected);
+            String previous=modelPreferences().getString("descriptor",null);
+            if(!modelPreferences().edit().putString("descriptor",descriptor.toString()).commit()){
+                if(previous==null)modelPreferences().edit().remove("descriptor").commit();else modelPreferences().edit().putString("descriptor",previous).commit();
+                session.target.delete();throw new IOException("Could not save model settings.");
+            }
+            call.resolve();
+        }catch(Exception error){try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}call.reject("Could not save the custom model.",error);}
+    }); }
+    @PluginMethod public void readModelChunk(PluginCall call) { io.execute(()->{try {
+        JSONObject descriptor=modelDescriptor();if(descriptor==null)throw new IOException("No custom model is saved.");long size=descriptor.getLong("size"),offset=call.getLong("offset",-1L);int length=call.getInt("length",0);if(offset<0||offset>size||length<0||length>262144||offset+length>size)throw new IOException("Invalid model read range.");
+        File file=modelFile(descriptor.getString("slot"));if(!file.isFile()||file.length()!=size)throw new FileNotFoundException("Saved custom model is missing.");byte[] bytes=new byte[length];try(RandomAccessFile input=new RandomAccessFile(file,"r")){input.seek(offset);input.readFully(bytes);}
+        JSObject result=new JSObject();result.put("data",Base64.encodeToString(bytes,Base64.NO_WRAP));result.put("done",offset+length==size);call.resolve(result);
+    }catch(Exception error){call.reject("Saved custom model is missing or damaged.",error);}}); }
+    @PluginMethod public void clearRememberedModelFile(PluginCall call) { io.execute(()->{try {JSONObject descriptor=modelDescriptor();if(descriptor!=null&&!modelFile(descriptor.getString("slot")).delete()&&modelFile(descriptor.getString("slot")).exists())throw new IOException("Could not clear the saved model file.");call.resolve();}catch(Exception error){call.reject("Could not clear the saved model file.",error);}}); }
+    @PluginMethod public void forgetRememberedModel(PluginCall call) { io.execute(()->{try {
+        for(String slot:new String[]{"a","b"}){File file=modelFile(slot);if(file.exists()&&!file.delete())throw new IOException("Could not remove the saved model file.");}
+        String previous=modelPreferences().getString("descriptor",null);
+        if(!modelPreferences().edit().remove("descriptor").commit()){
+            if(previous!=null)modelPreferences().edit().putString("descriptor",previous).commit();
+            throw new IOException("Could not clear saved model settings.");
+        }
+        call.resolve();
+    }catch(Exception error){call.reject("Could not remove the saved model.",error);}}); }
     @Override public void load() { enqueueShare(getActivity().getIntent()); }
     @Override protected void handleOnNewIntent(Intent intent) { enqueueShare(intent); }
     @PluginMethod public void chooseFolder(PluginCall call) {
@@ -139,5 +206,5 @@ public class ClearWaterFilesPlugin extends Plugin {
     }
     @PluginMethod public void drainShares(PluginCall call) {io.execute(()->{JSObject result=new JSObject();result.put("photos",new JSArray(shares));shares.clear();if(shareError!=null){result.put("error",shareError);shareError=null;}call.resolve(result);});}
     @PluginMethod public void releaseShare(PluginCall call) {io.execute(()->{File file=sharedFiles.remove(call.getString("id"));if(file!=null)file.delete();call.resolve();});}
-    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values()){try{session.stream.close();DocumentsContract.deleteDocument(getContext().getContentResolver(),session.uri);}catch(Exception ignored){}}writes.clear();});io.shutdown();}
+    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values()){try{session.stream.close();DocumentsContract.deleteDocument(getContext().getContentResolver(),session.uri);}catch(Exception ignored){}}writes.clear();for(ModelWriteSession session:modelWrites.values())try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}modelWrites.clear();});io.shutdown();}
 }

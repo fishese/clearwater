@@ -1,6 +1,7 @@
 import {Capacitor,registerPlugin,type PluginListenerHandle} from '@capacitor/core';
 import type {LocalDirectoryHandle,LocalFileHandle} from './file-save';
 import {mediaLimit,supportedMedia} from './core/media';
+import type {CustomModel} from './core/types';
 
 type SharedPhoto={id:string;path:string;name:string;type:string};
 export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
@@ -16,9 +17,36 @@ interface NativeFiles {
  drainShares():Promise<{photos:SharedPhoto[];error?:string}>;
  releaseShare(options:{id:string}):Promise<void>;
  addListener(name:'sharesAvailable',listener:()=>void):Promise<PluginListenerHandle>;
+ getRememberedModel():Promise<{present:boolean;hasFile:boolean;config?:CustomModel;size?:number}>;
+ beginModelWrite(options:{size:number}):Promise<{id:string}>;
+ writeModelChunk(options:{id:string;data:string}):Promise<void>;
+ finishModelWrite(options:{id:string;abort:boolean;config?:CustomModel}):Promise<void>;
+ readModelChunk(options:{offset:number;length:number}):Promise<{data:string;done:boolean}>;
+ clearRememberedModelFile():Promise<void>;
+ forgetRememberedModel():Promise<void>;
 }
 const files=registerPlugin<NativeFiles>('ClearWaterFiles');
 export const isAndroid=()=>Capacitor.getPlatform()==='android';
+export async function readRememberedAndroidModel():Promise<{config:CustomModel;blob:Blob|null}|null>{
+ const info=await files.getRememberedModel();if(!info.present||!info.config)return null;
+ if(!info.hasFile||!info.size||info.size>64*1024*1024)return {config:info.config,blob:null};
+ try{
+  const chunks:BlobPart[]=[];let offset=0;
+  while(offset<info.size){const result=await files.readModelChunk({offset,length:Math.min(256*1024,info.size-offset)});if(!result.data)throw new Error('Saved custom model is damaged.');const binary=atob(result.data),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);chunks.push(bytes);offset+=bytes.length;if(result.done&&offset<info.size)throw new Error('Saved custom model is incomplete.');}
+  if(offset!==info.size)throw new Error('Saved custom model is damaged.');
+  return {config:info.config,blob:new Blob(chunks,{type:'application/octet-stream'})};
+ }catch{return {config:info.config,blob:null};}
+}
+export async function saveRememberedAndroidModel(blob:Blob,config:CustomModel){
+ if(blob.size<=0||blob.size>64*1024*1024)throw new Error('Choose a self-contained ONNX model under 64 MB.');
+ const {id}=await files.beginModelWrite({size:blob.size});let committed=false;
+ try{
+  for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);await files.writeModelChunk({id,data:btoa(binary)});}
+  await files.finishModelWrite({id,abort:false,config});committed=true;
+ }finally{if(!committed)await files.finishModelWrite({id,abort:true}).catch(()=>{});}
+}
+export const clearRememberedAndroidModelFile=()=>files.clearRememberedModelFile();
+export const forgetRememberedAndroidModel=()=>files.forgetRememberedModel();
 function fileHandle(uri:string,name:string,created=false,size?:number):LocalFileHandle {
  return {name,size,getFile:async()=>{const response=await fetch(Capacitor.convertFileSrc(uri));if(!response.ok)throw new Error('Cannot read source file.');return new File([await response.blob()],name);},async createWritable(){
    if(!created)throw new Error('Existing files cannot be overwritten.');

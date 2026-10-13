@@ -17,11 +17,23 @@ const server=createServer(async(req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url='http://127.0.0.1:'+server.address().port;
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
+ if(process.env.CHECK_URL){
+  const production=await browser.newPage({viewport:{width:390,height:844}});await production.goto(process.env.CHECK_URL);
+  const productionUpdate=production.getByRole('button',{name:'Update app',exact:true});await productionUpdate.waitFor();
+  const target=await productionUpdate.boundingBox(),icon=await productionUpdate.locator('svg').boundingBox();
+  const style=await productionUpdate.evaluate(b=>{const s=getComputedStyle(b);return{borderWidth:s.borderTopWidth,borderStyle:s.borderStyle,boxShadow:s.boxShadow};});
+  assert.equal((await productionUpdate.innerText()).trim(),'','Update button must remain icon-only');assert.ok(target.width>=40&&target.height>=40);assert.ok(icon.width<=16&&icon.height<=16);assert.deepEqual(style,{borderWidth:'0px',borderStyle:'none',boxShadow:'none'});
+  await production.close();console.log('PASS production preview update target and unframed icon');
+ }
  const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
  version=1;await page.reload();assert.equal(await page.getByRole('heading').textContent(),'Previous version','Reproduce stale cached navigation');
  await page.goto(url+'/update.html');await page.getByRole('button',{name:'Update and open',exact:true}).click();await page.getByRole('button',{name:'Update app',exact:true}).waitFor({timeout:60000});
- const update=page.getByRole('button',{name:'Update app',exact:true});assert.equal(await update.innerText(),'');assert.equal(await update.evaluate(b=>getComputedStyle(b).borderTopWidth),'0px');assert.ok((await update.boundingBox()).width<=26);
+ const update=page.getByRole('button',{name:'Update app',exact:true});assert.equal((await update.innerText()).trim(),'','Update button must remain icon-only');
+ const updateTarget=await update.boundingBox(),icon=await update.locator('svg').boundingBox(),updateStyle=await update.evaluate(b=>{const s=getComputedStyle(b);return{borderTopWidth:s.borderTopWidth,borderStyle:s.borderStyle,boxShadow:s.boxShadow};});
+ assert.ok(updateTarget.width>=(page.viewportSize().width<=370?36:40)&&updateTarget.height>=40,'Update button target should be at least 40px, or 36px wide at narrow phone widths');
+ assert.ok(icon.width<=16&&icon.height<=16,'Update artwork should remain compact');
+ assert.equal(updateStyle.borderTopWidth,'0px');assert.equal(updateStyle.borderStyle,'none');assert.equal(updateStyle.boxShadow,'none');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));console.log('PASS recovery from stale worker and compact unframed update icon');
  await update.click();await page.getByRole('status').filter({hasText:'latest version'}).waitFor();
  // Store a real photo and make an edit immediately before requesting activation.

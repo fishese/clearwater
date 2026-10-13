@@ -97,5 +97,5 @@ ctx.onmessage=async({data})=>{
    catch(error){await current.cancel().catch(()=>{});throw error;}
    finally{clearInterval(watchdog);if(conversion===current)conversion=undefined;canvas.width=canvas.height=1;}
   }
- }catch(error){opening?.dispose();let message=error instanceof Error?error.message:'This video could not be processed.';if(/unsupported configuration/i.test(message))message='This device cannot decode or encode this video configuration. HEVC support varies by device. Try an H.264 SDR copy.';if(gen===generation)send({type:'error',gen,request,operation:type,message});}
+ }catch(error){if(type==='custom-model'&&data.silent)return;opening?.dispose();let message=error instanceof Error?error.message:'This video could not be processed.';if(/unsupported configuration/i.test(message))message='This device cannot decode or encode this video configuration. HEVC support varies by device. Try an H.264 SDR copy.';if(gen===generation)send({type:'error',gen,request,operation:type,message});}
 };

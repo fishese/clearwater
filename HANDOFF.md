@@ -24,7 +24,7 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 | EXIF/GPS | src/photo-metadata.ts |
 | Neural models | src/models.ts, src/core/model-contract.ts, src/core/neural-field.ts |
 | Video | src/video.worker.ts, src/core/video-*.ts |
-| Persistence / files | src/storage.ts, src/file-save.ts, src/native.ts |
+| Persistence / files | src/storage.ts, src/custom-model-storage.ts, src/file-save.ts, src/native.ts |
 | Android bridge | android/app/src/main/java/com/fishese/clearwater/ |
 | PWA lifecycle | scripts/sw.template.js, scripts/build-sw.mjs, src/update.ts, public/update.html |
 
@@ -33,7 +33,7 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 - Engines start from the original; do not stack Balanced underneath AI. Photo AI predicts at 256×256 and transfers a residual onto source detail; preview/export share coordinates and finishing.
 - Recipe keys are stable, including historical `wave` for the generic custom slot. Translate labels, never stored identifiers or asset filenames.
 - Output folder selected: original stem. Otherwise add `-restore`. App-managed saves add numbered siblings; browser downloads control their own collisions.
-- IndexedDB retains imported files/latest recipes. Undo history, folder handles, custom weights and resolution choices are session-only. Storage can be evicted.
+- IndexedDB retains imported files/latest recipes. A validated custom model and its range settings are saved locally (browser IndexedDB or Android app storage), checked on reuse, and can be removed. Missing/unreadable copies require reselection. Undo history, folder handles and resolution choices are session-only. Browser storage can be evicted.
 - Preserve generation/request guards and buffer cleanup. RAW uses disposable workers; large export buffers are released after saving.
 - Web models cache after first use; APK bundles supplied models. Never package locally supplied weights or personal fixtures.
 

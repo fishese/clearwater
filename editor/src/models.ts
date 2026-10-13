@@ -10,13 +10,14 @@ ort.env.wasm.numThreads=1;
 ort.env.wasm.proxy=false;
 const sessions=new Map<ModelName,Promise<ort.InferenceSession>>();
 let custom:CustomModel|undefined;
-export async function loadCustomModel(data:{permission:boolean;blob:Blob&{name?:string};inputRange:'unit'|'signed';outputRange:'unit'|'signed'}):Promise<CustomModel>{
+export async function loadCustomModel(data:{permission:boolean;blob:Blob&{name?:string};name?:string;inputRange:'unit'|'signed';outputRange:'unit'|'signed';expectedConfig?:CustomModel}):Promise<CustomModel>{
  if(data.permission!==true)throw new Error('Confirm permission to use your model.');
  if(!(data.blob instanceof Blob)||data.blob.size>64*1024*1024)throw new Error('Choose a self-contained ONNX model under 64 MB.');
  if(!['unit','signed'].includes(data.inputRange)||!['unit','signed'].includes(data.outputRange))throw new Error('Select valid model colour ranges.');
  const bytes=await data.blob.arrayBuffer();
  const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
- const config:CustomModel={sha256,name:String(data.blob.name??'custom.onnx').slice(0,255),inputRange:data.inputRange,outputRange:data.outputRange};
+ const config:CustomModel={sha256,name:String(data.name??data.expectedConfig?.name??data.blob.name??'custom.onnx').slice(0,255),inputRange:data.inputRange,outputRange:data.outputRange};
+ if(data.expectedConfig&&(data.expectedConfig.sha256!==config.sha256||data.expectedConfig.name!==config.name||data.expectedConfig.inputRange!==config.inputRange||data.expectedConfig.outputRange!==config.outputRange))throw new Error('Saved custom model is missing or damaged.');
  if(custom?.sha256!==sha256||custom.inputRange!==config.inputRange||custom.outputRange!==config.outputRange)await registerCustomModel(bytes,config);
  return config;
 }

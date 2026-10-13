@@ -11,13 +11,15 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Metadata | metadata-check.mjs |
 | Navigation / saving | browsing-check.mjs |
 | Async UI state | ui-state-check.mjs (synthetic fixtures) |
+| Compact touch layout | touch-target-check.mjs (CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
+| Saved custom model | custom-model-check.mjs (bundled model as the test input) |
 | Controls / adapter | controls-check.mjs |
 | Video / AI video | video-check.mjs, video-ai-check.mjs |
 | Guide | about-check.mjs |
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 59 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 62 tests.
 
 ## Languages
 
@@ -50,7 +52,7 @@ Project configuration explicitly uses the standard Android debug keystore, not p
 
 ## Dependencies, licences and data
 
-Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices. Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Custom weights are not persisted or redistributed; generic loading grants no licence rights.
+Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices. Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
 
 LibRaw bindings pinned at @colorhythm/libraw-wasm 1.1.1 / LibRaw 0.22.1. Keep MIT bindings, chosen CDDL notices, copyright and matching source archives. Mediabunny source/licence material is bundled too. Attribution is in About and public licence/model notes; do not remove source offerings to reduce size.
 
@@ -70,7 +72,7 @@ The audit added regression coverage for superseded photo previews, disabled-enha
 
 Remaining improvements, in priority order:
 
-- Touch accessibility: preserve the compact visual design while considering larger invisible touch targets for small icon buttons. Dialog Tab/Escape handling now has browser regression coverage; include screen-reader and physical-keyboard checks on devices.
+- Touch accessibility: controls now use wider hit areas (44px sliders, mostly 40px icon actions, 36px toolbar widths on the narrowest layout), with wrapping for long folder counters. Include screen-reader, physical-keyboard and real-phone checks; avoid overlapping invisible hit boxes when changing the compact layout.
 - Extreme photo exports: benchmark peak memory on actual phones before changing strip sizing. At the maximum legal width, a 448-row enhancement strip contains 14.7 million pixels; each RGBA/Float32 buffer is 56 MiB, and several coexist. Smaller strips trade memory for repeated halo processing. Existing Auto/Reduced options remain the practical fallback; the Full ceiling is not a memory guarantee.
 - Large libraries: profile hundreds of imports and folder visits, then consider a bounded thumbnail list and library storage usage/cleanup controls. Do not silently remove originals or recipes to reclaim space.
 

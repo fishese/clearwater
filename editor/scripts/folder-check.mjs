@@ -5,11 +5,12 @@ try {
  const context=await browser.newContext({viewport:{width:390,height:844}});
  await context.addInitScript(()=>{
   window.androidBridge={};window.folderPicks=0;window.cancelFolder=false;window.createdPhotos=[];window.nativeWrites=[];
-  const methods=['chooseFolder','listPhotos','drainShares','releaseShare','stat','create','beginWrite','writeChunk','finishWrite','removeListener'];
+  const methods=['chooseFolder','listPhotos','drainShares','releaseShare','stat','create','beginWrite','writeChunk','finishWrite','getRememberedModel','beginModelWrite','writeModelChunk','finishModelWrite','readModelChunk','clearRememberedModelFile','forgetRememberedModel','removeListener'];
   window.Capacitor={PluginHeaders:[{name:'ClearWaterFiles',methods:[...methods.map(name=>({name,rtype:'promise'})),{name:'addListener',rtype:'callback'}]}],nativeCallback:()=>Promise.resolve('listener-1'),async nativePromise(plugin,method,options){
    if(method==='chooseFolder'){window.folderPicks++;if(window.cancelFolder)throw Object.assign(new Error('Cancelled'),{code:'CANCELLED'});return {uri:'content://folder',name:'Dive photos'};}
    if(method==='listPhotos')return {photos:[{name:'IMG10.png',uri:'https://clearwater.test/10.png',type:'image/png',size:100},{name:'IMG2.png',uri:'https://clearwater.test/2.png',type:'image/png',size:100}]};
    if(method==='drainShares')return {photos:[]};
+   if(method==='getRememberedModel')return {present:false,hasFile:false};
    if(method==='stat')return {exists:window.createdPhotos.includes(options.name)};
    if(method==='create'){window.createdPhotos.push(options.name);return {name:options.name,uri:'content://new/'+options.name};}
    if(method==='beginWrite')return {id:options.uri};

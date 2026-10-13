@@ -38,7 +38,7 @@ ctx.onmessage=async({data})=>{
   try {
     if(type==='custom-model') {
       customTask=customTask.catch(()=>{}).then(async()=>{const {loadCustomModel}=await import('./models');customModel=await loadCustomModel(data);fields.delete('wave');return customModel;});
-      const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config});
+      const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config,restore:data.restore===true});
     } else if(type==='load') {
       generation=gen;decoding?.abort();decoding=new AbortController();
       source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();
@@ -116,6 +116,7 @@ ctx.onmessage=async({data})=>{
     else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();}
   } catch(error) {
     if((type==='render'||type==='enhance')&&request!==latestPreviewRequest)return;
-    send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.'});
+    if(type==='custom-model'&&data.silent)return;
+    send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.',restore:data.restore===true});
   }
 };
