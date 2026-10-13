@@ -24,10 +24,10 @@ await page.screenshot({path:root+'/analysis/browser-check/controls-radios.png'})
 await engine.locator('summary').click();await page.getByLabel('Correction engine',{exact:true}).selectOption('wave');
 const load=page.getByRole('button',{name:'Load model',exact:true});assert.equal(await load.isDisabled(),true);
 await page.getByLabel('ONNX model file',{exact:true}).setInputFiles({name:'invalid.onnx',mimeType:'application/octet-stream',buffer:Buffer.from('invalid')});
-await page.getByRole('checkbox').check();await load.click();await page.getByRole('alert').waitFor({timeout:30000});
+await page.getByRole('checkbox',{name:'I have permission to use this model and will follow its licence.'}).check();await load.click();await page.getByRole('alert').waitFor({timeout:30000});
 assert.equal(await page.getByRole('dialog').count(),1);
 // The same generic adapter handles a unit-range model and a signed-range model.
-for(const [file,range] of [['model-tools/weights/deep-wavenet-research.onnx','unit'],['editor/public/models/funie.onnx','signed']]){
+for(const [file,range] of [['editor/public/models/shallow.onnx','unit'],['editor/public/models/funie.onnx','signed']]){
   await page.getByLabel('ONNX model file',{exact:true}).setInputFiles(root+'/'+file);
   await page.getByLabel('Model input range',{exact:true}).selectOption(range);await page.getByLabel('Model output range',{exact:true}).selectOption(range);
   await load.click();await page.getByRole('dialog').waitFor({state:'hidden',timeout:120000});await ready();

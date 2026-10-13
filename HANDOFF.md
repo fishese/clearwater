@@ -2,7 +2,7 @@
 
 ## Current product
 
-ClearWater is a local-first React/TypeScript/Vite editor with web/PWA and Capacitor Android builds. No server-side image processing or account system. Next authorised milestone: English, Hong Kong Traditional Chinese (standard written Chinese, not Cantonese) and Japanese. Keep labels compact and recipes intact when changing language.
+ClearWater is a local-first React/TypeScript/Vite editor with web/PWA and Capacitor Android builds. No server-side image processing or account system. Interface and guide support English, Hong Kong Traditional Chinese (standard written Chinese, not Cantonese) and Japanese. A compact header selector switches language without restarting processing or changing edits. Browser language supplies the first default; a saved choice overrides it.
 
 Photos: JPEG, PNG, HEIC/HEIF and compatible Android DNG / Apple ProRAW; JPEG/PNG export with supported EXIF/GPS retention enabled by default. RAW develops into 8-bit sRGB. JPEG-XL DNG and HDR tone mapping are unsupported.
 
@@ -16,6 +16,7 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 | --- | --- |
 | UI and state | src/App.tsx, src/styles.css |
 | User guide and attribution | src/About.tsx |
+| Languages | src/i18n.tsx, src/i18n-core.ts, src/locales/*.json |
 | Correction / recipes | src/core/engine.ts, src/core/types.ts |
 | Photo rendering / export | src/processor.worker.ts |
 | Headers / resolution / DNG | src/photo-header.ts, src/photo-decode.ts, src/core/photo-size.ts, src/raw.worker.ts |
