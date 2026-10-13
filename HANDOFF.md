@@ -18,6 +18,7 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 | User guide and attribution | src/About.tsx |
 | Languages | src/i18n.tsx, src/i18n-core.ts, src/locales/*.json |
 | Correction / recipes | src/core/engine.ts, src/core/types.ts |
+| Optional photo contrast/detail finishing | src/core/enhancement.ts |
 | Photo rendering / export | src/processor.worker.ts |
 | Headers / resolution / DNG | src/photo-header.ts, src/photo-decode.ts, src/core/photo-size.ts, src/raw.worker.ts |
 | EXIF/GPS | src/photo-metadata.ts |
@@ -35,6 +36,8 @@ Video: SDR MP4/MOV, device-supported H.264/HEVC decoding. Input up to 10 minutes
 - IndexedDB retains imported files/latest recipes. Undo history, folder handles, custom weights and resolution choices are session-only. Storage can be evicted.
 - Preserve generation/request guards and buffer cleanup. RAW uses disposable workers; large export buffers are released after saving.
 - Web models cache after first use; APK bundles supplied models. Never package locally supplied weights or personal fixtures.
+
+Photo enhancement is an optional finishing pass after any engine: Auto enhance plus Auto contrast, Local contrast and Sharpness. Existing edits remain unchanged until enabled. Settings use the optional version-1 recipe enhancement field. Photo export needs halo rows for spatial filters; video ignores this photo-only field. Auto restore and manual reset clear it.
 
 ## Gaps and priorities
 

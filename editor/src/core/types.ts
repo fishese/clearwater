@@ -24,8 +24,11 @@ export interface Recipe {
   version: 1; engine: 'balanced' | 'baseline' | 'shallow' | 'funie' | 'wave'; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
   customModel?: CustomModel;
+  enhancement?: PhotoEnhancement;
   videoCorrection?: {mode:'sampled'|'fixed';interval:2|5|10;referenceTime:number};
 }
+export interface PhotoEnhancement {contrast:number;clarity:number;sharpness:number;black:number;white:number}
+export const DEFAULT_ENHANCEMENT:PhotoEnhancement={contrast:0,clarity:0,sharpness:0,black:0,white:1};
 // 'wave' remains the on-disk engine ID for compatibility with earlier recipes.
 export interface CustomModel {sha256:string;name:string;inputRange:'unit'|'signed';outputRange:'unit'|'signed'}
 export const DEFAULT_HINTS: Hints = { scene: 'auto', water: 'auto', filter: 'auto', depth: null };

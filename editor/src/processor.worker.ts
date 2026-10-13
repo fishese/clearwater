@@ -6,6 +6,7 @@ import type { ModelName } from './models';
 import {preservePhotoMetadata} from './photo-metadata';
 import {decodePhoto} from './photo-decode';
 import type {PhotoInfo,PhotoResolution,PhotoDevice} from './core/photo-size';
+import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancement';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
@@ -51,13 +52,22 @@ ctx.onmessage=async({data})=>{
       pixels=c.getImageData(0,0,canvas.width,canvas.height);
       const original=canvas.transferToImageBitmap();
       send({type:'loaded',gen,width:sourceInfo.sourceWidth,height:sourceInfo.sourceHeight,analysis:analyse(pixels.data,pixels.width,pixels.height),original,photo:sourceInfo},[original]);
+    } else if(type==='enhance' && gen===generation && pixels) {
+      const input=pixels,recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
+      if(gen!==generation)return;
+      const base=field?transferField(input.data,input.width,input.height,field):undefined;
+      send({type:'enhancement-ready',gen,request,enhancement:suggestEnhancement(renderPixels(input.data,recipe,base))});
     } else if(type==='render' && gen===generation && pixels) {
       const recipe=data.recipe as Recipe;
       const input=pixels,field=await neural(recipe,gen,request);
       if(gen!==generation)return;
       const base=field?transferField(input.data,input.width,input.height,field):undefined;
       const canvas=new OffscreenCanvas(input.width,input.height);
-      canvas.getContext('2d')!.putImageData(new ImageData(renderPixels(input.data,recipe,base),input.width,input.height),0,0);
+      const corrected=renderPixels(input.data,recipe,base),settings=recipe.enhancement;
+      const points=settings&&settings.black===0&&settings.white===1?suggestEnhancement(corrected):settings;
+      const resolved=settings&&points?{...settings,black:points.black,white:points.white}:settings;
+      const finished=enhancePixels(corrected,input.width,input.height,resolved,sourceInfo?.exportWidth,sourceInfo?.exportHeight);
+      canvas.getContext('2d')!.putImageData(new ImageData(finished,input.width,input.height),0,0);
       const bitmap=canvas.transferToImageBitmap();
       send({type:'rendered',gen,request,bitmap},[bitmap]);
     } else if(type==='export' && gen===generation && source) {
@@ -70,18 +80,27 @@ ctx.onmessage=async({data})=>{
         if(gen!==generation){decoded.bitmap.close();return;}exportSource=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
       }
       const bitmap=exportSource??source;
+      const settings=(data.recipe as Recipe).enhancement;
+      let resolved=settings;
+      if(settings&&settings.black===0&&settings.white===1){
+        const preview=pixels!,previewBase=field?transferField(preview.data,preview.width,preview.height,field):undefined;
+        const {black,white}=suggestEnhancement(renderPixels(preview.data,data.recipe,previewBase));resolved={...settings,black,white};
+      }
+      const radii=enhancementRadii(bitmap.width,bitmap.height),halo=Math.max(settings?.clarity?radii.clarity:0,settings?.sharpness?radii.sharpness:0);
       const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
       const out=canvas.getContext('2d')!;
-      const strip=new OffscreenCanvas(bitmap.width,Math.min(256,bitmap.height));
+      const strip=new OffscreenCanvas(bitmap.width,Math.min(256+2*halo,bitmap.height));
       const c=strip.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
       try{for(let y=0;y<bitmap.height;y+=256) {
         if(gen!==generation)throw new Error('Export cancelled.');
         const height=Math.min(256,bitmap.height-y);
+        const top=Math.max(0,y-halo),bottom=Math.min(bitmap.height,y+height+halo),rows=bottom-top;
         c.clearRect(0,0,strip.width,strip.height);
-        c.drawImage(bitmap,0,y,bitmap.width,height,0,0,bitmap.width,height);
-        const input=c.getImageData(0,0,bitmap.width,height);
-        const base=field?transferField(input.data,bitmap.width,height,field,256,y,bitmap.height):undefined;
-        out.putImageData(new ImageData(renderPixels(input.data,data.recipe,base),bitmap.width,height),0,y);
+        c.drawImage(bitmap,0,top,bitmap.width,rows,0,0,bitmap.width,rows);
+        const input=c.getImageData(0,0,bitmap.width,rows);
+        const base=field?transferField(input.data,bitmap.width,rows,field,256,top,bitmap.height):undefined;
+        const finished=enhancePixels(renderPixels(input.data,data.recipe,base),bitmap.width,rows,resolved,bitmap.width,bitmap.height);
+        out.putImageData(new ImageData(finished,bitmap.width,rows),0,top,0,y-top,bitmap.width,height);
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
       }

@@ -397,5 +397,15 @@
   "Could not load {0}. Check the model files and retry.": "未能載入 {0}，請檢查模型檔案後再試。",
   "Use a model with exactly one image input and one image output.": "模型須只有一組影像輸入及輸出。",
   "Use current frame ({0})": "使用目前影格（{0}）",
-  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB。輸出：{2} × {3}。 "
+  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB。輸出：{2} × {3}。 ",
+  "Photo enhancement": "相片增強",
+  "Auto enhance": "自動增強",
+  "Clear enhancement": "清除增強",
+  "Auto contrast": "自動對比",
+  "Local contrast": "局部對比",
+  "Sharpness": "銳利度",
+  "Analysing photo enhancement…": "正在分析相片增強…",
+  "Invalid photo enhancement settings.": "相片增強設定無效。",
+  "Photo enhancement dimensions do not match.": "相片增強尺寸不符。",
+  "Photo enhancement works after any correction engine. Auto enhance analyses the corrected preview and suggests a bounded tonal stretch, local contrast and mild sharpening. Auto contrast uses shared luminance endpoints instead of independent RGB stretching, helping preserve colour. Local contrast adds definition over a wider area; Sharpness strengthens small edges with a noise threshold. These controls are independent of restoration strength, apply to photo previews and exports, and are off for existing edits until enabled. They can emphasise noise or backscatter; reduce the sliders or Clear enhancement if needed. Reset manual edits and Auto restore also clear enhancement. Video does not use this spatial finishing pass yet.": "相片增強在任何修復引擎之後套用。自動增強分析修復預覽，建議有限度的明暗拉伸、局部對比及輕微銳化。自動對比按共同亮度端點調整，不會分別拉伸 RGB，有助保留色彩；局部對比改善較大範圍的層次，銳利度以雜訊門檻加強細小邊緣。它們獨立於修復強度，套用至相片預覽及輸出，舊編輯預設不啟用。可能突顯雜訊或懸浮粒子，可降低滑桿或清除增強。重設手動調整及自動修復亦會清除增強。目前影片不使用此空間處理。"
 }

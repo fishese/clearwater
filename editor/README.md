@@ -148,3 +148,9 @@ Each RAW decode has a dedicated worker that is terminated after transferring its
 ## Languages
 
 The editor and About guide support English, Hong Kong Traditional Chinese and Japanese. Choose a language in the header; the choice persists locally without changing files or recipes. Browser preference supplies the initial default. Common processing messages are translated; unknown system/library diagnostics and original licence documents retain their original text. See the Languages section in ../MAINTENANCE.md for catalogue conventions and checks.
+
+## Optional photo finishing
+
+Photo enhancement is independent of the correction engine and restoration strength. Auto enhance analyses the corrected preview, uses 0.5/99.5-percentile luminance with bounded black/white points (maximum stretch 1.7×), and suggests contrast, local contrast and mild sharpening. It does not stretch RGB channels separately. Local contrast and thresholded sharpening protect deep shadows/highlights and cap overshoot; they can still emphasise noise/backscatter. Defaults are off, including existing recipes. The three sliders, clear, undo/redo, reset and JSON recipes are supported. Auto restore and Reset manual edits clear finishing. This pass is photo-only; videos ignore it.
+
+Spatial blur radii scale relative to the selected output size. Exports use neighbouring rows around each strip and crop to the valid centre, avoiding strip seams without a full-resolution float working image. Preview is an approximation of fine detail because it is downsampled; inspect the exported photo at 100%. Tests cover alpha/hue, flat/noisy patches, backwards-compatible recipes, halo-strip equivalence and PNG preview/export parity at equal dimensions. Run node scripts/enhancement-check.mjs; optional local comparisons are described in the ignored notes.

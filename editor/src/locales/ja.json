@@ -397,5 +397,15 @@
   "Could not load {0}. Check the model files and retry.": "{0} を読み込めません。モデルファイルを確認して再試行してください。",
   "Use a model with exactly one image input and one image output.": "画像の入出力が1つずつあるモデルを使ってください。",
   "Use current frame ({0})": "現在のフレーム（{0}）",
-  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB。出力：{2} × {3}。 "
+  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB。出力：{2} × {3}。 ",
+  "Photo enhancement": "写真の仕上げ",
+  "Auto enhance": "自動仕上げ",
+  "Clear enhancement": "仕上げを解除",
+  "Auto contrast": "自動コントラスト",
+  "Local contrast": "局所コントラスト",
+  "Sharpness": "シャープネス",
+  "Analysing photo enhancement…": "写真の仕上げを分析中…",
+  "Invalid photo enhancement settings.": "写真の仕上げ設定が無効です。",
+  "Photo enhancement dimensions do not match.": "写真の仕上げサイズが一致しません。",
+  "Photo enhancement works after any correction engine. Auto enhance analyses the corrected preview and suggests a bounded tonal stretch, local contrast and mild sharpening. Auto contrast uses shared luminance endpoints instead of independent RGB stretching, helping preserve colour. Local contrast adds definition over a wider area; Sharpness strengthens small edges with a noise threshold. These controls are independent of restoration strength, apply to photo previews and exports, and are off for existing edits until enabled. They can emphasise noise or backscatter; reduce the sliders or Clear enhancement if needed. Reset manual edits and Auto restore also clear enhancement. Video does not use this spatial finishing pass yet.": "どの補正エンジンの後でも使える写真の仕上げです。自動仕上げは補正後のプレビューから、制限付きの階調拡張・局所コントラスト・軽いシャープ化を提案します。自動コントラストはRGBを個別に引き伸ばさず、共通の輝度範囲を使って色を保ちます。局所コントラストは広めの細部、シャープネスはノイズしきい値付きで小さな輪郭を強めます。補正の強さとは独立し、写真の表示・出力に反映します。既存編集では既定で無効です。ノイズや浮遊物が目立つ場合は弱めるか解除してください。手動調整のリセットと自動補正でも解除します。動画にはまだ適用しません。"
 }

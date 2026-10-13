@@ -7,6 +7,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Area | Script under editor/scripts |
 | --- | --- |
 | RAW / resolution | create-photo-fixtures.py (Python), then photo-check.mjs (Node) |
+| Photo finishing | enhancement-check.mjs |
 | Metadata | metadata-check.mjs |
 | Navigation / saving | browsing-check.mjs |
 | Controls / adapter | controls-check.mjs |
@@ -15,7 +16,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 48 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 53 tests.
 
 ## Languages
 
@@ -59,3 +60,5 @@ Metadata rebuilds supported EXIF/GPS and normalises orientation/dimensions/sRGB.
 Keep public handoff/maintenance concise; editor README holds the detailed feature contract and public asset directories hold provenance. Private fixture/restricted-model notes go in gitignored root LOCAL_NOTES.md, outside public assets. Ignore rules do not remove information already in Git history; history rewriting is a separate decision.
 
 Check git status/staged paths and diff whitespace before committing. Create checkpoints before major processing changes. Prefer revert commits for published regressions, rebuilding both platforms. Never discard unrelated edits or reset user data. Diagnose colour ranges, orientation, preview/export parity, generation IDs and buffer lifetime before changing algorithms.
+
+Photo finishing: preserve old recipe defaults, global preview-derived tonal endpoints, luminance-based colour ratios, alpha weights and export halo rows. Never analyse black/white points independently per strip. Test portrait and landscape halo-strip parity, low-noise flat regions, transparent pixels and neural-engine finishing. Spatial finishing is deliberately unavailable for video pending temporal/performance work.

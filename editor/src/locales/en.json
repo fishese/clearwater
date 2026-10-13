@@ -397,5 +397,15 @@
   "Could not load {0}. Check the model files and retry.": "Could not load {0}. Check the model files and retry.",
   "Use a model with exactly one image input and one image output.": "Use a model with exactly one image input and one image output.",
   "Use current frame ({0})": "Use current frame ({0})",
-  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB. Export: {2} × {3}. "
+  "{0} MP · {1} MB. Export: {2} × {3}. ": "{0} MP · {1} MB. Export: {2} × {3}. ",
+  "Photo enhancement": "Photo enhancement",
+  "Auto enhance": "Auto enhance",
+  "Clear enhancement": "Clear enhancement",
+  "Auto contrast": "Auto contrast",
+  "Local contrast": "Local contrast",
+  "Sharpness": "Sharpness",
+  "Analysing photo enhancement…": "Analysing photo enhancement…",
+  "Invalid photo enhancement settings.": "Invalid photo enhancement settings.",
+  "Photo enhancement dimensions do not match.": "Photo enhancement dimensions do not match.",
+  "Photo enhancement works after any correction engine. Auto enhance analyses the corrected preview and suggests a bounded tonal stretch, local contrast and mild sharpening. Auto contrast uses shared luminance endpoints instead of independent RGB stretching, helping preserve colour. Local contrast adds definition over a wider area; Sharpness strengthens small edges with a noise threshold. These controls are independent of restoration strength, apply to photo previews and exports, and are off for existing edits until enabled. They can emphasise noise or backscatter; reduce the sliders or Clear enhancement if needed. Reset manual edits and Auto restore also clear enhancement. Video does not use this spatial finishing pass yet.": "Photo enhancement works after any correction engine. Auto enhance analyses the corrected preview and suggests a bounded tonal stretch, local contrast and mild sharpening. Auto contrast uses shared luminance endpoints instead of independent RGB stretching, helping preserve colour. Local contrast adds definition over a wider area; Sharpness strengthens small edges with a noise threshold. These controls are independent of restoration strength, apply to photo previews and exports, and are off for existing edits until enabled. They can emphasise noise or backscatter; reduce the sliders or Clear enhancement if needed. Reset manual edits and Auto restore also clear enhancement. Video does not use this spatial finishing pass yet."
 }

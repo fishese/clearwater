@@ -130,3 +130,4 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 .about-header .language-select{margin-left:auto}
 @media(max-width:650px){.brand-cluster .language-select{width:60px;min-height:26px;font-size:10px;padding:2px}.topbar{gap:5px}.top-actions{gap:5px}.top-actions .button{padding:5px 7px}.about-header{gap:8px;flex-wrap:wrap}.about-header .button{font-size:11px}}
 @media(max-width:370px){.brand-cluster .brand>span:last-child{display:none}}
+.enhancement-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.enhancement-actions .button{font-size:10px;padding:4px 8px}.enhancement-actions .text-button{font-size:10px}
