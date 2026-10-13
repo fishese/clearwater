@@ -24,7 +24,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 70 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 81 tests.
 
 ## Languages
 
@@ -59,7 +59,7 @@ Debug builds use the standard Android test keystore. Release builds load only th
 
 Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices; WWE-UIE carries Apache-2.0 notices and pinned checkpoint/export hashes. Android HDR conversion uses unmodified Media3 1.11.1 (Apache-2.0). Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
 
-LibRaw bindings pinned at @colorhythm/libraw-wasm 1.1.1 / LibRaw 0.22.1. Keep MIT bindings, chosen CDDL notices, copyright and matching source archives. Mediabunny source/licence material is bundled too. Attribution is in About and public licence/model notes; do not remove source offerings to reduce size.
+LibRaw bindings pinned at @colorhythm/libraw-wasm 1.1.1 / LibRaw 0.22.1. Keep MIT bindings, chosen CDDL notices, copyright and matching source archives. Mediabunny and HEIC/HEIF decoder (heic-to/libheif) source/licence notices are bundled too. Attribution is in About and public licence/model notes; do not remove source offerings to reduce size.
 
 Metadata rebuilds supported EXIF/GPS and normalises orientation/dimensions/sRGB. MakerNotes, thumbnails, XMP/IPTC and source ICC are excluded. Failures leave a usable export plus warning. Do not promise metadata missing at import or copy RAW calibration tables into EXIF.
 
@@ -90,3 +90,5 @@ Branding: supplied rounded SVG is `editor/public/icon.svg`; supplied 16/32/192/5
 HDR validation: native compilation and mocked bridge/protocol tests do not prove device tone-mapping quality. Test original iPhone MOV clips on an Android 10+ phone: bright highlights, dark water, rotated portrait, long clips, audio sync, cancel during staging/conversion, removal/reselection, and original file preservation. The comparison uses the converted SDR copy. Keep the web HDR rejection helpful, and never reinterpret HDR values as SDR.
 
 Collection clearing must remove only app library records and recipes, preserve pending shares and independent settings/model storage, and leave external files untouched. Cover transaction failure, pending writes, reload and all three locale layouts. Generated IDE/release files and signing credentials are not release source files.
+
+Recent regression coverage: new-photo WWE-UIE + 30% Balanced defaults, existing-recipe retention, top-aligned expanded Fit, zoom/pinch/pan/picker separation, About Back, root double-Back exit, and full ten-minute sampled AI export. Expanded/browser checks wait for asynchronous layout observers and open collapsed engine controls after viewport changes. Physical Android checks confirmed expanded positioning and About/expanded/root Back behaviour; HDR camera-format compatibility still requires separate device fixtures.

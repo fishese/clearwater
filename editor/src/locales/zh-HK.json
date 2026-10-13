@@ -290,7 +290,6 @@
   "Undo / Redo": "復原／重做",
   "Step through recent edits for the selected file. History is kept for the current session; the latest saved recipe is retained across reloads.": "逐步回到所選檔案的近期編輯。歷史只在本次使用期間保留，最新設定則會在重新載入後保留。",
   "Clears your colour, light and clarity adjustments while retaining the selected engine and its suggestion.": "清除色彩、光線及清晰度手動設定，保留所選引擎及建議修復。",
-  "Creates a fresh Balanced suggestion and clears manual settings.": "重新產生均衡修復建議，並清除手動設定。",
   "Previous / Next": "上一張／下一張",
   "Moves through imported files, retaining each file's edits. Android Open folder browses supported files in natural filename order and loads them as needed.": "瀏覽已匯入檔案，並保留各自設定。Android 的開啟資料夾按自然檔名順序瀏覽支援檔案，並按需要載入。",
   "Scrub to inspect a frame and compare corrections. Continuous playback and in-app trimming are not available yet.": "拖曳時間軸檢查畫面及修復結果。目前未提供連續播放或程式內修剪。",
@@ -462,7 +461,8 @@
   "Balanced restoration follows the AI colour result at a modest blend.": "在 AI 色彩結果上輕度套用平衡修復。",
   "Available for photos only.": "僅適用於相片。",
   "Balanced after AI is available for photos only.": "AI 後平衡修復僅適用於相片。",
-  "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "AI 後平衡修復是相片專用的可選功能，預設關閉。它會分析 AI 結果的小型樣本，並參考潛水條件進行第二次校正，獨立強度預設為 30%。它會重用 AI 結果，毋須再次執行模型。WWE-UIE 已包含白平衡，因此額外修復可能令部分場景校正過度：請比較中性色調，並降低強度或關閉此功能。影片須另行處理以避免畫面閃爍，暫未支援此選項。",
   "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI 色彩校正在裝置上執行。強度及手動調整仍然適用；AI 後平衡修復亦會參考潛水條件。",
-  "Invalid Balanced after AI settings.": "AI 後平衡修復設定無效。"
+  "Invalid Balanced after AI settings.": "AI 後平衡修復設定無效。",
+  "New photos start with WWE-UIE and Balanced after AI at 30%. Existing saved edits are kept, and you can switch off the follow-up. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "新相片預設使用 WWE-UIE，並以 30% 強度套用 AI 後平衡修復。現有編輯設定會保留，亦可關閉額外修復。它會分析 AI 結果的小型樣本，並參考潛水條件進行第二次校正，獨立強度預設為 30%。它會重用 AI 結果，毋須再次執行模型。WWE-UIE 已包含白平衡，因此額外修復可能令部分場景校正過度：請比較中性色調，並降低強度或關閉此功能。影片須另行處理以避免畫面閃爍，暫未支援此選項。",
+  "Returns photos to WWE-UIE with Balanced after AI at 30%, or videos to Balanced restoration, and clears manual settings.": "將相片還原為 WWE-UIE 加 30% AI 後平衡修復，影片則還原為平衡修復，並清除手動設定。"
 }

@@ -78,6 +78,14 @@ export function makeRecipe(a:Analysis,hints:Hints={...DEFAULT_HINTS}):Recipe {
   return {version:1,engine:'balanced',strength:.8,hints,auto:suggest(a,hints),manual:structuredClone(DEFAULT_MANUAL)};
 }
 
+/** New photos start with the bundled AI correction and a modest Balanced follow-up.
+ * Keep makeRecipe's classical default for videos and existing callers/recipes.
+ */
+export function makePhotoRecipe(a:Analysis,hints:Hints={...DEFAULT_HINTS}):Recipe {
+  const recipe=makeRecipe(a,hints);
+  return {...recipe,engine:'wwe',auto:suggest(a,hints,'wwe'),balancedAfterAI:{strength:.3}};
+}
+
 /** Shared, deterministic CPU renderer used for preview and source-resolution export.
  * RGB correction is tuned in display-encoded SDR; automatic blend and exposure are linear-light.
  * Haze is bounded global veil/contrast reduction, not physical depth reconstruction.

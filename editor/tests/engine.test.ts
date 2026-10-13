@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, makeRecipe, parseRecipe, renderPixels, suggest } from '../src/core/engine';
+import { analyse, makePhotoRecipe, makeRecipe, parseRecipe, renderPixels, suggest } from '../src/core/engine';
 import { DEFAULT_HINTS } from '../src/core/types';
 
 function fixture(r:number,g:number,b:number){return new Uint8ClampedArray(Array.from({length:64},()=>[r,g,b,255]).flat());}
@@ -36,6 +36,12 @@ describe('restoration decisions',()=>{
   });
 });
 describe('render and recipe integrity',()=>{
+  it('uses WWE-UIE with a 30% Balanced follow-up for new photos while preserving the generic default',()=>{
+    const analysis=stats(30,100,150),photo=makePhotoRecipe(analysis),generic=makeRecipe(analysis);
+    expect(photo.engine).toBe('wwe');expect(photo.balancedAfterAI).toEqual({strength:.3});
+    expect(generic.engine).toBe('balanced');expect(generic.balancedAfterAI).toBeUndefined();
+    expect(parseRecipe(JSON.parse(JSON.stringify(generic)))).toEqual(generic);
+  });
   it('strength zero leaves the original intact to rounding tolerance and preserves alpha',()=>{
     const input=new Uint8ClampedArray([1,136,178,255,87,93,111,128,0,0,0,0,255,255,255,255]);
     const r=makeRecipe(analyse(input,4,1));r.strength=0;

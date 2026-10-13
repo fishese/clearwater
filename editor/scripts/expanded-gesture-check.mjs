@@ -10,6 +10,9 @@ try {
  const landscape=await makePng(960,540);
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'landscape.png',mimeType:'image/png',buffer:Buffer.from(landscape,'base64')});
  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
+ assert.equal(await page.getByLabel('Correction engine',{exact:true}).inputValue(),'wwe','New photos default to WWE-UIE');
+ assert.equal(await page.getByLabel('Balanced after AI',{exact:true}).isChecked(),true);
+ assert.equal(await page.getByLabel('Balanced after AI strength',{exact:true}).inputValue(),'30');
  await page.getByRole('button',{name:'Expand photo',exact:true}).click();
  const assertFits=async()=>{
   await page.waitForFunction(()=>{const s=document.querySelector('.stage'),f=document.querySelector('.image-frame');return s&&f&&s.clientWidth>100&&s.clientHeight>100&&f.clientWidth>1&&f.getBoundingClientRect().width<=s.clientWidth-10&&f.getBoundingClientRect().height<=s.clientHeight-10;},null,{timeout:5000});
@@ -17,6 +20,8 @@ try {
   assert.ok(frame.width<=stage.width-10,`frame width ${frame.width} must fit stage width ${stage.width}`);
   assert.ok(frame.height<=stage.height-10,`frame height ${frame.height} must fit stage height ${stage.height}`);
   assert.ok(Math.max(frame.width/stage.width,frame.height/stage.height)>.94,'Fit uses most of its limiting dimension');
+  const topGap=await page.evaluate(()=>document.querySelector('.image-frame').getBoundingClientRect().top-document.querySelector('.stage').getBoundingClientRect().top);
+  assert.ok(topGap>=0&&topGap<=8,`Expanded Fit starts near the top (${topGap}px)`);
  };
  await assertFits();
  const overlay=page.locator('.expanded-zoom-controls');assert.equal(await overlay.isVisible(),true);
@@ -25,6 +30,8 @@ try {
  await page.getByRole('button',{name:'Fit',exact:true}).click();
  await page.setViewportSize({width:390,height:844});await assertFits();
  await page.getByRole('button',{name:'Toggle adjustments'}).click();
+ // Overlay positioning follows ResizeObserver and settles on the next layout update.
+ await page.waitForFunction(()=>document.querySelector('.expanded-zoom-controls').getBoundingClientRect().bottom<=document.querySelector('.controls').getBoundingClientRect().top+1);
  const mobileBounds=await page.evaluate(()=>({zoom:document.querySelector('.expanded-zoom-controls').getBoundingClientRect().toJSON(),panel:document.querySelector('.controls').getBoundingClientRect().toJSON(),stage:document.querySelector('.stage').getBoundingClientRect().toJSON()}));
  assert.ok(mobileBounds.zoom.bottom<=mobileBounds.panel.top+1,'zoom controls stay above the mobile adjustment sheet');
  assert.ok(mobileBounds.zoom.left>=mobileBounds.stage.left-1&&mobileBounds.zoom.right<=mobileBounds.stage.right+1,'zoom controls stay inside the stage width');

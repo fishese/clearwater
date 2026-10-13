@@ -1,7 +1,7 @@
 import {t,message,useLanguage,LanguageSelect} from './i18n';
 import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
-import { clamp, makeRecipe, parseRecipe, suggest } from './core/engine';
+import { clamp, makePhotoRecipe, makeRecipe, parseRecipe, suggest } from './core/engine';
 import { DEFAULT_MANUAL,DEFAULT_ENHANCEMENT, type Analysis, type Adjustments, type Hints, type Recipe, type CustomModel } from './core/types';
 import { clearPhotos, deletePhoto, listPhotos, promoteSharedPhotos, savePhoto, type StoredPhoto } from './storage';
 import {forgetCustomModel,loadRememberedCustomModel,rememberCustomModel} from './custom-model-storage';
@@ -253,7 +253,7 @@ export default function App() {
         const thumbnailCanvas=document.createElement('canvas');thumbnailCanvas.width=160;thumbnailCanvas.height=Math.round(160*data.height/data.width);
         if(c)thumbnailCanvas.getContext('2d')!.drawImage(c,0,0,thumbnailCanvas.width,thumbnailCanvas.height);
         const thumbnail=c?thumbnailCanvas.toDataURL('image/jpeg',.75):undefined;
-        setPhotos(all=>all.map(p=>{if(p.id!==activeRef.current)return p;let next=p.recipe??makeRecipe(data.analysis);return {...p,recipe:next,thumbnail:thumbnail??p.thumbnail};}));
+        setPhotos(all=>all.map(p=>{if(p.id!==activeRef.current)return p;let next=p.recipe??(data.video?makeRecipe(data.analysis):makePhotoRecipe(data.analysis));return {...p,recipe:next,thumbnail:thumbnail??p.thumbnail};}));
       } else if(data.type==='rendered') {
         if(data.request===latest.current){if(data.analysis)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');}
         data.original?.close();
@@ -356,7 +356,7 @@ export default function App() {
     try{const response=await fetch('/__sample/'+encodeURIComponent(name));if(!response.ok)throw new Error(t("Sample unavailable."));const blob=await response.blob();addFiles([new File([blob],name,{type:blob.type})]);}
     catch{notify(t("Could not open this local sample. Use Open files instead."));}finally{setSampleBusy(false);}
   }
-  function reset(){if(analysis)update(()=>makeRecipe(analysis));setEyedropper(false);}
+  function reset(){if(analysis)update(()=>video?makeRecipe(analysis):makePhotoRecipe(analysis));setEyedropper(false);}
   function cancelCustom(){
     if(customLoading)return;pendingModelBlob.current=null;applyCustomModel.current=false;setCustomCandidate(null);setCustomOpen(false);setCustomError('');
     const matching=!!customModel&&(!recipe?.customModel||(recipe.customModel.sha256===customModel.sha256&&recipe.customModel.inputRange===customModel.inputRange&&recipe.customModel.outputRange===customModel.outputRange));

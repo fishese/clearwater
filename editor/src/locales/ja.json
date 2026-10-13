@@ -290,7 +290,6 @@
   "Undo / Redo": "元に戻す／やり直す",
   "Step through recent edits for the selected file. History is kept for the current session; the latest saved recipe is retained across reloads.": "選択ファイルの直近の編集をたどります。履歴はセッション内のみですが、最新設定は再読み込み後も保持されます。",
   "Clears your colour, light and clarity adjustments while retaining the selected engine and its suggestion.": "色・ライト・明瞭度の手動調整を消去し、エンジンと提案は保持します。",
-  "Creates a fresh Balanced suggestion and clears manual settings.": "バランス補正の提案を作り直し、手動設定を消去します。",
   "Previous / Next": "前へ／次へ",
   "Moves through imported files, retaining each file's edits. Android Open folder browses supported files in natural filename order and loads them as needed.": "読み込んだファイル間を移動し、各設定を保持します。Androidのフォルダー閲覧は自然なファイル名順で並べ、必要時に読み込みます。",
   "Scrub to inspect a frame and compare corrections. Continuous playback and in-app trimming are not available yet.": "シークしてフレームと補正を確認できます。連続再生とアプリ内トリミングは未対応です。",
@@ -462,7 +461,8 @@
   "Balanced restoration follows the AI colour result at a modest blend.": "AI の色補正後にバランス補正を控えめに重ねます。",
   "Available for photos only.": "写真のみ対応。",
   "Balanced after AI is available for photos only.": "AI 後のバランス補正は写真のみ対応しています。",
-  "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "AI 後のバランス補正は写真用の任意機能で、初期状態ではオフです。AI 結果の小さなサンプルを解析し、潜水条件を参考に追加補正します。独立した強度は 30% から始まります。AI 結果を再利用するため、モデルは再実行しません。WWE-UIE は白バランス補正を含むため、場面によっては補正が強すぎることがあります。無彩色の部分を比較し、強度を下げるかオフにしてください。動画はフレーム間のちらつきを防ぐ別の処理が必要で、現時点では対応していません。",
   "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI の色補正は端末内で実行します。強度と手動調整は引き続き有効で、AI 後のバランス補正には潜水条件も反映されます。",
-  "Invalid Balanced after AI settings.": "AI 後のバランス補正の設定が無効です。"
+  "Invalid Balanced after AI settings.": "AI 後のバランス補正の設定が無効です。",
+  "New photos start with WWE-UIE and Balanced after AI at 30%. Existing saved edits are kept, and you can switch off the follow-up. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "新しい写真には WWE-UIE と強度 30% の AI 後のバランス補正を適用します。保存済みの編集は保持し、追加補正はオフにできます。AI 結果の小さなサンプルを解析し、潜水条件を参考に追加補正します。独立した強度は 30% から始まります。AI 結果を再利用するため、モデルは再実行しません。WWE-UIE は白バランス補正を含むため、場面によっては補正が強すぎることがあります。無彩色の部分を比較し、強度を下げるかオフにしてください。動画はフレーム間のちらつきを防ぐ別の処理が必要で、現時点では対応していません。",
+  "Returns photos to WWE-UIE with Balanced after AI at 30%, or videos to Balanced restoration, and clears manual settings.": "写真は WWE-UIE と強度 30% の AI 後のバランス補正に、動画はバランス補正に戻し、手動設定をリセットします。"
 }

@@ -13,7 +13,7 @@ try{
  const load=async name=>{await page.getByLabel('Choose photos',{exact:true}).setInputFiles(resolve(dir,name));await ready();};
  const engine=page.getByLabel('Correction engine',{exact:true});
  const hash=()=>page.locator('canvas[aria-label="Edited photo"]').evaluate(async c=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',c.getContext('2d').getImageData(0,0,c.width,c.height).data))).join(','));
- const choose=async value=>{await engine.selectOption(value);await page.waitForTimeout(100);await ready();};
+ const choose=async value=>{if(!await engine.isVisible())await page.locator('summary').filter({hasText:/Correction Engine/i}).click();await engine.selectOption(value);await page.waitForTimeout(100);await ready();};
  const exportVideo=async name=>{const download=page.waitForEvent('download',{timeout:180000}),begin=Date.now();await page.getByRole('button',{name:'Download instead',exact:true}).click();await (await download).saveAs(resolve(dir,name));await ready();console.log(name+' export: '+(Date.now()-begin)+' ms');};
  await load('sampled.mp4');await page.locator('summary').filter({hasText:'Correction Engine'}).click();
  const balanced=await hash(),begin=Date.now();await choose('shallow');assert.notEqual(await hash(),balanced);console.log('Shallow initial sample: '+(Date.now()-begin)+' ms');
