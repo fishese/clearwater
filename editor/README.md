@@ -118,6 +118,10 @@ Preview analyses only the surrounding samples. Export analyses the remaining sam
 
 `node scripts/video-ai-check.mjs` checks sampled and fixed Shallow correction, inference reuse, cancelling sample analysis, FUnIE and generic ONNX video exports, custom model handoff to photos, mobile layout, a complete 10-minute export, and rejection above 10 minutes. Generate fixtures with `python scripts/create-video-fixtures.py` first. Set `CHECK_URL` for a production/Pages build; `CHECK_OFFLINE=1` verifies cached Shallow inference and export offline after warming the model.
 
+## About & guide
+
+Open **About & guide** in the desktop header or below the adjustment controls. The bundled, offline-capable page credits Shallow-UWnet and FUnIE-GAN with author, paper, repository and licence links; explains the colour-transfer approach and compatible user-supplied ONNX files; and describes editing controls, video modes, saving and privacy. Navigation uses `#about` and section hashes while keeping the editor mounted so opening the guide retains the active edit and model session. `node scripts/about-check.mjs` checks navigation, local licence links, mobile layout and edit preservation.
+
 ## Web app updates
 
 The small, unframed update icon beside the ClearWater brand explicitly checks for a new service worker, downloads it, activates it and reloads the app. The current file and edit recipe are saved before checking and again before reloading. Updating is disabled during export/saving. No library data or browser storage is cleared; session-only folder grants and custom model bytes need to be supplied again after reload as usual. When offline, checking fails with a message and leaves the current version usable. The icon is hidden in the bundled Android APK, which is updated by installing a new APK.
