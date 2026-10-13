@@ -9,3 +9,17 @@ Photo EXIF processing uses exifr 7.1.3, Copyright (c) 2020 Mike Kovarik, Mutiny.
 See LICENSE-exifr.txt; project: https://github.com/MikeKovarik/exifr
 EXIF writing uses Piexifjs 1.0.6, Copyright (c) 2014 Hiroaki Matoba (MIT).
 See LICENSE-piexifjs.txt; project: https://github.com/hMatoba/piexifjs
+
+DNG processing uses @colorhythm/libraw-wasm 1.1.1 (MIT bindings) by TOMIKAWA Sotaro and Colorhythm.
+See LICENSE-LibRaw-wasm.txt. Wrapper/binding source, including the build script's C API additions:
+LibRaw-wasm-source-9b0f59a.tar.gz (shipped beside this notice), or
+https://github.com/colorhythm/libraw-wasm/tree/9b0f59a5e0f6d3d12a8f6fa594015ef4f30a6e95
+The included LibRaw 0.22.1 is distributed under CDDL 1.0 (chosen from its dual licence).
+See LICENSE-LibRaw-CDDL.txt and COPYRIGHT-LibRaw.txt for notices and third-party credits.
+Original LibRaw source for the pinned submodule is shipped beside this notice:
+LibRaw-source-b860248.tar.gz, or
+https://github.com/LibRaw/LibRaw/tree/b860248a89d9082b8e0a1e202e516f46af9adb29
+Rebuild with the pinned binding repository's packages/libraw.wasm/scripts/build.mjs;
+the source archive's LibRaw submodule must be populated from the LibRaw source archive above.
+ClearWater does not modify the distributed decoder binary or its sources.
+Typed-cstruct 0.10.2 supports the bindings (MIT); see LICENSE-typed-cstruct.txt.

@@ -7,7 +7,7 @@ self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith(CACHE.slice(0,20))&&name!==CACHE)await caches.delete(name);await self.clients.claim();})());});
 async function acceptShare(request){
   const form=await request.formData();
-  const files=form.getAll('photos').filter(file=>file instanceof File && file.size<=(/\.(mp4|mov)$/i.test(file.name)||file.type.startsWith('video/')?512:60)*1024*1024 && (/\.(jpe?g|png|heic|heif|mp4|mov)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif','video/mp4','video/quicktime'].includes(file.type)));
+  const files=form.getAll('photos').filter(file=>file instanceof File && file.size<=512*1024*1024 && (/\.(jpe?g|png|heic|heif|dng|mp4|mov)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif','image/dng','image/x-adobe-dng','video/mp4','video/quicktime'].includes(file.type)));
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   const addedAt=Date.now();
   const records=files.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000}));

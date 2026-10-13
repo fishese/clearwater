@@ -24,7 +24,7 @@ describe('Android file bridge',()=>{
  it('lists supported folder photos in natural filename order without reading their contents',async()=>{
   bridge.listPhotos.mockResolvedValue({photos:[{uri:'content://10',name:'IMG10.JPG',size:42,type:'image/jpeg'},{uri:'content://2',name:'IMG2.JPG',size:42,type:'image/jpeg'},{uri:'content://text',name:'notes.txt',size:20,type:'text/plain'},{uri:'content://large',name:'large.png',size:61*1024*1024,type:'image/png'}]});
   const fetch=vi.spyOn(globalThis,'fetch');
-  try{const folder=await openAndroidPhotoFolder();expect(folder.photos.map(photo=>photo.name)).toEqual(['IMG2.JPG','IMG10.JPG']);expect(fetch).not.toHaveBeenCalled();expect(folder.directory.name).toBe('Output');}finally{fetch.mockRestore();}
+  try{const folder=await openAndroidPhotoFolder();expect(folder.photos.map(photo=>photo.name)).toEqual(['IMG2.JPG','IMG10.JPG','large.png']);expect(fetch).not.toHaveBeenCalled();expect(folder.directory.name).toBe('Output');}finally{fetch.mockRestore();}
  });
  it('reads only the requested folder photo and reports missing files',async()=>{
   const fetch=vi.spyOn(globalThis,'fetch').mockResolvedValueOnce(new Response('photo')).mockResolvedValueOnce(new Response('',{status:404}));

@@ -46,9 +46,9 @@ export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{
 export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto):Promise<File>{
  const response=await fetch(Capacitor.convertFileSrc(photo.uri));if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
  const reader=response.body?.getReader();let blob:Blob;
- if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>mediaLimit(photo))throw new Error('This file exceeds the import size limit.');chunks.push(new Uint8Array(part.value));}}catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
+ if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>mediaLimit(photo))throw new Error('This file exceeds the 512 MB safety ceiling.');chunks.push(new Uint8Array(part.value));}}catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
  else blob=await response.blob();
- if(blob.size>mediaLimit(photo))throw new Error('This file exceeds the import size limit.');
+ if(blob.size>mediaLimit(photo))throw new Error('This file exceeds the 512 MB safety ceiling.');
  return new File([blob],photo.name,{type:photo.type});
 }
 export async function receiveAndroidPhotos(onFiles:(photos:File[])=>void,onError:(message:string)=>void){

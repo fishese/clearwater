@@ -49,6 +49,7 @@ function valueFor(value:unknown,type:string):unknown {
 export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:number):Promise<{exif?:Uint8Array;warning?:string}> {
  try{
   const options={translateKeys:false,translateValues:false,reviveValues:false,mergeOutput:false,sanitize:false,
+   ifd0:{pick:[...ifd0Tags]},exif:{pick:Object.keys(piexif.TAGS.Exif).map(Number).filter(tag=>!excludedExif.has(tag))},gps:{pick:Object.keys(piexif.TAGS.GPS).map(Number)},
    ifd1:false,interop:false,makerNote:false,userComment:true,xmp:false,icc:false,iptc:false,jfif:false,ihdr:false,silentErrors:false};
   const parsed=await parse(source,options);
   if(!parsed)return {};

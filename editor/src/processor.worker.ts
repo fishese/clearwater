@@ -4,10 +4,14 @@ import type { Recipe,CustomModel } from './core/types';
 import { transferField } from './core/neural-field';
 import type { ModelName } from './models';
 import {preservePhotoMetadata} from './photo-metadata';
+import {decodePhoto} from './photo-decode';
+import type {PhotoInfo,PhotoResolution,PhotoDevice} from './core/photo-size';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
-let sourceFile:Blob|null=null;
+let sourceFile:File|null=null,exportSource:ImageBitmap|null=null,sourceInfo:PhotoInfo|null=null;
+let decoding:AbortController|null=null;
+let mode:PhotoResolution='auto',device:PhotoDevice={mobile:false};
 let fields=new Map<ModelName,Promise<Float32Array>>();
 let customModel:CustomModel|undefined;
 let customTask:Promise<unknown>=Promise.resolve();
@@ -26,13 +30,6 @@ async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Ar
   return cache.get(name)!;
 }
 const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message,transfer);
-async function decode(blob:Blob):Promise<ImageBitmap> {
-  try {return await createImageBitmap(blob,{imageOrientation:'from-image',colorSpaceConversion:'default'});}
-  catch {
-    const {heicTo}=await import('heic-to/next');
-    return await heicTo({blob,type:'bitmap'});
-  }
-}
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
   try {
@@ -40,18 +37,20 @@ ctx.onmessage=async({data})=>{
       customTask=customTask.catch(()=>{}).then(async()=>{const {loadCustomModel}=await import('./models');customModel=await loadCustomModel(data);fields.delete('wave');return customModel;});
       const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config});
     } else if(type==='load') {
-      generation=gen;
-      const bitmap=await decode(data.blob);
+      generation=gen;decoding?.abort();decoding=new AbortController();
+      source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();
+      mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
+      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+      const {bitmap}=decoded;
       if(gen!==generation){bitmap.close();return;}
-      if(bitmap.width*bitmap.height>45_000_000){bitmap.close();throw new Error('This prototype supports photos up to 45 megapixels. Please choose a smaller copy.');}
-      source?.close();source=bitmap;sourceFile=data.blob;fields=new Map();
+      source=bitmap;sourceFile=data.blob;sourceInfo=decoded.info;
       const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
       const canvas=new OffscreenCanvas(Math.round(bitmap.width*scale),Math.round(bitmap.height*scale));
       const c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
       c.drawImage(bitmap,0,0,canvas.width,canvas.height);
       pixels=c.getImageData(0,0,canvas.width,canvas.height);
       const original=canvas.transferToImageBitmap();
-      send({type:'loaded',gen,width:bitmap.width,height:bitmap.height,analysis:analyse(pixels.data,pixels.width,pixels.height),original},[original]);
+      send({type:'loaded',gen,width:sourceInfo.sourceWidth,height:sourceInfo.sourceHeight,analysis:analyse(pixels.data,pixels.width,pixels.height),original,photo:sourceInfo},[original]);
     } else if(type==='render' && gen===generation && pixels) {
       const recipe=data.recipe as Recipe;
       const input=pixels,field=await neural(recipe,gen,request);
@@ -62,14 +61,20 @@ ctx.onmessage=async({data})=>{
       const bitmap=canvas.transferToImageBitmap();
       send({type:'rendered',gen,request,bitmap},[bitmap]);
     } else if(type==='export' && gen===generation && source) {
-      const bitmap=source,originalFile=sourceFile;
+      const originalFile=sourceFile;
       const field=await neural(data.recipe,gen,request);
       if(gen!==generation)return;
+      if(sourceInfo?.large&&!exportSource&&originalFile){
+        send({type:'progress',gen,request,progress:1});decoding=new AbortController();
+        const decoded=await decodePhoto(originalFile,{mode,device,preview:false,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+        if(gen!==generation){decoded.bitmap.close();return;}exportSource=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
+      }
+      const bitmap=exportSource??source;
       const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
       const out=canvas.getContext('2d')!;
       const strip=new OffscreenCanvas(bitmap.width,Math.min(256,bitmap.height));
       const c=strip.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
-      for(let y=0;y<bitmap.height;y+=256) {
+      try{for(let y=0;y<bitmap.height;y+=256) {
         if(gen!==generation)throw new Error('Export cancelled.');
         const height=Math.min(256,bitmap.height-y);
         c.clearRect(0,0,strip.width,strip.height);
@@ -84,9 +89,9 @@ ctx.onmessage=async({data})=>{
       const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
       send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
-      canvas.width=1;canvas.height=1;
-    } else if(type==='cancel') {generation=gen;}
-    else if(type==='unload'){generation=gen;source?.close();source=null;sourceFile=null;pixels=null;fields=new Map();}
+      }finally{canvas.width=1;canvas.height=1;strip.width=1;exportSource?.close();exportSource=null;}
+    } else if(type==='cancel') {generation=gen;decoding?.abort();}
+    else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();}
   } catch(error) {
     send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.'});
   }

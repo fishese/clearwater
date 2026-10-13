@@ -76,7 +76,7 @@ public class ClearWaterFilesPlugin extends Plugin {
             if(cursor==null)throw new IOException("Could not list this folder.");
             while(cursor.moveToNext()) {
                 String name=cursor.getString(1),type=cursor.getString(2);long size=cursor.isNull(3)?-1:cursor.getLong(3);
-                if(DocumentsContract.Document.MIME_TYPE_DIR.equals(type)||name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|mp4|mov)$")||size>(isVideoName(name)?512L:60L)*1024*1024)continue;
+                if(DocumentsContract.Document.MIME_TYPE_DIR.equals(type)||name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|dng|mp4|mov)$")||size>512L*1024*1024)continue;
                 JSObject photo=new JSObject();photo.put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,cursor.getString(0)).toString());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);photo.put("size",size);photos.put(photo);
             }
         }
@@ -118,7 +118,7 @@ public class ClearWaterFilesPlugin extends Plugin {
         else {Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)uris.add(uri);}
         if(uris.isEmpty() && intent.getClipData()!=null)for(int i=0;i<intent.getClipData().getItemCount();i++)uris.add(intent.getClipData().getItemAt(i).getUri());
         io.execute(()->{
-            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){shareError="Some shared files could not be imported. Photo limit: 60 MB. MP4/MOV limit: 512 MB.";}
+            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){shareError="Some shared files could not be imported. Maximum file size: 512 MB.";}
             notifyListeners("sharesAvailable",new JSObject(),true);
         });
     }
@@ -127,13 +127,13 @@ public class ClearWaterFilesPlugin extends Plugin {
         if(uri==null || !"content".equals(uri.getScheme()))throw new IOException("Invalid shared photo.");
         String name=displayName(uri,"photo.jpg").replaceAll("[\\\\/\\p{Cntrl}]","_");
         String type=getContext().getContentResolver().getType(uri);
-        if(!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|mp4|mov)$"))throw new IOException("Unsupported image.");
+        if(!name.toLowerCase(Locale.ROOT).matches(".*\\.(jpe?g|png|heic|heif|dng|mp4|mov)$"))throw new IOException("Unsupported image.");
         String id=UUID.randomUUID().toString();File dir=new File(getContext().getCacheDir(),"shared-photos");if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("No cache space.");
         File file=new File(dir,id);
         try(InputStream input=getContext().getContentResolver().openInputStream(uri);OutputStream output=new FileOutputStream(file)) {
             if(input==null)throw new IOException("Cannot read photo.");
             byte[] buffer=new byte[65536];long total=0;int count;
-            while((count=input.read(buffer))!=-1){total+=count;if(total>(isVideoName(name)?512L:60L)*1024*1024)throw new IOException("Photo too large.");output.write(buffer,0,count);}
+            while((count=input.read(buffer))!=-1){total+=count;if(total>512L*1024*1024)throw new IOException("Photo too large.");output.write(buffer,0,count);}
         }catch(Exception error){file.delete();throw new IOException(error);}
         sharedFiles.put(id,file);JSObject photo=new JSObject();photo.put("id",id);photo.put("path",file.getAbsolutePath());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);shares.add(photo);
     }
