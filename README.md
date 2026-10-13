@@ -12,4 +12,12 @@ Use Node.js 24. In `editor`, run `npm ci`, then `npm run dev`. Run `npm test` an
 
 Personal samples, reference documents, research-only model weights, and conversion environments are excluded from Git. Bundled model licences and provenance are in `editor/public/models`.
 
-The Android project is in `editor/android`. Run `npm run android:sync` from `editor` to bundle the editor for Android, then follow [the Android build instructions](editor/android/README.md). The first build is unsigned; native sharing and folder access require on-device testing.
+The Android project is in `editor/android`. Run `npm run android:sync` from `editor`, then follow [Maintenance](MAINTENANCE.md) to build the minified debug-signed APK. Native sharing and folder access require on-device testing.
+
+## Documentation
+
+- [Handoff](HANDOFF.md): current capabilities, source map, contracts and remaining work.
+- [Maintenance](MAINTENANCE.md): verification, release, dependencies and rollback.
+- [Editor reference](editor/README.md): detailed behaviour and limits.
+
+Private fixture and restricted-model context belongs in root `LOCAL_NOTES.md`, which is gitignored and excluded from builds. Historical design notes are not the current feature contract.

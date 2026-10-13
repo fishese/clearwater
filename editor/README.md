@@ -12,7 +12,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The server binds to loopback only. The local development server offers the nine original samples from the adjacent `Sample photos` directory, with thumbnails from `analysis/previews`. These files are not copied into the app or production build. You can also import files with Open files or drag and drop.
+Open http://127.0.0.1:5173. Import files with Open files or drag and drop. Development-only fixtures are excluded from production assets.
 
 ## Included
 
@@ -50,11 +50,9 @@ npm run build
 
 Tests cover classical correction, neural strength/manual finishing, source-detail transfer, strip/full-buffer equivalence, recipe validation, transparent input and safe export naming/writing.
 
-The scripts `scripts/browser-check.mjs` and `scripts/pwa-check.mjs` run integration checks against the local dev/production servers, using Playwright and installed Microsoft Edge. Browser checks use this project's private sample folder. Set `CLEARWATER_PROJECT_ROOT` to relocate the project or `CLEARWATER_BROWSER` to choose a Playwright browser channel (default `msedge`). Screenshots, exported checks and results are stored under `analysis/browser-check`, which is ignored by Git.
+Browser integration scripts use Playwright with Microsoft Edge. Generated fixtures and screenshots belong in gitignored analysis directories; see MAINTENANCE.md for the check matrix.
 
-Verified on desktop Edge: all nine supplied photos decode and render; keyboard undo/redo/reset; strength-zero comparison; full-resolution 4284x5712 JPEG export; mobile-width layout without horizontal page overflow; photo-library restoration after reload; production sample exclusion; offline HEIC restoration; share-target POST intake and local persistence.
 
-`node scripts/models-check.mjs` additionally checks all three models on all nine photos, the custom-model permission/file prompt and reloading the model after a page reload, manual edits, source-resolution neural export and offline Shallow-UWnet/FUnIE-GAN reuse. It requires the privately prepared Deep WaveNet ONNX file. All checks passed in desktop Edge with no external inference requests or page errors. Warm runs were roughly 0.6 s for FUnIE-GAN, 1.6 s for Shallow-UWnet and 2.6 s for Deep WaveNet on this computer; these are not mobile performance guarantees or image-quality scores.
 
 ## Processing contract and limits
 
@@ -70,13 +68,12 @@ AI currently predicts a 256×256 image. Its RGB residual is interpolated and add
 
 **Load other ONNX model** accepts self-contained models up to 64 MB with one RGB float32 NCHW image input and output compatible with `[1,3,256,256]`. Symbolic dimensions are allowed, then validated by a trial run. Models using BGR, NHWC, mean/std normalization, extra inputs/outputs, external weight files, or different output sizes need additional adapters. Choose the author's documented input and output ranges independently (`0..1` or `-1..1`). Invalid shapes, types or non-finite output are rejected with an error in the loader. The loaded model filename, SHA-256 and range settings are stored in recipes; model bytes remain in worker memory and must be supplied again on reload. The historical `wave` recipe ID now denotes this custom slot, preserving compatibility with earlier recipes.
 
-Users must have permission to use their chosen model and comply with its licence; a generic loader does not alter licence terms. The privately prepared Deep WaveNet model is compatible with both ranges set to `0..1`; it retains the authors' academic-only statement and CC BY-NC-ND restrictions. Its weights are still excluded from Git and builds. See [model provenance and local conversion instructions](public/models/README.md).
 
 Dive conditions use compact radio buttons in two columns, plus a `0..100 m` depth slider and a Not sure reset. Correction Engine is first and collapsed; Auto restore sits beside strength. `node scripts/controls-check.mjs` checks these controls, undo, mobile overflow, incompatible files, generic loading with unit/signed model ranges, and prompting for the file after reload.
 
 This is an SDR, 8-bit prototype, not a physically calibrated restoration tool. RGB correction is tuned in display-encoded sRGB; automatic strength blending and exposure use linear-light conversion. Preview and export share `src/core/engine.ts`. A reduced preview is used for analysis; normal-sized photos retain their decoded bitmap for export; large photos defer the export-sized decode until saving. Exports use bounded strips for working pixels, but still need a full output canvas. Device memory matters for large images.
 
-Native browser decoding requests normal orientation and colour-space conversion. Unsupported HEIC falls back to libheif through `heic-to/next` inside the worker. The seven supplied HEIC files have been tested; arbitrary HDR HEIC, gain maps, unusual profiles and multiple-image HEIF sequences have not. Compatible DNG RAW development is supported separately. Explicit HDR tone mapping and full colour-profile conformance remain future work. JPEG/PNG exports attempt to preserve supported source EXIF/GPS by default (see Photo metadata below). Transparent PNG retains alpha; JPEG output has no alpha.
+Native browser decoding applies orientation and colour conversion. Unsupported HEIC falls back to libheif via heic-to/next. Arbitrary HDR HEIC, gain maps and unusual colour profiles are not guaranteed. Compatible DNG uses a separate decoder. JPEG/PNG exports preserve supported EXIF/GPS by default; transparent PNG retains alpha.
 
 Photo import now uses 60 MB / 45 MP as soft recommendations. Larger files are accepted up to the 512 MB / 200 MP / 32,768-pixel safety ceilings, with resolution options; see DNG and large photos below. These are guards, not a promise that all devices can handle the maximum. Mobile memory, thermal behaviour, browser compatibility and quality require real-device testing.
 

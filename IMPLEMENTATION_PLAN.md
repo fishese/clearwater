@@ -1,6 +1,6 @@
 # ClearWater implementation plan
 
-Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a gated, user-loaded Deep WaveNet research adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
+Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
 ## Recommendation
 
@@ -8,27 +8,6 @@ Build a local-first photo editor with a shared TypeScript web interface and proc
 
 Start with an explainable, deterministic correction engine. Evaluate Shallow-UWnet and FUnIE-GAN as competing optional enhancement paths. Do not automatically chain a strong colour correction, FUnIE-GAN and Shallow-UWnet: each may duplicate the other's work and encounter inputs outside its training distribution.
 
-## Sample inspection
-
-The project currently contains a Sample photos folder, with seven HEIC files and two JPEGs, and no existing app source at the project root. Images are approximately 12 or 24 megapixels. All nine decoded successfully using Pillow and pillow-heif. Originals were not modified or uploaded.
-
-Analysis output: sample-contact-sheet.jpg, sample-statistics.json and inspect_samples.py in analysis/. HEIC analysis dependencies are isolated in .analysis-deps/; these are development tools, not proposed app dependencies.
-
-Means below are rounded 8-bit RGB values from orientation-corrected, downscaled inspection images sampled every second pixel. They are diagnostic observations, not calibrated colour measurements or exact full-resolution clipping statistics. Embedded colour-profile conversion was not explicitly performed in this inspection; production processing must do it.
-
-| Sample | Mean R/G/B | Observation and implementation implication |
-| --- | --- | --- |
-| IMG_6085-blue.HEIC | 2 / 136 / 178 | Almost no red signal. A 2x gain only produces an average near 4. Conservative red reconstruction and a confidence limit are needed. |
-| IMG_6459-red filter.HEIC | 160 / 49 / 52 | Surface scene with a strong red cast. Proposed lower green/blue gain limits prevent adequate balancing; preserve genuine sunset warmth rather than force a neutral sunset. |
-| IMG_6729-blue and hazy.HEIC | 34 / 101 / 149 | Blue scene with strong distance-dependent haze. Evaluate modest local contrast separately from white balance. |
-| IMG_6730-blue.HEIC | 11 / 81 / 178 | Strong blue cast with dark divers and naturally blue open water. Avoid treating all water as a neutral reference. |
-| IMG_6788-red filter.HEIC | 155 / 73 / 166 | Magenta cast, especially on paper and skin. A red-only removal operation misses the weak green channel. Good neutral-point test image. |
-| IMG_6832-blue green and hazy.HEIC | 67 / 123 / 130 | Cyan-green cast with backscatter and a bright surface region. Haze handling must protect highlights. |
-| IMG_7165-hazy.HEIC | 119 / 142 / 144 | Relatively modest colour cast but low contrast/veiling haze. Aggressive red restoration would address the wrong problem. |
-| IMG_7386-green tint.JPG | 7 / 138 / 117 | Severe red deficiency and green cast. Test reef texture, noise amplification and green-water handling. |
-| IMG_E7433-too bright.JPG | 118 / 106 / 94 | Local strong illumination on reef/subject, with a darker background. Overall mean does not diagnose local overexposure. Use highlight-aware analysis. |
-
-Nine samples are a useful regression set, not enough to validate a general automatic mode. Add unfiltered surface photos, naturally red/orange subjects, strobes, dark/noisy deep shots and already-corrected images. Record approximate depth, filter and lighting when known. Keep unknown values genuinely unknown.
 
 ## User workflow
 
@@ -48,7 +27,7 @@ Import -> orientation/profile normalization -> analysis preview -> scene/cast as
 ### Decode and colour management
 
 - Android: use platform image decoding where supported, verify HEIC on target devices, and preserve orientation and source metadata deliberately.
-- Web: JPEG/PNG first, with HEIC decoding fallback validated against these actual samples. Browser HEIC decoding must not be assumed. Evaluate a lazy-loaded WASM decoder and its licensing, file size, memory use and colour handling.
+- Web: JPEG/PNG first, with HEIC decoding fallback validated against representative files. Browser HEIC decoding must not be assumed. Evaluate a lazy-loaded WASM decoder and its licensing, file size, memory use and colour handling.
 - Normalize to an explicit SDR sRGB working/output contract for the MVP, converting embedded profiles and tone-mapping HDR sources where needed. Do not merely relabel Display-P3 or HDR pixels as sRGB.
 - Analyse a roughly 256-512 px preview. Render an approximately 1-2 MP interactive preview. Export from the original, not from the analysis image or neural-network thumbnail.
 - A 24 MP RGBA8 buffer uses about 98 MB before extra copies, GPU textures or float tensors. Bound memory use; investigate region decoding and tiled export. Avoid bridging full images as base64 strings.
@@ -114,7 +93,7 @@ Installed PWAs can receive files through Web Share Target on supported browsers.
 
 ### 0. Image-quality prototype
 
-Implement the user's exact heuristic as a named baseline, then a robust balanced variant. Build local comparison sheets and 100% crops for the nine samples. Add explicit filter mode, tint control and separate highlight/haze processing. Record human preference and artifacts. Goal: agree on desirable output before committing to a model or UI framework details.
+Implement the user's exact heuristic as a named baseline, then a robust balanced variant. Build local comparison sheets and 100% crops for a local regression set. Add explicit filter mode, tint control and separate highlight/haze processing. Record human preference and artifacts. Goal: agree on desirable output before committing to a model or UI framework details.
 
 ### 1. Photo MVP
 
@@ -132,7 +111,7 @@ Edit queue, copy/paste recipe, saved presets, re-edit persistence, export metada
 
 Begin on Android with Media3 Transformer and reusable colour shaders. Start with SDR MP4/H.264 and preserved audio/timestamps. Analyse sparse frames, detect scene cuts and smooth correction within each shot to prevent flicker. Avoid independent aggressive one-click decisions on every frame. Add trim, preview, cancellable export and storage/thermal handling. Add temporal AI only after stable classical video. Keep web photo parity while evaluating web video export separately; it need not block Android video.
 
-Validation: all sample orientations and dimensions; no original modification; red-filter and magenta cases; severe red loss; green water; local highlights; neutral/no-op scenes; slider reversibility; preview/export agreement; portrait and landscape model inputs; full-resolution detail/seams; app cold/warm share entry; cloud-backed picker URIs; cancellation; offline mode; low storage and memory; representative midrange Android devices. Establish latency targets through profiling rather than promising model speed now.
+Validation: supported orientations and dimensions; no original modification; red-filter and magenta cases; severe red loss; green water; local highlights; neutral/no-op scenes; slider reversibility; preview/export agreement; portrait and landscape model inputs; full-resolution detail/seams; app cold/warm share entry; cloud-backed picker URIs; cancellation; offline mode; low storage and memory; representative midrange Android devices. Establish latency targets through profiling rather than promising model speed now.
 
 ## Sources reviewed
 
