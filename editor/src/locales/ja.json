@@ -324,7 +324,6 @@
   "Checks for a new web version and activates it after saving the current edit. The Android package is updated by installing a new APK. Folder choices last for the session. Custom models are saved on this device and loaded when needed; choose the file again if it is missing or damaged.": "現在の編集を保存してWeb更新を確認・適用します。Androidは新APKをインストールして更新します。フォルダー選択はセッション中のみ保持されます。カスタムモデルは端末に保存され、必要時に読み込まれます。ファイルが見つからないか破損している場合は再選択してください。",
   "Processing is local; photos, videos and custom model files are not sent to an inference service. The web app downloads its own assets and supplied model files when needed. Browser storage holds the library and edit recipes, but can be evicted or fill up: retain your originals and export results you want to keep. Supplied web models become available offline after their first successful use; the Android APK includes them.": "処理は端末内で行い、写真・動画・カスタムモデルを推論サービスへ送りません。Webは必要なアプリ資産と付属モデルをダウンロードします。ブラウザーのライブラリ・設定は容量不足や自動削除の可能性があるため、元ファイルを保管し、必要な結果を書き出してください。付属Webモデルは初回使用後にオフライン利用でき、APKには同梱されています。",
   "Attribution & sources": "クレジット・出典",
-  "ClearWater's classical corrections, interface and colour-transfer workflow build on the work credited above. Converted Shallow-UWnet and FUnIE-GAN weights are distributed with their MIT licence notices. Model source links and detailed conversion provenance are available in the": "ClearWaterの補正・UI・色転写は上記の成果を活用しています。変換済みShallow-UWnetとFUnIE-GANにはMITライセンス表記を付属しています。出典と変換記録は",
   "model notes": "モデルの説明",
   "runs neural models locally.": "端末内でニューラルモデルを実行します。",
   "handles video reading, conversion and MP4 writing. Unmodified, MPL-2.0;": "動画の読み込み・変換・MP4出力を担当。未改変、MPL-2.0。",
@@ -451,5 +450,8 @@
   "Supplied AI model · about 3 MB": "付属AIモデル · 約3 MB",
   "WWE-UIE · AI": "WWE-UIE · AI",
   "Loading and running WWE-UIE…": "WWE-UIEを読み込み・実行中…",
-  "Could not load WWE-UIE. Check the model files and retry.": "WWE-UIEを読み込めません。モデルファイルを確認して再試行してください。"
+  "Could not load WWE-UIE. Check the model files and retry.": "WWE-UIEを読み込めません。モデルファイルを確認して再試行してください。",
+  "ClearWater's classical corrections, interface and colour-transfer workflow build on the work credited above. Converted WWE-UIE weights include an Apache-2.0 licence notice; Shallow-UWnet and FUnIE-GAN weights include MIT licence notices. Model source links and detailed conversion provenance are available in the": "ClearWater の従来型補正、インターフェース、色転送処理は、上記の研究やソフトウェアに基づいています。変換済み WWE-UIE の重みには Apache-2.0、Shallow-UWnet と FUnIE-GAN の重みには MIT のライセンス表記を同梱しています。モデルのソースと変換の詳細は次をご覧ください：",
+  "supplies the WWE-UIE model described above. Apache-2.0.": "上記の WWE-UIE モデルを提供。Apache-2.0 ライセンス。",
+  "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "libheif で HEIC/HEIF 写真をデコードします。Hopper Gee と libheif の貢献者による開発。LGPL ライセンス。"
 }

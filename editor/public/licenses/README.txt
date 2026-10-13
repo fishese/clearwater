@@ -33,3 +33,11 @@ WWE-UIE: supplied underwater image enhancement model weights converted from the 
 Copyright the WWE-UIE authors. Source: https://github.com/chingheng0808/WWE-UIE/tree/fd0697558203f9f849800cc13b804116bb3f921c
 The repository and checkpoint are distributed under Apache License 2.0; see LICENSE-WWE-UIE.txt.
 The ONNX conversion provenance, checkpoint/model hashes and PyTorch/ONNX parity are recorded in ../models/manifest.json.
+
+HEIC/HEIF decoding uses unmodified heic-to 1.6.6 by Hopper Gee (LGPL-3.0-or-later),
+including libheif 1.23.6 by the libheif contributors (LGPL-3.0).
+See LICENSE-heic-to.txt and LICENSE-libheif.txt for the full notices.
+Package: https://registry.npmjs.org/heic-to/-/heic-to-1.6.6.tgz
+Wrapper source and decoder build instructions: https://github.com/hoppergee/heic-to
+Decoder source: https://github.com/strukturag/libheif/tree/v1.23.6
+The wrapper repository README documents the Emscripten decoder build changes.
