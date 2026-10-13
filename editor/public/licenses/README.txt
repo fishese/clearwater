@@ -12,12 +12,12 @@ See LICENSE-piexifjs.txt; project: https://github.com/hMatoba/piexifjs
 
 DNG processing uses @colorhythm/libraw-wasm 1.1.1 (MIT bindings) by TOMIKAWA Sotaro and Colorhythm.
 See LICENSE-LibRaw-wasm.txt. Wrapper/binding source, including the build script's C API additions:
-LibRaw-wasm-source-9b0f59a.tar.gz (shipped beside this notice), or
+LibRaw-wasm-source-9b0f59a.zip (shipped beside this notice), or
 https://github.com/colorhythm/libraw-wasm/tree/9b0f59a5e0f6d3d12a8f6fa594015ef4f30a6e95
 The included LibRaw 0.22.1 is distributed under CDDL 1.0 (chosen from its dual licence).
 See LICENSE-LibRaw-CDDL.txt and COPYRIGHT-LibRaw.txt for notices and third-party credits.
 Original LibRaw source for the pinned submodule is shipped beside this notice:
-LibRaw-source-b860248.tar.gz, or
+LibRaw-source-b860248.zip, or
 https://github.com/LibRaw/LibRaw/tree/b860248a89d9082b8e0a1e202e516f46af9adb29
 Rebuild with the pinned binding repository's packages/libraw.wasm/scripts/build.mjs;
 the source archive's LibRaw submodule must be populated from the LibRaw source archive above.
