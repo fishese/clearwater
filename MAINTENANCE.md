@@ -11,6 +11,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Metadata | metadata-check.mjs |
 | Navigation / saving | browsing-check.mjs |
 | Async UI state | ui-state-check.mjs (synthetic fixtures) |
+| Mobile text / footer / desktop Effects inset | mobile-readability-check.mjs |
 | Compact touch layout | touch-target-check.mjs (CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
 | Layered mobile controls | layered-controls-check.mjs (synthetic input; CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
 | Expanded fit and gestures | expanded-gesture-check.mjs (synthetic input; CHECK_URL supported) |

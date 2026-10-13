@@ -22,6 +22,6 @@ export const message=(text:string)=>translateMessage(language,text);
 export function LanguageSelect(){
  const value=useLanguage();
  return <select className="language-select" aria-label={t('Language')} title={t('Language')} value={value} onChange={event=>setLanguage(event.target.value as Language)}>
-  <option value="en" lang="en" label="EN">English</option><option value="zh-HK" lang="zh-HK" label="繁中">繁體中文</option><option value="ja" lang="ja">日本語</option>
+  <option value="en" lang="en" label="EN">EN</option><option value="zh-HK" lang="zh-HK" label="中">中</option><option value="ja" lang="ja" label="日">日</option>
  </select>;
 }

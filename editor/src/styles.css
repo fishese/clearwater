@@ -288,3 +288,47 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 .balanced-followup small{font-size:10px;line-height:1.4;color:#8fa59b}
 .balanced-followup .range-field{margin:3px 0 5px}
 @media(pointer:coarse){.balanced-followup .metadata-option{min-height:44px}}
+
+/* Mobile labels stay readable across English, Traditional Chinese, and Japanese. */
+@media(max-width:650px){
+ .workspace-bottom{min-height:0;flex-wrap:wrap;justify-content:flex-start;row-gap:2px;padding:4px 8px}
+ .workspace-bottom>span{order:0;flex:1 1 100%;min-width:0;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+ .workspace-bottom>div{order:1;width:100%;justify-content:center;gap:2px;white-space:nowrap}
+ .workspace-bottom button{font-size:11px;white-space:nowrap}
+ .workspace-bottom>span{font-size:11px}
+ .workspace-bottom>div>button:first-child{flex:0 1 auto;min-width:0;padding:3px 5px}
+ .workspace-bottom>div>button:not(:first-child){flex:0 0 40px;width:40px;min-width:40px;padding:0}
+ .control-tabs button{font-size:12px}
+ .main-control-tabs button{font-size:13px}
+ .range-field output{font-size:12px}
+ .radio-group label{font-size:11px}
+ .dive-options .radio-group label{font-size:10px}
+ .dive-options .radio-group legend{font-size:12px}
+ .compact-controls .depth-control .range-field>span{font-size:11px}
+ .depth-control output{font-size:11px}
+ .compact-controls .depth-control .text-button{font-size:10px}
+ .photo-navigation{font-size:11px}
+ .folder-browser{font-size:11px}
+ .model-actions>.text-button{font-size:11px}
+ .group-content .restoration-row .auto-button{font-size:11px}
+ .analysis-note>span,.balanced-only-note{font-size:11px}
+}
+@media(max-width:370px){
+ .workspace-bottom>div>button:not(:first-child){flex-basis:36px;width:36px;min-width:36px}
+}
+
+@media(max-width:650px){
+ .brand-cluster .language-select{width:52px;font-size:12px}
+ .compact-controls .range-field:not(.vertical-range)>span{font-size:12px}
+ .compact-controls .vertical-range>span>span,.compact-controls .vertical-range output{font-size:12px;line-height:1.2}
+ .compact-controls .depth-control .range-field>span,.depth-control output{font-size:12px}
+ .compact-controls select{font-size:13px}
+ .compact-controls .neutral-button,.metadata-option,.depth-unsure{font-size:12px!important}
+ .engine-subpanel .analysis-note .suggestion,.balanced-followup small{font-size:11px;line-height:1.45}
+ .export-options>label,.save-destination,.save-destination small{font-size:11px}
+ .dive-options .radio-group label{font-size:11px}
+}
+@media(max-width:350px){.dive-options .radio-group label{font-size:10px}}
+
+@media(min-width:651px){.enhancement-group>summary{padding:0 10px}}
+@media(max-width:650px){.image-label{font-size:8px}.canvas-toolbar .filename{font-size:10px}}
