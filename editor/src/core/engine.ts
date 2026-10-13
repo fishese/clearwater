@@ -122,6 +122,7 @@ export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:U
 export function parseRecipe(value:unknown): Recipe {
   if(!value || typeof value!=='object') throw new Error('This is not a ClearWater recipe.');
   const r=value as Recipe;
+    if(r.videoCorrection&&(!['sampled','fixed'].includes(r.videoCorrection.mode)||![2,5,10].includes(r.videoCorrection.interval)||!Number.isFinite(r.videoCorrection.referenceTime)||r.videoCorrection.referenceTime<0||r.videoCorrection.referenceTime>600))throw new Error('Invalid video correction settings.');
   const finite=(v:unknown,lo:number,hi:number)=>typeof v==='number'&&Number.isFinite(v)&&v>=lo&&v<=hi;
   const triple=(v:unknown,lo:number,hi:number)=>Array.isArray(v)&&v.length===3&&v.every(n=>finite(n,lo,hi));
   if(r.customModel&&(!/^[a-f0-9]{64}$/.test(r.customModel.sha256)||typeof r.customModel.name!=='string'||r.customModel.name.length>255||!['unit','signed'].includes(r.customModel.inputRange)||!['unit','signed'].includes(r.customModel.outputRange)))throw new Error('Invalid custom model settings.');

@@ -88,20 +88,32 @@ Red reconstruction estimates plausible appearance from the remaining channels; i
 2. Validate full-resolution colour/noise on representative Android hardware.
 3. Validate Android folder and share workflows on additional devices.
 4. Review the three model results, benchmark Android performance, and evaluate full-resolution/tiled inference or improved colour transfer. Consider ADCCA-GAN if verified artifacts become available.
-5. Add HDR tone mapping, video playback, longer clips and temporally stable neural video restoration.
+5. Add HDR tone mapping, video playback, native/GPU processing and full temporal neural restoration.
 
 The parent `IMPLEMENTATION_PLAN.md` and `analysis/ADCCA_GAN_REVIEW.md` contain the research and longer-term architecture.
 
 
 ## Video (first version)
 
-Open MP4 or MOV from the file picker, Android folder browser, or Android share menu. Scrub the timeline to choose a frame, use Auto restore or manual adjustments, and export an MP4. One fixed correction recipe is applied to every frame to avoid colour changes caused by independent frame-by-frame analysis. Use a representative frame for Auto restore. There is frame preview, but no continuous playback yet.
+Open MP4 or MOV from the file picker, Android folder browser, or Android share menu. Scrub the timeline to choose a frame, use Auto restore or manual adjustments, and export an MP4. Balanced and RGB use one fixed correction recipe across the clip. For these engines, use a representative frame for Auto restore. There is frame preview, but no continuous playback yet.
 
 - SDR H.264 and HEVC input work when the browser/device has the matching WebCodecs decoder. MOV is a container; it does not guarantee codec support. iPhone rotation is baked into the exported pixels.
 - HDR/PQ/HLG and Dolby Vision clips are rejected pending proper tone mapping. For now, record with iPhone HDR Video disabled or supply an SDR copy.
-- Input: up to 3 minutes, 512 MB and 34 megapixels per frame. Output: H.264 MP4, up to 1080p (portrait or landscape) and 30 fps, maximum 256 MB. Originals are preserved.
+- Input: up to 10 minutes, 512 MB and 34 megapixels per frame. Output: H.264 MP4, up to 1080p (portrait or landscape) and 30 fps, maximum 256 MB. Bitrate is reduced for longer clips, reserving room for audio and encoder variation. Originals are preserved.
 - Primary audio is retained as compatible AAC or converted when supported. Unsupported audio prompts the user to turn off Keep audio; it is never silently dropped. Additional audio tracks, subtitles and descriptive/GPS metadata are not exported.
-- Balanced restoration and the RGB heuristic are supported; neural models are disabled for video until temporal stability and mobile performance are addressed. Long exports can take time; keep the app open. Export can be cancelled.
+- Balanced, RGB, Shallow-UWnet, FUnIE-GAN and compatible custom ONNX engines are supported. AI video uses sampled global colour fitting, described below; it does not run a spatial correction map over moving subjects. Long exports can take time; keep the app open. Export and sample analysis can be cancelled.
 - All decoding/correction/encoding runs locally. Large clips are stored in the local library, and encoded output is buffered in memory. These limits do not guarantee every phone can process the largest clip.
 
 Video uses unmodified Mediabunny (MPL-2.0); licence and corresponding source links are included under `public/licenses/`. To reproduce the integration check, install `imageio-ffmpeg` in an optional Python environment, run `python scripts/create-video-fixtures.py`, start the app, then run `node scripts/video-check.mjs`. Fixtures and exported test clips are ignored by Git. `CHECK_URL` selects a production/Pages preview. The check covers MP4/MOV, rotation, audio, seeking, correction, cancellation, HDR rejection, codec availability, mobile fit and returning to photos.
+
+### Sampled AI video colour
+
+Select Shallow-UWnet, FUnIE-GAN or a compatible custom ONNX model under Correction Engine. **Sampled AI colour** defaults to one sample every 5 seconds; 2 or 10 seconds are also available. Each sample runs the existing 256x256 model once. A regularized affine RGB transform is fitted between the original and the model result; per-pixel spatial residuals are not reused across moving video subjects. The fitted global transforms interpolate between sample times, followed by the same strength and manual adjustment renderer used for photos. This approximates model colour; it does not transfer local dehazing, denoising or reconstructed details.
+
+Colour histograms flag strongly different sampled scenes. At those boundaries, each frame chooses the closer sampled scene's transform instead of blending the two. Brief scenes entirely between sample points can be missed; a shorter interval can help. This is a heuristic, not full shot detection or optical-flow tracking.
+
+**Fixed selected frame** fits one AI transform from the selected frame and applies it throughout the clip. Use the current-frame button to change the reference. Balanced and RGB remain the original low-cost whole-clip alternatives. Mode, interval and reference time are saved in recipes and each file's edits.
+
+Preview analyses only the surrounding samples. Export analyses the remaining samples first (0-20% progress), then renders all frames (20-95%). Completed analysis is cached for the active video/model and reused for manual edits, strength changes, seeking and repeated export. Caches are discarded when changing files; custom models still need to be loaded after an app reload. Inference is serialized to avoid concurrent sessions competing for memory. A 10-minute clip at 5-second spacing has 121 samples, so mobile export preparation can take significant time even though models do not run on every output frame.
+
+`node scripts/video-ai-check.mjs` checks sampled and fixed Shallow correction, inference reuse, cancelling sample analysis, FUnIE and generic ONNX video exports, custom model handoff to photos, mobile layout, a complete 10-minute export, and rejection above 10 minutes. Generate fixtures with `python scripts/create-video-fixtures.py` first. Set `CHECK_URL` for a production/Pages build; `CHECK_OFFLINE=1` verifies cached Shallow inference and export offline after warming the model.

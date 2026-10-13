@@ -24,6 +24,7 @@ export interface Recipe {
   version: 1; engine: 'balanced' | 'baseline' | 'shallow' | 'funie' | 'wave'; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
   customModel?: CustomModel;
+  videoCorrection?: {mode:'sampled'|'fixed';interval:2|5|10;referenceTime:number};
 }
 // 'wave' remains the on-disk engine ID for compatibility with earlier recipes.
 export interface CustomModel {sha256:string;name:string;inputRange:'unit'|'signed';outputRange:'unit'|'signed'}

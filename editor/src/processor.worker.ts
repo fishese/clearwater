@@ -8,8 +8,10 @@ const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
 let fields=new Map<ModelName,Promise<Float32Array>>();
 let customModel:CustomModel|undefined;
+let customTask:Promise<unknown>=Promise.resolve();
 async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Array|undefined> {
   if(recipe.engine!=='shallow'&&recipe.engine!=='funie'&&recipe.engine!=='wave')return;
+  if(recipe.engine==='wave')await customTask;
   const name=recipe.engine,cache=fields,bitmap=source!;
   if(name==='wave'&&(!customModel||(recipe.customModel&&(recipe.customModel.sha256!==customModel.sha256||recipe.customModel.inputRange!==customModel.inputRange||recipe.customModel.outputRange!==customModel.outputRange))))throw new Error('Load the matching custom ONNX file and range settings for this recipe.');
   if(!cache.has(name)) {
@@ -33,15 +35,8 @@ ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
   try {
     if(type==='custom-model') {
-      if(data.permission!==true)throw new Error('Confirm permission to use your model.');
-      if(!(data.blob instanceof Blob)||data.blob.size>64*1024*1024)throw new Error('Choose a self-contained ONNX model under 64 MB.');
-      if(!['unit','signed'].includes(data.inputRange)||!['unit','signed'].includes(data.outputRange))throw new Error('Select valid model colour ranges.');
-      const bytes=await data.blob.arrayBuffer();
-      const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
-      const config:CustomModel={sha256,name:String(data.blob.name??'custom.onnx').slice(0,255),inputRange:data.inputRange,outputRange:data.outputRange};
-      const {registerCustomModel}=await import('./models');
-      await registerCustomModel(bytes,config);customModel=config;fields.delete('wave');
-      send({type:'custom-ready',gen,config});
+      customTask=customTask.catch(()=>{}).then(async()=>{const {loadCustomModel}=await import('./models');customModel=await loadCustomModel(data);fields.delete('wave');return customModel;});
+      const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config});
     } else if(type==='load') {
       generation=gen;
       const bitmap=await decode(data.blob);

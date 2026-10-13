@@ -25,3 +25,8 @@ run('-i', source, '-c:v', 'libx265', '-preset', 'ultrafast', '-x265-params', 'lo
     '-pix_fmt', 'yuv420p10le', '-color_primaries', 'bt2020', '-color_trc', 'smpte2084',
     '-colorspace', 'bt2020nc', '-tag:v', 'hvc1', '-c:a', 'copy', folder / 'hdr.mov')
 print(f'Created fixtures in {folder}')
+run('-f','lavfi','-i','testsrc2=size=320x240:rate=12','-f','lavfi','-i','sine=frequency=440:sample_rate=48000',
+    '-t','8','-vf','colorchannelmixer=rr=0.5:gg=0.85:bb=1','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',folder/'sampled.mp4')
+for seconds,name in [(600,'ten-minutes.mp4'),(601,'too-long.mp4')]:
+    run('-f','lavfi','-i','testsrc2=size=64x48:rate=1','-t',seconds,'-c:v','libx264','-preset','ultrafast',
+        '-pix_fmt','yuv420p',folder/name)

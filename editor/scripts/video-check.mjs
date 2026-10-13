@@ -25,7 +25,7 @@ try{
   const saved=page.waitForEvent('download');await page.getByRole('button',{name:'Download instead',exact:true}).click();const file=await saved;
   assert.ok(file.suggestedFilename().endsWith('-restore.mp4'));await file.saveAs(resolve(dir,fixture+'-edited.mp4'));await ready();
   await page.locator('summary').filter({hasText:'Correction Engine'}).click();
-  assert.equal(await page.getByLabel('Correction engine',{exact:true}).locator('option[value="funie"]').isDisabled(),true);
+  assert.equal(await page.getByLabel('Correction engine',{exact:true}).locator('option[value="funie"]').isDisabled(),false);
   await page.locator('summary').filter({hasText:'Correction Engine'}).click();
   console.log('PASS edit/scrub/audio/export '+fixture);
  }
