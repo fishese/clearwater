@@ -97,6 +97,32 @@ try{
       assert.equal(await page.locator('#control-subpanel-effects input[type=range]').first().getAttribute('min'),'-100');
       await page.screenshot({path:path.join(outputDir,`controls-${width}-${language}.png`),fullPage:true});
       await page.locator('[data-control-tab="enhancement"]').click();await page.locator('[data-control-subtab="effects"]').click();
+      if(language==='en'&&width===390){
+        const autoButton=page.getByRole('button',{name:'Auto enhance'}),brightness=page.locator('#control-subpanel-effects input[type=range]').first();
+        const readyPaint=await autoButton.evaluate(button=>{const style=getComputedStyle(button);return {background:style.backgroundColor,border:style.borderTopColor};});
+        assert.deepEqual(readyPaint,{background:'rgba(0, 0, 0, 0)',border:'rgb(142, 203, 180)'},'narrow ready state has a mint outline');
+        await autoButton.evaluate(button=>button.classList.add('is-applied'));await page.waitForTimeout(180);
+        const appliedPaint=await autoButton.evaluate(button=>{const style=getComputedStyle(button);return {background:style.backgroundColor,border:style.borderTopColor};});
+        assert.deepEqual(appliedPaint,{background:'rgb(44, 88, 71)',border:'rgb(167, 223, 206)'},'narrow applied state has a filled mint treatment');
+        await autoButton.evaluate(button=>button.classList.remove('is-applied'));
+        assert.equal(await autoButton.getAttribute('aria-pressed'),'false','manual-only effect starts in the ready state');
+        await brightness.focus();await page.keyboard.press('ArrowRight');
+        assert.equal(await autoButton.getAttribute('aria-pressed'),'false','manual slider edits do not claim Auto enhance');
+        await page.getByRole('button',{name:'Undo'}).click();assert.equal(await autoButton.getAttribute('aria-pressed'),'false','undo returns to the ready state');
+        await page.getByRole('button',{name:'Redo'}).click();assert.equal(await autoButton.getAttribute('aria-pressed'),'false','redo restores a manual-only state');
+        await page.waitForFunction(()=>{const button=document.querySelector('.auto-enhance-button');return button&&!button.disabled;});
+        await autoButton.click();await page.waitForFunction(()=>document.querySelector('.auto-enhance-button')?.getAttribute('aria-pressed')==='true',null,{timeout:15000});
+        await brightness.focus();await page.keyboard.press('ArrowRight');assert.equal(await autoButton.getAttribute('aria-pressed'),'false','manual edits clear the Auto marker');
+        await page.getByRole('button',{name:'Undo'}).click();assert.equal(await autoButton.getAttribute('aria-pressed'),'true','undo restores Auto origin');
+        await page.getByRole('button',{name:'Redo'}).click();assert.equal(await autoButton.getAttribute('aria-pressed'),'false','redo restores manual state');
+        await page.waitForFunction(()=>{const button=document.querySelector('.auto-enhance-button');return button&&!button.disabled;});
+        await autoButton.click();await page.waitForFunction(()=>document.querySelector('.auto-enhance-button')?.getAttribute('aria-pressed')==='true',null,{timeout:15000});
+        await delay(800);await page.reload({waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
+        await page.locator('[data-control-tab="enhancement"]').click();await page.locator('[data-control-subtab="effects"]').click();
+        await page.waitForFunction(()=>document.querySelector('.auto-enhance-button')?.getAttribute('aria-pressed')==='true',null,{timeout:10000});
+        await page.getByRole('button',{name:'Clear enhancement'}).click();assert.equal(await autoButton.getAttribute('aria-pressed'),'false','clear removes applied state');
+      }
       await page.locator('input[type=file][multiple]').setInputFiles({name:'switch-test.mp4',mimeType:'video/mp4',buffer:Buffer.from([0,0,0,0])});
       await page.waitForFunction(()=>!document.querySelector('[data-control-subtab="effects"]')&&document.querySelector('[data-control-subtab="colour"]')?.getAttribute('aria-selected')==='true');
       const afterVideo=await page.evaluate(()=>({count:window.__cwWorkerCount,messages:window.__cwWorkerMessages.length}));
@@ -109,6 +135,13 @@ try{
       assert.equal(await page.locator('#control-panel-correction').evaluate(node=>getComputedStyle(node).display),'contents');
       assert.equal(await page.locator('.light-clarity-group').count(),1,`${width}px ${language}: one combined desktop light/clarity group`);
       assert.equal(await page.locator('.light-clarity-grid input[type=range]').count(),5,`${width}px ${language}: desktop retains five manual sliders`);
+      const autoButton=page.getByRole('button',{name:'Auto enhance'});
+      const readyPaint=await autoButton.evaluate(button=>{const style=getComputedStyle(button);return {background:style.backgroundColor,border:style.borderTopColor};});
+      assert.deepEqual(readyPaint,{background:'rgba(0, 0, 0, 0)',border:'rgb(142, 203, 180)'},`${width}px ${language}: desktop ready state has a mint outline`);
+      await autoButton.evaluate(button=>button.classList.add('is-applied'));await page.waitForTimeout(180);
+      const appliedPaint=await autoButton.evaluate(button=>{const style=getComputedStyle(button);return {background:style.backgroundColor,border:style.borderTopColor};});
+      assert.deepEqual(appliedPaint,{background:'rgb(44, 88, 71)',border:'rgb(167, 223, 206)'},`${width}px ${language}: desktop applied state has a filled mint treatment`);
+      await autoButton.evaluate(button=>button.classList.remove('is-applied'));
       await page.screenshot({path:path.join(outputDir,`controls-${width}-${language}.png`),fullPage:true});
     }
     await page.close();

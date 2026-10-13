@@ -64,8 +64,10 @@ export default function App() {
   const [saveDialog,setSaveDialog]=useState(false),[saveName,setSaveName]=useState('');
   const exportTarget=useRef<{name:string;folder?:LocalDirectoryHandle}|null>(null),librarySwitchLock=useRef(false);
   const [eyedropper,setEyedropper]=useState(false),[zoom,setZoom]=useState(1);
-  const [stageSize,setStageSize]=useState({width:700,height:600}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
-  const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null);
+  const [stageSize,setStageSize]=useState({width:0,height:0}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
+  const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null),controlsPanel=useRef<HTMLElement>(null);
+  const [zoomControlPosition,setZoomControlPosition]=useState({right:8,bottom:8});
+  const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
   const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
   const photoProcessor=useRef<Worker|null>(null),videoProcessor=useRef<Worker|null>(null);
@@ -94,7 +96,8 @@ export default function App() {
   const sourceFolder=active?sourceFolders.get(active):undefined;
   const canEdit=!!recipe && ready && !busy && !exporting && !folderLoading && !customOpen;
   const aspect=dimensions[0]/dimensions[1];
-  const fitWidth=Math.min(stageSize.width-48,(stageSize.height-48)*aspect);
+  const fitInset=expanded?80:48;
+  const fitWidth=Math.max(1,Math.min(Math.max(1,stageSize.width-48),Math.max(1,(stageSize.height-fitInset)*aspect)));
   const persist=(p:Photo)=>{const {id,file,recipe,thumbnail,addedAt}=p;savePhoto({id,file,recipe,thumbnail,addedAt}).catch(()=>setStorageWarning(true));};
   const notify=(message:string)=>setNotice(message);
   function navigatePhoto(direction:number){if(busy||exporting||customOpen||folderLoading)return;if(folderBrowser){void browseFolderPhoto(folderBrowser,photoIndex+direction);return;}const next=photos[photoIndex+direction];if(next){setReady(false);setActive(next.id);}}
@@ -199,10 +202,10 @@ export default function App() {
       }
       if(data.gen!==generation.current){data.bitmap?.close();data.original?.close();return;}
       if(data.type==='photo-info'){setPhotoInfo(data.info);}
-      else if(data.type==='enhancement-ready'&&data.request===latest.current){setBusy('');setRendering(false);update(r=>({...r,enhancement:data.enhancement}));}
+      else if(data.type==='enhancement-ready'&&data.request===latest.current){setBusy('');setRendering(false);update(r=>({...r,enhancement:{...data.enhancement,autoApplied:true}}));}
       else if(data.type==='loaded') {
         setPhotoInfo(data.photo??null);setPhotoRetry(false);
-        setAnalysis(data.analysis);setDimensions([data.width,data.height]);setVideoInfo(data.video??null);setBusy('');setReady(true);setZoom(1);
+        setAnalysis(data.analysis);setDimensions([data.width,data.height]);setVideoInfo(data.video??null);setBusy('');setReady(true);expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setZoom(1);
         const c=originalCanvas.current;
         if(c){c.width=data.original.width;c.height=data.original.height;c.getContext('2d')!.drawImage(data.original,0,0);
           const edited=editedCanvas.current;if(edited){edited.width=c.width;edited.height=c.height;edited.getContext('2d')!.drawImage(c,0,0);}}
@@ -299,7 +302,12 @@ export default function App() {
     document.addEventListener('keydown',onKey,true);
     return ()=>{document.removeEventListener('keydown',onKey,true);if(previous?.isConnected)previous.focus();};
   },[saveDialog,customOpen,exporting,customLoading,saving]);
-  useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(entries=>{const {width,height}=entries[0].contentRect;setStageSize({width,height});});observer.observe(stage.current);return ()=>observer.disconnect();},[]);
+  useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(entries=>{const element=entries[0].target as HTMLDivElement;setStageSize({width:element.clientWidth,height:element.clientHeight});});observer.observe(stage.current);return ()=>observer.disconnect();},[]);
+  useEffect(()=>{if(!expanded)return;const place=()=>{const bounds=stage.current?.getBoundingClientRect();if(!bounds)return;let bottomEdge=bounds.bottom;
+      if(narrowControls&&adjustmentsOpen){const panel=controlsPanel.current?.getBoundingClientRect();if(panel&&panel.top>bounds.top)bottomEdge=Math.min(bottomEdge,panel.top);}
+      bottomEdge=Math.max(bounds.top+56,bottomEdge);const next={right:Math.round(Math.max(8,window.innerWidth-bounds.right+8)),bottom:Math.round(Math.max(8,window.innerHeight-bottomEdge+8))};setZoomControlPosition(current=>current.right===next.right&&current.bottom===next.bottom?current:next);};
+    const observer=new ResizeObserver(place);if(stage.current)observer.observe(stage.current);if(controlsPanel.current)observer.observe(controlsPanel.current);window.addEventListener('resize',place);window.addEventListener('scroll',place,true);place();return()=>{observer.disconnect();window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
+  },[expanded,narrowControls,adjustmentsOpen]);
   useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();if(canEdit)history(e.shiftKey?'redo':'undo');}};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[active,canEdit]);
   async function sample(name:string){
     if(exporting||sampleBusy)return;setSampleBusy(true);
@@ -314,7 +322,10 @@ export default function App() {
   }
   async function forgetSavedModel(){if(customLoading)return;try{await forgetCustomModel();setRememberedModel(null);notify(t("Saved custom model removed from this device."));}catch{notify(t("Could not remove the saved custom model."));}}
   function autoEnhance(){if(!canEdit||video||rendering)return;const id=++request.current;latest.current=id;setBusy(t('Analysing photo enhancement…'));worker.current?.postMessage({type:'enhance',gen:generation.current,request:id,recipe});}
-  function enhance(key:'contrast'|'clarity'|'sharpness'|'brightness',value:number){update(r=>({...r,enhancement:{...DEFAULT_ENHANCEMENT,...r.enhancement,[key]:value}}),false);}
+  function enhance(key:'contrast'|'clarity'|'sharpness'|'brightness',value:number){update(r=>{const previous={...r.enhancement??DEFAULT_ENHANCEMENT};delete previous.autoApplied;return {...r,enhancement:{...previous,[key]:value}};},false);}
+  const autoEnhancementApplied=recipe?.enhancement?.autoApplied===true&&(
+    recipe.enhancement.contrast!==0||recipe.enhancement.clarity!==0||recipe.enhancement.sharpness!==0||
+    (recipe.enhancement.brightness??0)!==0||recipe.enhancement.black!==0||recipe.enhancement.white!==1);
   async function exportPhoto(saveAs=false,chooseNewFolder=false,downloadOnly=false){
     if(!canEdit||rendering||!photo)return;
     if(saveAs&&!saveDialog&&supportsFolder()){setSaveName(restoredName(photo.file.name,exportFormat,!outputFolder));setSaveDialog(true);return;}
@@ -331,16 +342,49 @@ export default function App() {
     }catch(error){setExporting(false);if(!(error instanceof DOMException&&error.name==='AbortError'))notify(error instanceof Error?error.message:t("Could not open the save folder."));}
   }
   function cancelExport(){if(saving)return;generation.current++;exportTarget.current=null;worker.current?.postMessage({type:'cancel',gen:generation.current});setExporting(false);notify(t("Export cancelled."));}
-  function pickNeutral(e:ReactPointerEvent<HTMLDivElement>){
+  function pickNeutralAt(clientX:number,clientY:number,frame:HTMLDivElement){
     if(!eyedropper||!canEdit||!editedCanvas.current)return;
-    const c=editedCanvas.current,rect=e.currentTarget.getBoundingClientRect();
-    const x=clamp(Math.floor((e.clientX-rect.left)/rect.width*c.width),0,c.width-1),y=clamp(Math.floor((e.clientY-rect.top)/rect.height*c.height),0,c.height-1);
+    const c=editedCanvas.current,rect=frame.getBoundingClientRect();
+    const x=clamp(Math.floor((clientX-rect.left)/rect.width*c.width),0,c.width-1),y=clamp(Math.floor((clientY-rect.top)/rect.height*c.height),0,c.height-1);
     const pixel=c.getContext('2d')!.getImageData(Math.max(0,x-1),Math.max(0,y-1),Math.min(3,c.width-x),Math.min(3,c.height-y)).data;
     const rgb=[0,0,0];for(let i=0;i<pixel.length;i+=4){rgb[0]+=pixel[i];rgb[1]+=pixel[i+1];rgb[2]+=pixel[i+2];}rgb.forEach((_,i)=>rgb[i]/=pixel.length/4);
     if(Math.min(...rgb)<12||Math.max(...rgb)>245){notify(t("Choose a midtone white or grey area, away from deep shadows and bright highlights."));return;}
     const target=(rgb[0]+rgb[1]+rgb[2])/3;
     update(r=>({...r,manual:{...r.manual,neutral:r.manual.neutral.map((v,i)=>clamp(v*target/rgb[i],.25,4)) as [number,number,number]}}));
     setEyedropper(false);notify(t("Neutral point applied. Undo if the selected area was not white or grey."));
+  }
+  function expandedPointerDown(e:ReactPointerEvent<HTMLDivElement>){
+    const comparison=!!(e.target as HTMLElement).closest('.comparison-input');
+    if(!expanded){if(eyedropper&&canEdit&&!comparison)pickNeutralAt(e.clientX,e.clientY,e.currentTarget);return;}
+    if(!ready)return;
+    const gesture=expandedGesture.current;
+    if(comparison){e.preventDefault();if(gesture.points.size===0){gesture.startDivider=divider;const rect=e.currentTarget.getBoundingClientRect();setDivider(clamp((e.clientX-rect.left)/rect.width*100,0,100));}else if(gesture.points.size===1)setDivider(gesture.startDivider);}
+    const point={x:e.clientX,y:e.clientY};gesture.points.set(e.pointerId,point);
+    try{e.currentTarget.setPointerCapture(e.pointerId);}catch{/* Synthetic and already-cancelled pointers cannot be captured. */}
+    if(gesture.points.size===1){gesture.pinched=false;gesture.moved=false;gesture.comparison=comparison;gesture.picker=eyedropper&&!comparison;gesture.startZoom=zoom;gesture.lastPoint=point;gesture.startDistance=0;}
+    else if(gesture.points.size===2){gesture.pinched=true;gesture.picker=false;gesture.startZoom=zoom;const [a,b]=[...gesture.points.values()];gesture.startDistance=Math.hypot(a.x-b.x,a.y-b.y);}
+    else {gesture.pinched=true;gesture.picker=false;}
+  }
+  function expandedPointerMove(e:ReactPointerEvent<HTMLDivElement>){
+    const gesture=expandedGesture.current;if(!expanded||!gesture.points.has(e.pointerId))return;
+    const next={x:e.clientX,y:e.clientY},previous=gesture.points.get(e.pointerId)!;gesture.points.set(e.pointerId,next);
+    if(gesture.points.size>=2){
+      gesture.pinched=true;gesture.picker=false;gesture.moved=true;const [a,b]=[...gesture.points.values()],distance=Math.hypot(a.x-b.x,a.y-b.y);
+      if(gesture.startDistance>0)setZoom(clamp(gesture.startZoom*distance/gesture.startDistance,1,4));
+      return;
+    }
+    if(gesture.pinched){gesture.moved=true;return;}
+    const dx=next.x-previous.x,dy=next.y-previous.y;if(Math.hypot(next.x-(gesture.lastPoint?.x??next.x),next.y-(gesture.lastPoint?.y??next.y))>8)gesture.moved=true;
+    if(gesture.comparison){const rect=e.currentTarget.getBoundingClientRect();setDivider(clamp((next.x-rect.left)/rect.width*100,0,100));}
+    else if(zoom>1&&gesture.lastPoint){stage.current!.scrollLeft-=dx;stage.current!.scrollTop-=dy;}
+  }
+  function expandedPointerUp(e:ReactPointerEvent<HTMLDivElement>,cancelled=false){
+    const gesture=expandedGesture.current;if(!gesture.points.has(e.pointerId))return;
+    const applyPicker=gesture.points.size===1&&!gesture.pinched&&!gesture.moved&&gesture.picker&&!cancelled&&!((e.target as HTMLElement).closest('.comparison-input'));
+    if(applyPicker)pickNeutralAt(e.clientX,e.clientY,e.currentTarget);
+    gesture.points.delete(e.pointerId);
+    if(gesture.points.size===0){gesture.pinched=false;gesture.moved=false;gesture.picker=false;gesture.comparison=false;gesture.startDistance=0;gesture.lastPoint=null;}
+    try{if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId);}catch{/* Pointer capture may already be released by the browser. */}
   }
   async function readRecipe(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0],targetId=activeRef.current;e.target.value='';if(!file||!targetId)return;try{if(file.size>20000)throw new Error(t("Recipe file is too large."));const next=parseRecipe(JSON.parse(await file.text())),target=photoRef.current.find(p=>p.id===targetId);if(!target)return;const updated={...target,recipe:next,past:target.recipe?[...target.past.slice(-59),clone(target.recipe)]:target.past,future:[]};setPhotos(all=>all.map(p=>p.id===targetId?{...p,recipe:next,past:p.recipe?[...p.past.slice(-59),clone(p.recipe)]:p.past,future:[]}:p));persist(updated);notify(t("Recipe applied."));}catch(err){notify(err instanceof Error?err.message:t("Could not read the recipe."));}}
   async function removePhoto(p:Photo){if(exporting||folderLoading)return;if(folderBrowser)setFolderBrowser(null);const removingActive=p.id===active;if(removingActive){const gen=++generation.current;worker.current?.postMessage({type:'unload',gen});setBusy('');setReady(false);setRendering(false);setAnalysis(null);setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);}URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(removingActive)setActive(photos.find(x=>x.id!==p.id)?.id??null);await deletePhoto(p.id).catch(()=>setStorageWarning(true));}
@@ -357,21 +401,22 @@ export default function App() {
       </aside>
       <section className="workspace">
         {folderBrowser&&<div className="folder-browser"><FolderOpen size={12}/><span title={folderBrowser.name}>{folderBrowser.name}</span><button disabled={folderLoading||exporting||!!busy} aria-label={t("Close folder browser")} title={t("Return to imported photos")} onClick={()=>setFolderBrowser(null)}><X size={13}/></button></div>}
-        <div className="canvas-toolbar"><div className="photo-navigation"><button aria-label={t("Previous photo")} title={t("Previous photo")} disabled={photoIndex<=0||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(-1)}><ChevronLeft size={16}/></button><span aria-label={t("Photo position")}>{photoIndex<0?'0 / 0':`${photoIndex+1} / ${photoCount}`}</span><button aria-label={t("Next photo")} title={t("Next photo")} disabled={photoIndex<0||photoIndex>=photoCount-1||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(1)}><ChevronRight size={16}/></button></div><div className="filename"><span className="file-dot"/>{photo?.file.name??t("No photo selected")}</div><div className="canvas-tools"><button disabled={!photo} aria-label={expanded?t("Exit expanded view"):t("Expand photo")} title={expanded?t("Exit expanded view (Esc)"):t("Expand photo")} aria-pressed={expanded} onClick={()=>{setExpanded(!expanded);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button><button disabled={!canEdit||!photo?.past.length} aria-label={t("Undo")} title={t("Undo (Ctrl+Z)")} onClick={()=>history('undo')}><Undo2 size={16}/></button><button disabled={!canEdit||!photo?.future.length} aria-label={t("Redo")} title={t("Redo")} onClick={()=>history('redo')}><Redo2 size={16}/></button><span className="tool-separator"/><button className={compare?'active':''} disabled={!ready} onClick={()=>{setCompare(!compare);setEyedropper(false);}} title={t("Before / after comparison")} aria-label={t("Toggle comparison")}><ArrowLeftRight size={16}/></button><button className={eyedropper?'active':''} disabled={!canEdit} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}} title={t("Pick a white or grey point")} aria-label={t("Pick neutral point")}><Pipette size={16}/></button></div></div>
+        <div className="canvas-toolbar"><div className="photo-navigation"><button aria-label={t("Previous photo")} title={t("Previous photo")} disabled={photoIndex<=0||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(-1)}><ChevronLeft size={16}/></button><span aria-label={t("Photo position")}>{photoIndex<0?'0 / 0':`${photoIndex+1} / ${photoCount}`}</span><button aria-label={t("Next photo")} title={t("Next photo")} disabled={photoIndex<0||photoIndex>=photoCount-1||!!busy||exporting||customOpen||folderLoading} onClick={()=>navigatePhoto(1)}><ChevronRight size={16}/></button></div><div className="filename"><span className="file-dot"/>{photo?.file.name??t("No photo selected")}</div><div className="canvas-tools"><button disabled={!photo} aria-label={expanded?t("Exit expanded view"):t("Expand photo")} title={expanded?t("Exit expanded view (Esc)"):t("Expand photo")} aria-pressed={expanded} onClick={()=>{expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setExpanded(!expanded);setZoom(1);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button><button disabled={!canEdit||!photo?.past.length} aria-label={t("Undo")} title={t("Undo (Ctrl+Z)")} onClick={()=>history('undo')}><Undo2 size={16}/></button><button disabled={!canEdit||!photo?.future.length} aria-label={t("Redo")} title={t("Redo")} onClick={()=>history('redo')}><Redo2 size={16}/></button><span className="tool-separator"/><button className={compare?'active':''} disabled={!ready} onClick={()=>{setCompare(!compare);setEyedropper(false);}} title={t("Before / after comparison")} aria-label={t("Toggle comparison")}><ArrowLeftRight size={16}/></button><button className={eyedropper?'active':''} disabled={!canEdit} onClick={()=>{setEyedropper(!eyedropper);setCompare(false);}} title={t("Pick a white or grey point")} aria-label={t("Pick neutral point")}><Pipette size={16}/></button></div></div>
         <div className={`stage ${eyedropper?'picking':''}`} ref={stage}>
           {!photo&&<div className="empty-state"><h1>{t("Photo & video editor")}</h1><p>{t("Open a photo, MP4 or MOV to start.")}</p><button className="button primary" onClick={()=>importInput.current?.click()}><Upload size={16}/> {t("Choose a photo or video")}</button><small>{t("Or drop photos anywhere in the studio")}</small></div>}
-          {photo&&<div className="image-frame" onPointerDown={pickNeutral} style={{width:Math.max(1,fitWidth)*zoom,height:Math.max(1,fitWidth)/aspect*zoom,visibility:ready?'visible':'hidden'}}>
+          {photo&&<div className="image-frame" onPointerDown={expandedPointerDown} onPointerMove={expandedPointerMove} onPointerUp={e=>expandedPointerUp(e)} onPointerCancel={e=>expandedPointerUp(e,true)} style={{width:fitWidth*zoom,height:fitWidth/aspect*zoom,visibility:ready?'visible':'hidden'}}>
             <canvas ref={editedCanvas} aria-label={t("Edited photo")}/><canvas ref={originalCanvas} className="original-canvas" aria-label={t("Original photo")} style={{clipPath:showOriginal?'none':compare?`inset(0 ${100-divider}% 0 0)`:'inset(0 100% 0 0)'}}/>
             {compare&&!showOriginal&&<><span className="image-label before">{t("ORIGINAL")}</span><span className="image-label after">{t("RESTORED")}</span><div className="divider-line" style={{left:`${divider}%`}}><span><ArrowLeftRight size={16}/></span></div><input className="comparison-input" aria-label={t("Before and after divider")} type="range" min="0" max="100" value={divider} onChange={e=>setDivider(Number(e.target.value))}/></>}
             {eyedropper&&<span className="picker-hint">{t("Click a white or grey area")}</span>}
           </div>}
+          {expanded&&photo&&<div className="expanded-zoom-controls" style={zoomControlPosition} aria-label={t("Zoom, Fit & expand")}><button type="button" aria-label={t("Zoom out")} title={t("Zoom out")} disabled={!ready||zoom<=1} onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={16}/></button><button type="button" className="zoom-fit" aria-label={t("Fit")} title={t("Fit")} disabled={!ready} onClick={()=>{setZoom(1);if(stage.current)stage.current.scrollTo({left:0,top:0});}}>{zoom===1?t("Fit"):`${Math.round(zoom*100)}%`}</button><button type="button" aria-label={t("Zoom in")} title={t("Zoom in")} disabled={!ready||zoom>=4} onClick={()=>setZoom(z=>Math.min(4,z+.5))}><ZoomIn size={16}/></button></div>}
           {(busy||folderLoading)&&<div className="processing-overlay" role="status"><LoaderCircle className="spin" size={25}/><span>{folderLoading?t("Opening folder file…"):message(busy)}</span><small>{t("Your file stays on this device.")}</small></div>}
         </div>
         {!video&&photo&&(photoInfo?.large||photoRetry||photoResolution!=='auto')&&<div className="large-photo-note" role="status"><div><strong>{photoRetry?t("Photo processing could not finish"):photoInfo?.large?t("Large photo"):t("Photo resolution")}</strong><span>{photoInfo?t("{0} MP · {1} MB. Export: {2} × {3}. ",[(photoInfo.sourceWidth*photoInfo.sourceHeight/1e6).toFixed(1),(photo.file.size/1024/1024).toFixed(0),photoInfo.exportWidth,photoInfo.exportHeight]):''}{photoRetry?t("Try reduced resolution; your original and edit settings are kept."):t("A small preview keeps editing responsive. Full resolution can use substantial memory.")}</span></div><label>{t("Resolution")}<select aria-label={t("Photo resolution")} value={photoResolution} disabled={exporting||saving} onChange={e=>reopenPhoto(e.target.value as PhotoResolution)}><option value="auto">{t("Auto")}</option><option value="full">{t("Full resolution")}</option><option value="reduced">{t("Reduced · up to 12 MP")}</option></select></label>{photoRetry&&<button className="button secondary" disabled={exporting||saving} onClick={()=>reopenPhoto('reduced')}>{t("Retry reduced")}</button>}</div>}
         {video&&videoInfo&&<div className="video-timeline"><label><span>{t("Frame preview")} <output>{videoTime(previewTime)} / {videoTime(videoInfo.duration)}</output></span><input aria-label={t("Video position")} type="range" min={0} max={Math.max(0,videoInfo.duration-.001)} step={.04} value={previewTime} disabled={!ready||exporting} onChange={e=>setPreviewTime(Number(e.target.value))}/></label><small>{videoInfo.codec.toUpperCase()} · {videoInfo.outputWidth} × {videoInfo.outputHeight} {t("MP4 export · up to")} {Math.round(videoInfo.frameRate)} fps</small></div>}
-        <div className="workspace-bottom"><span>{ready?`${dimensions[0]} × ${dimensions[1]} · ${(dimensions[0]*dimensions[1]/1e6).toFixed(1)} MP`:t("No photo selected")}</span><div><button disabled={!ready} onPointerDown={()=>setShowOriginal(true)} onPointerUp={()=>setShowOriginal(false)} onPointerLeave={()=>setShowOriginal(false)} onKeyDown={e=>{if(e.key===' ')setShowOriginal(true);}} onKeyUp={()=>setShowOriginal(false)}>{t("Hold for original")}</button><span className="tool-separator"/><button disabled={!ready} aria-label={t("Zoom out")} onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={15}/></button><button disabled={!ready} onClick={()=>setZoom(1)}>{zoom===1?t("Fit"):`${Math.round(zoom*100)}%`}</button><button disabled={!ready} aria-label={t("Zoom in")} onClick={()=>setZoom(z=>Math.min(3,z+.5))}><ZoomIn size={15}/></button></div></div>
+        <div className="workspace-bottom"><span>{ready?`${dimensions[0]} × ${dimensions[1]} · ${(dimensions[0]*dimensions[1]/1e6).toFixed(1)} MP`:t("No photo selected")}</span><div><button disabled={!ready} onPointerDown={()=>setShowOriginal(true)} onPointerUp={()=>setShowOriginal(false)} onPointerLeave={()=>setShowOriginal(false)} onKeyDown={e=>{if(e.key===' ')setShowOriginal(true);}} onKeyUp={()=>setShowOriginal(false)}>{t("Hold for original")}</button>{!expanded&&<><span className="tool-separator"/><button disabled={!ready||zoom<=1} aria-label={t("Zoom out")} onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={15}/></button><button disabled={!ready} aria-label={t("Fit")} onClick={()=>{setZoom(1);if(stage.current)stage.current.scrollTo({left:0,top:0});}}>{zoom===1?t("Fit"):`${Math.round(zoom*100)}%`}</button><button disabled={!ready||zoom>=4} aria-label={t("Zoom in")} onClick={()=>setZoom(z=>Math.min(4,z+.5))}><ZoomIn size={15}/></button></>}</div></div>
       </section>
-      <aside className="controls compact-controls"><div className="controls-top"><SlidersHorizontal size={16}/><span className="adjustments-label">{t("Adjustments")}</span><button className="adjustments-toggle" aria-label={t("Toggle adjustments")} aria-expanded={adjustmentsOpen} aria-controls="adjustment-settings" onClick={()=>setAdjustmentsOpen(!adjustmentsOpen)}><SlidersHorizontal size={15}/> {t("Adjustments")} <ChevronDown size={14}/></button><button disabled={!canEdit} onClick={reset} title={t("Reset all edits")} aria-label={t("Reset all edits")}><RotateCcw size={15}/></button></div>
+      <aside ref={controlsPanel} className="controls compact-controls"><div className="controls-top"><SlidersHorizontal size={16}/><span className="adjustments-label">{t("Adjustments")}</span><button className="adjustments-toggle" aria-label={t("Toggle adjustments")} aria-expanded={adjustmentsOpen} aria-controls="adjustment-settings" onClick={()=>setAdjustmentsOpen(!adjustmentsOpen)}><SlidersHorizontal size={15}/> {t("Adjustments")} <ChevronDown size={14}/></button><button disabled={!canEdit} onClick={reset} title={t("Reset all edits")} aria-label={t("Reset all edits")}><RotateCcw size={15}/></button></div>
         <nav className="control-tabs main-control-tabs" role="tablist" aria-label={t("Adjustments")}>
           {(['correction','enhancement','export'] as const).map(tab=><button key={tab} id={`control-tab-${tab}`} type="button" role="tab" data-control-tab={tab} data-tab-value={tab} aria-selected={controlTab===tab} aria-controls={`control-panel-${tab}`} tabIndex={controlTab===tab?0:-1} onClick={()=>setControlTab(tab)} onKeyDown={e=>tabKeyDown(e,['correction','enhancement','export'],setControlTab)}>{t(({correction:'Correction',enhancement:'Enhancement',export:'Export'} as const)[tab])}</button>)}
         </nav>
@@ -416,7 +461,7 @@ export default function App() {
             </div>
           </div></details>
           <div id="control-subpanel-effects" role="tabpanel" aria-labelledby="control-subtab-effects" className={`mobile-subpanel enhancement-subpanel effects-subpanel ${visibleEnhancementTab==='effects'?'is-active':''}`}>
-          {!video&&<details className="settings-group photo-enhancement enhancement-group" open><summary>{t('Effects')} <ChevronDown size={14}/></summary><div className="group-content"><div className="enhancement-actions"><button className="button secondary" disabled={rendering} onClick={autoEnhance}><Sparkles size={12}/>{t('Auto enhance')}</button><button className="text-button" onClick={()=>update(r=>({...r,enhancement:undefined}))}>{t('Clear enhancement')}</button></div><div className="fader-grid">{(['brightness','contrast','clarity','sharpness'] as const).map(key=><Range vertical key={key} label={t({brightness:'Brightness',contrast:'Auto contrast',clarity:'Local contrast',sharpness:'Sharpness'}[key])} value={recipe?.enhancement?.[key]??0} min={key==='brightness'?-100:0} max={100} onStart={checkpoint} onChange={value=>enhance(key,value)}/>)}</div></div></details>}
+          {!video&&<details className="settings-group photo-enhancement enhancement-group" open><summary>{t('Effects')} <ChevronDown size={14}/></summary><div className="group-content"><div className="enhancement-actions"><button className={`button auto-enhance-button${autoEnhancementApplied?' is-applied':''}`} disabled={rendering} aria-pressed={autoEnhancementApplied} onClick={autoEnhance}>{autoEnhancementApplied?<Check size={14}/>:<Sparkles size={14}/>} {t('Auto enhance')}</button><button className="text-button" onClick={()=>update(r=>({...r,enhancement:undefined}))}>{t('Clear enhancement')}</button></div><div className="fader-grid">{(['brightness','contrast','clarity','sharpness'] as const).map(key=><Range vertical key={key} label={t({brightness:'Brightness',contrast:'Auto contrast',clarity:'Local contrast',sharpness:'Sharpness'}[key])} value={recipe?.enhancement?.[key]??0} min={key==='brightness'?-100:0} max={100} onStart={checkpoint} onChange={value=>enhance(key,value)}/>)}</div></div></details>}
           </div>
           <div className="manual-actions"><button className="text-button" onClick={()=>update(r=>({...r,manual:clone(DEFAULT_MANUAL),enhancement:undefined}))}><RotateCcw size={12}/> {t("Reset manual edits")}</button></div>
           </section>

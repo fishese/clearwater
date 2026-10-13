@@ -286,7 +286,7 @@
   "Before/after slider & hold for original": "比較スライダー・長押しで元画像",
   "Drag the divider to compare the same image area, or hold the original button for an unobstructed comparison. Video comparison uses the currently selected frame.": "境界をドラッグして同じ部分を比較するか、元画像ボタンを押し続けて全体を見ます。動画では選択中のフレームを比較します。",
   "Zoom, Fit & expand": "ズーム・全体表示・拡大表示",
-  "Inspect details, return to the fitted view, or hide most of the interface for more image space. Expanded mode keeps adjustments accessible.": "細部の確認、全体表示への復帰、操作部を隠して画像領域を広げる操作です。拡大表示でも調整は使えます。",
+  "Inspect details, return to the fitted view, or hide most of the interface for more image space. Expanded mode keeps adjustments accessible. Use the corner zoom controls or pinch in expanded view; drag to pan when comparison is off. A stationary tap still picks a neutral point when the picker is armed.": "細部の確認、全体表示への復帰、操作部を隠して画像領域を広げる操作です。拡大表示でも調整は使えます。隅のズームボタンやピンチで拡大縮小でき、比較をオフにするとドラッグで移動できます。中立点の選択中は、動かさずタップすると色を採取します。",
   "Undo / Redo": "元に戻す／やり直す",
   "Step through recent edits for the selected file. History is kept for the current session; the latest saved recipe is retained across reloads.": "選択ファイルの直近の編集をたどります。履歴はセッション内のみですが、最新設定は再読み込み後も保持されます。",
   "Clears your colour, light and clarity adjustments while retaining the selected engine and its suggestion.": "色・明るさ・くっきり感の手動調整を消去し、エンジンと提案は保持します。",

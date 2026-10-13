@@ -27,7 +27,7 @@ export interface Recipe {
   enhancement?: PhotoEnhancement;
   videoCorrection?: {mode:'sampled'|'fixed';interval:2|5|10;referenceTime:number};
 }
-export interface PhotoEnhancement {contrast:number;clarity:number;sharpness:number;black:number;white:number;brightness?:number}
+export interface PhotoEnhancement {contrast:number;clarity:number;sharpness:number;black:number;white:number;brightness?:number;autoApplied?:boolean}
 export const DEFAULT_ENHANCEMENT:PhotoEnhancement={contrast:0,clarity:0,sharpness:0,black:0,white:1,brightness:0};
 // 'wave' remains the on-disk engine ID for compatibility with earlier recipes.
 export interface CustomModel {sha256:string;name:string;inputRange:'unit'|'signed';outputRange:'unit'|'signed'}

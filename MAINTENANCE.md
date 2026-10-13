@@ -13,6 +13,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Async UI state | ui-state-check.mjs (synthetic fixtures) |
 | Compact touch layout | touch-target-check.mjs (CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
 | Layered mobile controls | layered-controls-check.mjs (synthetic input; CHECK_URL and PLAYWRIGHT_CHANNEL supported) |
+| Expanded fit and gestures | expanded-gesture-check.mjs (synthetic input; CHECK_URL supported) |
 | Saved custom model | custom-model-check.mjs (bundled model as the test input) |
 | Controls / adapter | controls-check.mjs |
 | Video / AI video | video-check.mjs, video-ai-check.mjs |
@@ -67,7 +68,7 @@ Check git status/staged paths and diff whitespace before committing. Create chec
 
 Photo finishing: preserve old recipe defaults, global preview-derived tonal endpoints, luminance-based colour ratios, alpha weights and export halo rows. Never analyse black/white points independently per strip. Test portrait and landscape halo-strip parity, low-noise flat regions, transparent pixels and neural-engine finishing. Spatial finishing is deliberately unavailable for video pending temporal/performance work.
 
-Responsive tabs change control visibility only: retain a single set of inputs, canvases, object URLs and workers. Test the 650px breakpoint in both directions, all tab groups, keyboard focus, expanded mode and the photo-to-video Effects fallback. Unknown depth is stored as null (Balanced extra-red depth factor 1.0), distinct from explicit zero metres (factor 0.75); its checkbox must be undoable. Effects brightness is optional in version-1 recipes, defaults to zero and uses the existing photo luminance pass. Keep its preview/export parity and old-recipe identity checks.
+Responsive tabs change control visibility only: retain a single set of inputs, canvases, object URLs and workers. Test the 650px breakpoint in both directions, all tab groups, keyboard focus, expanded mode and the photo-to-video Effects fallback. Unknown depth is stored as null (Balanced extra-red depth factor 1.0), distinct from explicit zero metres (factor 0.75); its checkbox must be undoable. Effects brightness is optional in version-1 recipes, defaults to zero and uses the existing photo luminance pass. Keep its preview/export parity and old-recipe identity checks. Auto enhance uses optional `autoApplied` visual metadata; manual Effects edits clear the marker. Verify outlined/filled states through undo, redo and reload without adding visible status labels. Expanded preview gestures must preserve recipe/history: test pinch with the picker armed, pointer cancellation, comparison dragging, pan reachability and zoom controls above the mobile adjustment sheet.
 
 ## Reliability review (October 2026)
 

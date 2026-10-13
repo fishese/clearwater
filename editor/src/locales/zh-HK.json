@@ -286,7 +286,7 @@
   "Before/after slider & hold for original": "前後滑桿及按住看原圖",
   "Drag the divider to compare the same image area, or hold the original button for an unobstructed comparison. Video comparison uses the currently selected frame.": "拖曳分隔線比較同一區域，或按住原圖按鈕查看完整原圖。影片比較使用目前選取影格。",
   "Zoom, Fit & expand": "縮放、符合畫面及放大檢視",
-  "Inspect details, return to the fitted view, or hide most of the interface for more image space. Expanded mode keeps adjustments accessible.": "檢查細節、返回符合畫面，或隱藏大部分介面以擴大影像空間。放大檢視仍可使用調整功能。",
+  "Inspect details, return to the fitted view, or hide most of the interface for more image space. Expanded mode keeps adjustments accessible. Use the corner zoom controls or pinch in expanded view; drag to pan when comparison is off. A stationary tap still picks a neutral point when the picker is armed.": "檢查細節、返回符合畫面，或隱藏大部分介面以擴大影像空間。放大檢視仍可使用調整功能。可使用角落的縮放按鈕，或以雙指縮放；關閉比較後可拖曳平移。啟用中性點選取工具時，輕觸不移動仍可取樣。",
   "Undo / Redo": "復原／重做",
   "Step through recent edits for the selected file. History is kept for the current session; the latest saved recipe is retained across reloads.": "逐步回到所選檔案的近期編輯。歷史只在本次使用期間保留，最新設定則會在重新載入後保留。",
   "Clears your colour, light and clarity adjustments while retaining the selected engine and its suggestion.": "清除色彩、光線及清晰度手動設定，保留所選引擎及建議修復。",

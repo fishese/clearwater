@@ -8,6 +8,10 @@ it('keeps old recipes and disabled enhancement exactly unchanged',()=>{
  for(const enhancement of [null,{...DEFAULT_ENHANCEMENT,black:NaN},{...DEFAULT_ENHANCEMENT,sharpness:101},{...DEFAULT_ENHANCEMENT,white:.4},{...DEFAULT_ENHANCEMENT,brightness:NaN},{...DEFAULT_ENHANCEMENT,brightness:-101},{...DEFAULT_ENHANCEMENT,brightness:101}])expect(()=>parseRecipe({...r,enhancement})).toThrow('Invalid photo enhancement');
  expect(parseRecipe({...r,enhancement:{...DEFAULT_ENHANCEMENT,black:.2,white:.6}}).enhancement?.white).toBe(.6);
  expect(parseRecipe({...r,enhancement:{...DEFAULT_ENHANCEMENT,sharpness:50}}).enhancement?.sharpness).toBe(50);
+ const automatic={...DEFAULT_ENHANCEMENT,contrast:35,autoApplied:true};expect(parseRecipe({...r,enhancement:automatic}).enhancement?.autoApplied).toBe(true);
+ expect(parseRecipe({...r,enhancement:{...automatic,autoApplied:false}}).enhancement?.autoApplied).toBe(false);
+ expect(()=>parseRecipe({...r,enhancement:{...DEFAULT_ENHANCEMENT,autoApplied:'yes' as unknown as boolean}})).toThrow('Invalid photo enhancement');
+ expect(enhancePixels(p,12,20,{...automatic})).toEqual(enhancePixels(p,12,20,{...automatic,autoApplied:false}));
  expect(parseRecipe({...r,enhancement:{contrast:80,clarity:0,sharpness:0,black:.1,white:.9}}).enhancement?.brightness).toBeUndefined();
 });
 it('expands a compressed tonal range without reacting to flat patches or transparent RGB',()=>{
