@@ -3,9 +3,11 @@ import { analyse, renderPixels } from './core/engine';
 import type { Recipe,CustomModel } from './core/types';
 import { transferField } from './core/neural-field';
 import type { ModelName } from './models';
+import {preservePhotoMetadata} from './photo-metadata';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
+let sourceFile:Blob|null=null;
 let fields=new Map<ModelName,Promise<Float32Array>>();
 let customModel:CustomModel|undefined;
 let customTask:Promise<unknown>=Promise.resolve();
@@ -42,7 +44,7 @@ ctx.onmessage=async({data})=>{
       const bitmap=await decode(data.blob);
       if(gen!==generation){bitmap.close();return;}
       if(bitmap.width*bitmap.height>45_000_000){bitmap.close();throw new Error('This prototype supports photos up to 45 megapixels. Please choose a smaller copy.');}
-      source?.close();source=bitmap;fields=new Map();
+      source?.close();source=bitmap;sourceFile=data.blob;fields=new Map();
       const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
       const canvas=new OffscreenCanvas(Math.round(bitmap.width*scale),Math.round(bitmap.height*scale));
       const c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
@@ -60,7 +62,7 @@ ctx.onmessage=async({data})=>{
       const bitmap=canvas.transferToImageBitmap();
       send({type:'rendered',gen,request,bitmap},[bitmap]);
     } else if(type==='export' && gen===generation && source) {
-      const bitmap=source;
+      const bitmap=source,originalFile=sourceFile;
       const field=await neural(data.recipe,gen,request);
       if(gen!==generation)return;
       const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
@@ -78,12 +80,13 @@ ctx.onmessage=async({data})=>{
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
-      const blob=await canvas.convertToBlob({type:data.format==='png'?'image/png':'image/jpeg',quality:.95});
+      const rendered=await canvas.convertToBlob({type:data.format==='png'?'image/png':'image/jpeg',quality:.95});
+      const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
-      send({type:'exported',gen,request,blob});
+      send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
       canvas.width=1;canvas.height=1;
     } else if(type==='cancel') {generation=gen;}
-    else if(type==='unload'){generation=gen;source?.close();source=null;pixels=null;fields=new Map();}
+    else if(type==='unload'){generation=gen;source?.close();source=null;sourceFile=null;pixels=null;fields=new Map();}
   } catch(error) {
     send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.'});
   }
