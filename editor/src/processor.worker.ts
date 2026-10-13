@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
-import { analyse, renderPixels } from './core/engine';
-import type { Recipe,CustomModel } from './core/types';
+import { analyse, renderPixels, suggest } from './core/engine';
+import {DEFAULT_MANUAL,type Recipe,CustomModel,Suggestion} from './core/types';
 import { transferField } from './core/neural-field';
 import type { ModelName } from './models';
 import {preservePhotoMetadata} from './photo-metadata';
@@ -15,6 +15,7 @@ let sourceFile:File|null=null,exportSource:ImageBitmap|null=null,sourceInfo:Phot
 let decoding:AbortController|null=null;
 let mode:PhotoResolution='auto',device:PhotoDevice={mobile:false};
 let fields=new Map<ModelName,Promise<Float32Array>>();
+let followUpSuggestions=new Map<string,Suggestion>();
 let customModel:CustomModel|undefined;
 let customTask:Promise<unknown>=Promise.resolve();
 async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Array|undefined> {
@@ -31,6 +32,20 @@ async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Ar
   }
   return cache.get(name)!;
 }
+/** Fit the optional Balanced follow-up once from the same 256px AI-corrected photo reference. */
+function balancedFollowUp(recipe:Recipe,field:Float32Array|undefined):Suggestion|undefined {
+  if(!field||!recipe.balancedAfterAI||!source)return;
+  const key=JSON.stringify([recipe.engine,recipe.customModel?.sha256,recipe.customModel?.inputRange,recipe.customModel?.outputRange,recipe.strength,recipe.hints]);
+  const cached=followUpSuggestions.get(key);if(cached)return cached;
+  const canvas=new OffscreenCanvas(256,256),c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
+  c.drawImage(source,0,0,256,256);
+  const sample=c.getImageData(0,0,256,256).data;
+  const corrected=transferField(sample,256,256,field);
+  const beforeManual=renderPixels(sample,{...recipe,balancedAfterAI:undefined,manual:structuredClone(DEFAULT_MANUAL)},corrected);
+  const result=suggest(analyse(beforeManual,256,256),recipe.hints,'balanced');
+  if(followUpSuggestions.size>=16)followUpSuggestions.delete(followUpSuggestions.keys().next().value!);
+  followUpSuggestions.set(key,result);return result;
+}
 const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message,transfer);
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
@@ -41,7 +56,7 @@ ctx.onmessage=async({data})=>{
       const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config,restore:data.restore===true});
     } else if(type==='load') {
       generation=gen;decoding?.abort();decoding=new AbortController();
-      source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();
+      source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
       mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
       const decoded=await decodePhoto(data.blob,{mode,device,preview:true,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
       const {bitmap}=decoded;
@@ -58,14 +73,15 @@ ctx.onmessage=async({data})=>{
       const input=pixels,recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
       if(gen!==generation||request!==latestPreviewRequest)return;
       const base=field?transferField(input.data,input.width,input.height,field):undefined;
-      send({type:'enhancement-ready',gen,request,enhancement:suggestEnhancement(renderPixels(input.data,recipe,base))});
+      send({type:'enhancement-ready',gen,request,enhancement:suggestEnhancement(renderPixels(input.data,recipe,base,balancedFollowUp(recipe,field)))});
     } else if(type==='render' && gen===generation && pixels) {
       const recipe=data.recipe as Recipe;
       const input=pixels,field=await neural(recipe,gen,request);
       if(gen!==generation||request!==latestPreviewRequest)return;
       const base=field?transferField(input.data,input.width,input.height,field):undefined;
+      const followUp=balancedFollowUp(recipe,field);
       const canvas=new OffscreenCanvas(input.width,input.height);
-      const corrected=renderPixels(input.data,recipe,base),settings=recipe.enhancement;
+      const corrected=renderPixels(input.data,recipe,base,followUp),settings=recipe.enhancement;
       const enabled=settings&&(settings.contrast||settings.clarity||settings.sharpness);
       const points=enabled&&settings.black===0&&settings.white===1?suggestEnhancement(corrected):settings;
       const resolved=settings&&points?{...settings,black:points.black,white:points.white}:settings;
@@ -75,8 +91,9 @@ ctx.onmessage=async({data})=>{
       send({type:'rendered',gen,request,bitmap},[bitmap]);
     } else if(type==='export' && gen===generation && source) {
       const originalFile=sourceFile;
-      const field=await neural(data.recipe,gen,request);
+      const recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
       if(gen!==generation)return;
+      const followUp=balancedFollowUp(recipe,field);
       if(sourceInfo?.large&&!exportSource&&originalFile){
         send({type:'progress',gen,request,progress:1});decoding=new AbortController();
         const decoded=await decodePhoto(originalFile,{mode,device,preview:false,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
@@ -87,7 +104,7 @@ ctx.onmessage=async({data})=>{
       let resolved=settings;
       if(settings&&(settings.contrast||settings.clarity||settings.sharpness)&&settings.black===0&&settings.white===1){
         const preview=pixels!,previewBase=field?transferField(preview.data,preview.width,preview.height,field):undefined;
-        const {black,white}=suggestEnhancement(renderPixels(preview.data,data.recipe,previewBase));resolved={...settings,black,white};
+        const {black,white}=suggestEnhancement(renderPixels(preview.data,recipe,previewBase,followUp));resolved={...settings,black,white};
       }
       const radii=enhancementRadii(bitmap.width,bitmap.height),halo=Math.max(settings?.clarity?radii.clarity:0,settings?.sharpness?radii.sharpness:0);
       const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
@@ -102,7 +119,7 @@ ctx.onmessage=async({data})=>{
         c.drawImage(bitmap,0,top,bitmap.width,rows,0,0,bitmap.width,rows);
         const input=c.getImageData(0,0,bitmap.width,rows);
         const base=field?transferField(input.data,bitmap.width,rows,field,256,top,bitmap.height):undefined;
-        const finished=enhancePixels(renderPixels(input.data,data.recipe,base),bitmap.width,rows,resolved,bitmap.width,bitmap.height);
+        const finished=enhancePixels(renderPixels(input.data,recipe,base,followUp),bitmap.width,rows,resolved,bitmap.width,bitmap.height);
         out.putImageData(new ImageData(finished,bitmap.width,rows),0,top,0,y-top,bitmap.width,height);
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
@@ -113,7 +130,7 @@ ctx.onmessage=async({data})=>{
       send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
       }finally{canvas.width=1;canvas.height=1;strip.width=1;exportSource?.close();exportSource=null;}
     } else if(type==='cancel') {generation=gen;decoding?.abort();}
-    else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();}
+    else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();followUpSuggestions.clear();}
   } catch(error) {
     if((type==='render'||type==='enhance')&&request!==latestPreviewRequest)return;
     if(type==='custom-model'&&data.silent)return;

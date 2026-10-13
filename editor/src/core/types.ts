@@ -25,6 +25,8 @@ export interface Recipe {
   hints: Hints; auto: Suggestion; manual: Adjustments;
   customModel?: CustomModel;
   enhancement?: PhotoEnhancement;
+  /** Optional follow-up Balanced pass for AI photo results. Omitted means disabled. */
+  balancedAfterAI?: { strength: number };
   videoCorrection?: {mode:'sampled'|'fixed';interval:2|5|10;referenceTime:number};
 }
 export interface PhotoEnhancement {contrast:number;clarity:number;sharpness:number;black:number;white:number;brightness?:number;autoApplied?:boolean}

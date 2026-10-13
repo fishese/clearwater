@@ -33,7 +33,7 @@ async function getNode(recipe:Recipe,time:number,gen:number,request:number):Prom
  try{return await task;}finally{pendingNodes.delete(pendingKey);}
 }
 async function decodeFrame<T>(promise:Promise<T>):Promise<T>{let timer:ReturnType<typeof setTimeout>|undefined;try{return await Promise.race([promise,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.')),20000);})]);}finally{clearTimeout(timer);}}
-function ensureRecipe(value:unknown){return parseRecipe(value);}
+function ensureRecipe(value:unknown){const recipe=parseRecipe(value);if(recipe.balancedAfterAI)throw new Error('Balanced after AI is available for photos only.');return recipe;}
 async function frame(time:number){if(!sink||!info)throw new Error('Open a video first.');const timestamp=Math.max(start,start+Math.min(time,Math.max(0,info.duration-.001)));const wrapped=await decodeFrame(sink.getCanvas(timestamp));if(!wrapped)throw new Error('Could not decode this video frame.');return wrapped.canvas.getContext('2d')!.getImageData(0,0,wrapped.canvas.width,wrapped.canvas.height);}
 function bitmap(image:ImageData){const canvas=new OffscreenCanvas(image.width,image.height);canvas.getContext('2d')!.putImageData(image,0,0);return canvas.transferToImageBitmap();}
 ctx.onmessage=async({data})=>{

@@ -1,6 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {analyse,makeRecipe,parseRecipe,renderPixels,suggest} from '../src/core/engine';
 import {transferField} from '../src/core/neural-field';
+import {DEFAULT_HINTS} from '../src/core/types';
 
 describe('AI finishing pipeline',()=>{
   const input=new Uint8ClampedArray([50,100,150,255,60,110,160,255,70,120,170,255,80,130,180,255]);
@@ -27,5 +28,33 @@ describe('AI finishing pipeline',()=>{
     expect(renderPixels(input,recipe,base)[0]).toBeLessThan(enhanced[0]);
     expect(parseRecipe(JSON.parse(JSON.stringify(recipe)))).toEqual(recipe);
     expect(()=>renderPixels(input,recipe)).toThrow('AI correction is not ready');
+  });
+  it('keeps the optional follow-up disabled by default and makes it a separate, alpha-safe pass',()=>{
+    const a=analyse(input,2,2),recipe=makeRecipe(a);recipe.engine='shallow';recipe.strength=.8;
+    const ai=new Uint8ClampedArray([120,90,70,255,115,95,75,127,110,100,80,0,105,105,85,255]);
+    const alphaInput=input.slice();alphaInput[7]=127;alphaInput[11]=0;
+    const off=renderPixels(alphaInput,recipe,ai);
+    expect(renderPixels(alphaInput,recipe,ai,undefined)).toEqual(off);
+    recipe.balancedAfterAI={strength:.3};
+    const suggestion=suggest(analyse(ai,2,2),{...DEFAULT_HINTS,filter:'yes'},'balanced');
+    const followed=renderPixels(alphaInput,recipe,ai,suggestion);
+    expect(followed).not.toEqual(off);expect(followed[3]).toBe(255);expect(followed[7]).toBe(127);expect(followed[11]).toBe(0);
+    expect(renderPixels(alphaInput,recipe,ai,suggestion)).toEqual(followed);
+  });
+  it('uses dive hints for the post-AI Balanced suggestion and reuses it across strips',()=>{
+    const image=new Uint8ClampedArray([...input,...input]),a=analyse(input,2,2),recipe=makeRecipe(a);
+    recipe.engine='wwe';recipe.balancedAfterAI={strength:.3};
+    const ai=new Uint8ClampedArray([...input,...input].map((v,i)=>i%4===3?v:Math.max(0,v-25)));
+    const analysis=analyse(ai,2,4),underwater=suggest(analysis,{...DEFAULT_HINTS,scene:'underwater',water:'green'},'balanced');
+    const filtered=suggest(analysis,{...DEFAULT_HINTS,scene:'surface',filter:'yes'},'balanced');
+    const full=renderPixels(image,recipe,ai,underwater),first=renderPixels(image.slice(0,16),recipe,ai.slice(0,16),underwater),second=renderPixels(image.slice(16),recipe,ai.slice(16),underwater);
+    expect(underwater).not.toEqual(filtered);expect(full).toEqual(new Uint8ClampedArray([...first,...second]));
+  });
+  it('validates optional Balanced after AI recipe settings and keeps older recipes valid',()=>{
+    const recipe=makeRecipe(analyse(input,2,2));
+    expect(parseRecipe(JSON.parse(JSON.stringify(recipe)))).toEqual(recipe);
+    expect(parseRecipe({...recipe,balancedAfterAI:{strength:.3}}).balancedAfterAI).toEqual({strength:.3});
+    expect(()=>parseRecipe({...recipe,balancedAfterAI:{strength:Infinity}})).toThrow('Invalid Balanced after AI settings.');
+    expect(()=>parseRecipe({...recipe,balancedAfterAI:[]})).toThrow('Invalid Balanced after AI settings.');
   });
 });

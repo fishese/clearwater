@@ -82,7 +82,7 @@ export function makeRecipe(a:Analysis,hints:Hints={...DEFAULT_HINTS}):Recipe {
  * RGB correction is tuned in display-encoded SDR; automatic blend and exposure are linear-light.
  * Haze is bounded global veil/contrast reduction, not physical depth reconstruction.
  */
-export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:Uint8ClampedArray):Uint8ClampedArray {
+export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:Uint8ClampedArray,balancedAfterAI?:Suggestion):Uint8ClampedArray {
   if((recipe.engine==='shallow'||recipe.engine==='funie'||recipe.engine==='wwe'||recipe.engine==='wave')&&!neuralBase) throw new Error('AI correction is not ready.');
   if(neuralBase&&neuralBase.length!==input.length) throw new Error('AI correction dimensions do not match.');
   const out=new Uint8ClampedArray(input.length);
@@ -90,8 +90,11 @@ export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:U
   const warmth=m.warmth/100,tint=m.tint/100;
   const gains=[m.neutral[0]*2**(warmth*.45+m.red/100*.8),m.neutral[1]*2**(-tint*.4),m.neutral[2]*2**(-warmth*.45)];
   const exposure=2**m.exposure;
-  const haze=clamp((neuralBase?0:a.haze*s)+m.haze/100*.12,-.1,.18);
-  const highlights=clamp(m.highlights/100+(neuralBase?0:a.highlights*s),-1,1);
+  const afterStrength=neuralBase&&balancedAfterAI?clamp(recipe.balancedAfterAI?.strength??0):0;
+  const followGains=afterStrength&&balancedAfterAI?balancedAfterAI.gains.map(g=>1+(g-1)*afterStrength):[1,1,1];
+  const followRedMix=afterStrength&&balancedAfterAI?balancedAfterAI.redMix*afterStrength:0;
+  const haze=clamp((neuralBase?(balancedAfterAI?.haze??0)*afterStrength:a.haze*s)+m.haze/100*.12,-.1,.18);
+  const highlights=clamp(m.highlights/100+(neuralBase?(balancedAfterAI?.highlights??0)*afterStrength:a.highlights*s),-1,1);
   const shadows=m.shadows/100;
   const contrast=1+m.contrast/100*.65;
   for(let i=0;i<input.length;i+=4) {
@@ -102,6 +105,12 @@ export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:U
     r=toSrgb(origR*(1-s)+toLinear(restoredR)*s);
     g=toSrgb(origG*(1-s)+toLinear(neuralBase?neuralBase[i+1]/255:g*a.gains[1])*s);
     b=toSrgb(origB*(1-s)+toLinear(neuralBase?neuralBase[i+2]/255:b*a.gains[2])*s);
+    if(afterStrength&&balancedAfterAI) {
+      // This optional low-strength finish blends its channel gains in display-encoded RGB
+      // to avoid another six transfer-table lookups per pixel in the full-resolution pass.
+      r=clamp(r*followGains[0]+followRedMix*Math.max(0,g-.3*b)*(1-.45*smooth(.65,1,Math.max(r,g,b))));
+      g=clamp(g*followGains[1]);b=clamp(b*followGains[2]);
+    }
     r=clamp(r*gains[0]);g=clamp(g*gains[1]);b=clamp(b*gains[2]);
     let lr=toLinear(r)*exposure,lg=toLinear(g)*exposure,lb=toLinear(b)*exposure;
     const l=luminance(lr,lg,lb);
@@ -126,6 +135,7 @@ export function parseRecipe(value:unknown): Recipe {
   const finite=(v:unknown,lo:number,hi:number)=>typeof v==='number'&&Number.isFinite(v)&&v>=lo&&v<=hi;
   const triple=(v:unknown,lo:number,hi:number)=>Array.isArray(v)&&v.length===3&&v.every(n=>finite(n,lo,hi));
   if(r.enhancement!==undefined&&(!r.enhancement||!(['contrast','clarity','sharpness'] as const).every(k=>finite(r.enhancement![k],0,100))||!finite(r.enhancement.black,0,.2)||!finite(r.enhancement.white,.6,1)||(r.enhancement.brightness!==undefined&&!finite(r.enhancement.brightness,-100,100))||(r.enhancement.autoApplied!==undefined&&typeof r.enhancement.autoApplied!=='boolean')))throw new Error('Invalid photo enhancement settings.');
+  if(r.balancedAfterAI!==undefined&&(!r.balancedAfterAI||typeof r.balancedAfterAI!=='object'||Array.isArray(r.balancedAfterAI)||!finite(r.balancedAfterAI.strength,0,1)))throw new Error('Invalid Balanced after AI settings.');
   if(r.customModel&&(!/^[a-f0-9]{64}$/.test(r.customModel.sha256)||typeof r.customModel.name!=='string'||r.customModel.name.length>255||!['unit','signed'].includes(r.customModel.inputRange)||!['unit','signed'].includes(r.customModel.outputRange)))throw new Error('Invalid custom model settings.');
   if(r.version!==1 || !['balanced','baseline','shallow','funie','wwe','wave'].includes(r.engine) || !finite(r.strength,0,1) ||
     !r.hints || !['auto','underwater','surface'].includes(r.hints.scene) || !['auto','blue','green'].includes(r.hints.water) ||

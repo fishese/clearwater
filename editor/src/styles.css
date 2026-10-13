@@ -282,3 +282,9 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
  .remove-photo{top:auto;bottom:1px;right:1px;width:24px;height:24px;border-radius:4px;background:transparent;opacity:1}
  .remove-photo:hover:not(:disabled){background:#344443;color:#f2d2c6}
 }
+
+.balanced-followup{display:grid;gap:4px;padding:6px 0;border-bottom:1px solid var(--border)}
+.balanced-followup .metadata-option{min-height:36px;padding:0;cursor:pointer}
+.balanced-followup small{font-size:10px;line-height:1.4;color:#8fa59b}
+.balanced-followup .range-field{margin:3px 0 5px}
+@media(pointer:coarse){.balanced-followup .metadata-option{min-height:44px}}

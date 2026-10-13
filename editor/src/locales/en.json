@@ -456,5 +456,13 @@
   "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.",
   "Back again to exit app": "Back again to exit app",
   "Keep the app open while work is active.": "Keep the app open while work is active.",
-  "Could not exit the app.": "Could not exit the app."
+  "Could not exit the app.": "Could not exit the app.",
+  "Balanced after AI": "Balanced after AI",
+  "Balanced after AI strength": "Balanced after AI strength",
+  "Balanced restoration follows the AI colour result at a modest blend.": "Balanced restoration follows the AI colour result at a modest blend.",
+  "Available for photos only.": "Available for photos only.",
+  "Balanced after AI is available for photos only.": "Balanced after AI is available for photos only.",
+  "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.",
+  "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.",
+  "Invalid Balanced after AI settings.": "Invalid Balanced after AI settings."
 }

@@ -456,5 +456,13 @@
   "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "透過 libheif 解碼 HEIC/HEIF 相片。由 Hopper Gee 及 libheif 貢獻者開發；採用 LGPL 授權。",
   "Back again to exit app": "再按一次返回以離開程式",
   "Keep the app open while work is active.": "處理期間請保持程式開啟。",
-  "Could not exit the app.": "無法離開程式。"
+  "Could not exit the app.": "無法離開程式。",
+  "Balanced after AI": "AI 後平衡修復",
+  "Balanced after AI strength": "AI 後修復強度",
+  "Balanced restoration follows the AI colour result at a modest blend.": "在 AI 色彩結果上輕度套用平衡修復。",
+  "Available for photos only.": "僅適用於相片。",
+  "Balanced after AI is available for photos only.": "AI 後平衡修復僅適用於相片。",
+  "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "AI 後平衡修復是相片專用的可選功能，預設關閉。它會分析 AI 結果的小型樣本，並參考潛水條件進行第二次校正，獨立強度預設為 30%。它會重用 AI 結果，毋須再次執行模型。WWE-UIE 已包含白平衡，因此額外修復可能令部分場景校正過度：請比較中性色調，並降低強度或關閉此功能。影片須另行處理以避免畫面閃爍，暫未支援此選項。",
+  "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI 色彩校正在裝置上執行。強度及手動調整仍然適用；AI 後平衡修復亦會參考潛水條件。",
+  "Invalid Balanced after AI settings.": "AI 後平衡修復設定無效。"
 }

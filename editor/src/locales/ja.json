@@ -456,5 +456,13 @@
   "decodes HEIC/HEIF photos using libheif. By Hopper Gee and the libheif contributors; LGPL licences.": "libheif で HEIC/HEIF 写真をデコードします。Hopper Gee と libheif の貢献者による開発。LGPL ライセンス。",
   "Back again to exit app": "もう一度戻ると終了します",
   "Keep the app open while work is active.": "処理中はアプリを開いたままにしてください。",
-  "Could not exit the app.": "アプリを終了できませんでした。"
+  "Could not exit the app.": "アプリを終了できませんでした。",
+  "Balanced after AI": "AI 後にバランス補正",
+  "Balanced after AI strength": "AI 後の補正強度",
+  "Balanced restoration follows the AI colour result at a modest blend.": "AI の色補正後にバランス補正を控えめに重ねます。",
+  "Available for photos only.": "写真のみ対応。",
+  "Balanced after AI is available for photos only.": "AI 後のバランス補正は写真のみ対応しています。",
+  "Balanced after AI is optional for photos and starts off. It analyses a small sample of the AI result and uses your dive hints for a second correction, with a separate strength starting at 30%. It reuses the AI result rather than running the model again. WWE-UIE already includes white balance, so this extra pass may overcorrect some scenes: compare neutral tones and reduce the strength or switch it off. Video needs a separate approach to avoid frame-to-frame flicker and does not support this option yet.": "AI 後のバランス補正は写真用の任意機能で、初期状態ではオフです。AI 結果の小さなサンプルを解析し、潜水条件を参考に追加補正します。独立した強度は 30% から始まります。AI 結果を再利用するため、モデルは再実行しません。WWE-UIE は白バランス補正を含むため、場面によっては補正が強すぎることがあります。無彩色の部分を比較し、強度を下げるかオフにしてください。動画はフレーム間のちらつきを防ぐ別の処理が必要で、現時点では対応していません。",
+  "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI の色補正は端末内で実行します。強度と手動調整は引き続き有効で、AI 後のバランス補正には潜水条件も反映されます。",
+  "Invalid Balanced after AI settings.": "AI 後のバランス補正の設定が無効です。"
 }
