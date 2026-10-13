@@ -15,7 +15,7 @@ try {
  assert.equal(await page.getByLabel('Balanced after AI strength',{exact:true}).inputValue(),'30');
  await page.getByRole('button',{name:'Expand photo',exact:true}).click();
  const assertFits=async()=>{
-  await page.waitForFunction(()=>{const s=document.querySelector('.stage'),f=document.querySelector('.image-frame');return s&&f&&s.clientWidth>100&&s.clientHeight>100&&f.clientWidth>1&&f.getBoundingClientRect().width<=s.clientWidth-10&&f.getBoundingClientRect().height<=s.clientHeight-10;},null,{timeout:5000});
+  await page.waitForFunction(()=>{const s=document.querySelector('.stage'),f=document.querySelector('.image-frame');return s&&f&&s.clientWidth>100&&s.clientHeight>100&&f.clientWidth>1&&f.getBoundingClientRect().width<=s.clientWidth-10&&f.getBoundingClientRect().height<=s.clientHeight-10&&Math.max(f.getBoundingClientRect().width/s.clientWidth,f.getBoundingClientRect().height/s.clientHeight)>.94;},null,{timeout:5000});
   const {stage,frame}=await page.evaluate(()=>({stage:{width:document.querySelector('.stage').clientWidth,height:document.querySelector('.stage').clientHeight},frame:{width:document.querySelector('.image-frame').getBoundingClientRect().width,height:document.querySelector('.image-frame').getBoundingClientRect().height}}));
   assert.ok(frame.width<=stage.width-10,`frame width ${frame.width} must fit stage width ${stage.width}`);
   assert.ok(frame.height<=stage.height-10,`frame height ${frame.height} must fit stage height ${stage.height}`);
