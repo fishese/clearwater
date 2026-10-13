@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn()}));
+const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn()}));
 vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:()=>bridge}));
-import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto} from '../src/native';
+import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos} from '../src/native';
 import {writeFile} from '../src/file-save';
 
 describe('Android file bridge',()=>{
@@ -36,5 +36,17 @@ describe('Android file bridge',()=>{
   const folder=await chooseAndroidFolder(),handle=await folder.getFileHandle('original.jpg');
   await expect(handle.createWritable()).rejects.toThrow('cannot be overwritten');
   expect(bridge.beginWrite).not.toHaveBeenCalled();
+ });
+ it('releases temporary shared files even when reading them fails',async()=>{
+  bridge.addListener.mockResolvedValue({remove:vi.fn()});
+  bridge.drainShares.mockResolvedValue({photos:[{id:'share-1',path:'/cache/share-1',name:'shared.jpg',type:'image/jpeg'}]});
+  bridge.releaseShare.mockResolvedValue(undefined);
+  const fetch=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response('',{status:404}));
+  const onFiles=vi.fn(),onError=vi.fn();
+  try{
+   await receiveAndroidPhotos(onFiles,onError);
+   expect(onFiles).not.toHaveBeenCalled();expect(onError).toHaveBeenCalledOnce();
+   expect(bridge.releaseShare).toHaveBeenCalledWith({id:'share-1'});
+  }finally{fetch.mockRestore();}
  });
 });

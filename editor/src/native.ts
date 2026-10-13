@@ -55,7 +55,7 @@ export async function receiveAndroidPhotos(onFiles:(photos:File[])=>void,onError
  let running=false,pending=false,stopped=false;
  const drain=async()=>{if(stopped)return;if(running){pending=true;return;}running=true;try{
    do {pending=false;const result=await files.drainShares();if(result.error)onError(result.error);
-    for(const item of result.photos){try{const response=await fetch(Capacitor.convertFileSrc(item.path));if(!response.ok)throw new Error('Read failed');onFiles([new File([await response.blob()],item.name,{type:item.type})]);await files.releaseShare({id:item.id});}catch{onError('Could not import a shared file. Share it again or use Open files.');}}
+    for(const item of result.photos){try{const response=await fetch(Capacitor.convertFileSrc(item.path));if(!response.ok)throw new Error('Read failed');onFiles([new File([await response.blob()],item.name,{type:item.type})]);}catch{onError('Could not import a shared file. Share it again or use Open files.');}finally{await files.releaseShare({id:item.id}).catch(()=>{});}}
    }while(pending&&!stopped);
  }catch{onError('Could not receive shared files.');}finally{running=false;}};
  const listener=await files.addListener('sharesAvailable',()=>void drain());await drain();

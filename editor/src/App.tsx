@@ -56,7 +56,7 @@ export default function App() {
   const [outputFolder,setOutputFolder]=useState<LocalDirectoryHandle|null>(null),[saving,setSaving]=useState(false);
   const [sourceFolders,setSourceFolders]=useState<Map<string,LocalDirectoryHandle>>(()=>new Map());
   const [saveDialog,setSaveDialog]=useState(false),[saveName,setSaveName]=useState('');
-  const exportTarget=useRef<{name:string;folder?:LocalDirectoryHandle}|null>(null);
+  const exportTarget=useRef<{name:string;folder?:LocalDirectoryHandle}|null>(null),librarySwitchLock=useRef(false);
   const [eyedropper,setEyedropper]=useState(false),[zoom,setZoom]=useState(1);
   const [stageSize,setStageSize]=useState({width:700,height:600}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
   const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null);
@@ -64,7 +64,7 @@ export default function App() {
   const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0);
   const photoProcessor=useRef<Worker|null>(null),videoProcessor=useRef<Worker|null>(null);
   const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
-  photoRef.current=photos;activeRef.current=active;
+  photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||customOpen||customLoading;
   const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
   const video=!!photo&&isVideo(photo.file),exportFormat=video?'mp4':format;
   const photoResolution=active?resolutions.get(active)??'auto':'auto';
@@ -73,7 +73,7 @@ export default function App() {
   const photoIndex=folderBrowser?folderBrowser.index:photos.findIndex(p=>p.id===active);
   const photoCount=folderBrowser?folderBrowser.photos.length:photos.length;
   const sourceFolder=active?sourceFolders.get(active):undefined;
-  const canEdit=!!recipe && ready && !busy && !exporting && !folderLoading;
+  const canEdit=!!recipe && ready && !busy && !exporting && !folderLoading && !customOpen;
   const aspect=dimensions[0]/dimensions[1];
   const fitWidth=Math.min(stageSize.width-48,(stageSize.height-48)*aspect);
   const persist=(p:Photo)=>{const {id,file,recipe,thumbnail,addedAt}=p;savePhoto({id,file,recipe,thumbnail,addedAt}).catch(()=>setStorageWarning(true));};
@@ -150,7 +150,7 @@ export default function App() {
     if(accepted.length!==valid.length)notify(t("Files above the 512 MB safety ceiling were skipped."));
     const addedAt=Date.now();
     const items:Photo[]=accepted.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000,url:URL.createObjectURL(file),past:[],future:[]}));
-    if(items.length){if(!fromFolder){folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);}setReady(false);setPhotos(all=>[...all,...items]);setActive(items[0].id);items.forEach(persist);}
+    if(items.length){if(!fromFolder){folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);}setPhotos(all=>[...all,...items]);if(!librarySwitchLock.current){setReady(false);setActive(items[0].id);}items.forEach(persist);}
     return items.map(item=>item.id);
   }
   useEffect(()=>{if(!isAndroid())return;let dispose:(()=>void)|undefined,cancelled=false;receiveAndroidPhotos(addFiles,notify).then(cleanup=>{if(cancelled)cleanup();else dispose=cleanup;}).catch(()=>notify(t("Could not enable Android file sharing.")));return()=>{cancelled=true;dispose?.();};},[]);
@@ -158,7 +158,7 @@ export default function App() {
     if(initialized.current)return;initialized.current=true;
     listPhotos().then(items=>{setPhotos(all=>[...items.map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]})),...all]);if(items.length){const shared=new URLSearchParams(location.search).get('shared');setActive(current=>current??items.find(p=>p.id===shared)?.id??items[0].id);}}).catch(()=>setStorageWarning(true));
     if(import.meta.env.DEV) fetch('/__samples').then(r=>r.json()).then((names:string[])=>setSamples(names.map(name=>({name,label:labelFor(name)})))).catch(()=>{});
-    const receive=(event:MessageEvent)=>{if(event.data?.type!=='shared-photos')return;listPhotos().then(items=>{const ids=new Set(photoRef.current.map(p=>p.id)),added=items.filter(p=>!ids.has(p.id));setPhotos(all=>[...all,...added.map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}))]);if(event.data.id&&items.some(p=>p.id===event.data.id))setActive(event.data.id);}).catch(()=>setStorageWarning(true));};
+    const receive=(event:MessageEvent)=>{if(event.data?.type!=='shared-photos')return;listPhotos().then(items=>{const ids=new Set(photoRef.current.map(p=>p.id)),added=items.filter(p=>!ids.has(p.id));setPhotos(all=>{const current=new Set(all.map(p=>p.id));return [...all,...added.filter(p=>!current.has(p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}))];});if(!librarySwitchLock.current&&event.data.id&&items.some(p=>p.id===event.data.id))setActive(event.data.id);}).catch(()=>setStorageWarning(true));};
     navigator.serviceWorker?.addEventListener('message',receive);
     return ()=>navigator.serviceWorker?.removeEventListener('message',receive);
   },[]);
@@ -204,7 +204,13 @@ export default function App() {
     return ()=>{w.terminate();v.terminate();worker.current=null;photoProcessor.current=null;videoProcessor.current=null;pendingBitmap.current?.close();};
   },[]);
   useEffect(()=>{
-    if(!active)return;
+    if(!active){
+      const gen=++generation.current;photoProcessor.current?.postMessage({type:'unload',gen});videoProcessor.current?.postMessage({type:'unload',gen});worker.current=null;
+      pendingBitmap.current?.close();pendingBitmap.current=null;
+      for(const canvas of [originalCanvas.current,editedCanvas.current])if(canvas){canvas.width=1;canvas.height=1;delete canvas.dataset.generation;delete canvas.dataset.request;}
+      setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setPreviewTime(0);setModelStatus('');setAnalysis(null);setDimensions([1,1]);setBusy('');setReady(false);setRendering(false);setEyedropper(false);
+      return;
+    }
     const p=photoRef.current.find(p=>p.id===active);if(!p)return;
     const clip=isVideo(p.file);worker.current=clip?videoProcessor.current:photoProcessor.current;
     generation.current++;setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setPreviewTime(0);setKeepAudio(true);setModelStatus('');setReady(false);setRendering(true);setAnalysis(null);setBusy(clip?t("Opening video…"):isRaw(p.file)?t("Developing DNG locally…"):/\.hei[cf]$/i.test(p.file.name)?t("Decoding HEIC locally…"):t("Opening photo…"));setEyedropper(false);
@@ -228,6 +234,27 @@ export default function App() {
   },[customModel]);
   useEffect(()=>{if(!photo?.recipe)return;const timer=setTimeout(()=>persist(photo),400);return ()=>clearTimeout(timer);},[photo?.recipe,photo?.thumbnail]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(''),6500);return ()=>clearTimeout(timer);},[notice]);
+  useEffect(()=>{
+    const dialog=Array.from(document.querySelectorAll<HTMLElement>('.modal-shade [role="dialog"]')).at(-1);if(!dialog)return;dialog.tabIndex=-1;
+    const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    const focusable=()=>Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'));
+    const first=focusable()[0]??dialog;first.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==='Escape'){
+        if(exporting){event.preventDefault();event.stopPropagation();if(!saving)cancelExport();}
+        else if(customOpen){event.preventDefault();event.stopPropagation();if(!customLoading)cancelCustom();}
+        else if(saveDialog){event.preventDefault();event.stopPropagation();setSaveDialog(false);}
+        return;
+      }
+      if(event.key!=='Tab')return;
+      const items=focusable();if(!items.length){event.preventDefault();dialog.focus();return;}
+      const start=items[0],end=items[items.length-1];
+      if(event.shiftKey&&(document.activeElement===start||!dialog.contains(document.activeElement))){event.preventDefault();end.focus();}
+      else if(!event.shiftKey&&(document.activeElement===end||!dialog.contains(document.activeElement))){event.preventDefault();start.focus();}
+    };
+    document.addEventListener('keydown',onKey,true);
+    return ()=>{document.removeEventListener('keydown',onKey,true);if(previous?.isConnected)previous.focus();};
+  },[saveDialog,customOpen,exporting,customLoading,saving]);
   useEffect(()=>{if(!stage.current)return;const observer=new ResizeObserver(entries=>{const {width,height}=entries[0].contentRect;setStageSize({width,height});});observer.observe(stage.current);return ()=>observer.disconnect();},[]);
   useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();if(canEdit)history(e.shiftKey?'redo':'undo');}};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[active,canEdit]);
   async function sample(name:string){
@@ -236,6 +263,7 @@ export default function App() {
     catch{notify(t("Could not open this local sample. Use Open files instead."));}finally{setSampleBusy(false);}
   }
   function reset(){if(analysis)update(()=>makeRecipe(analysis));setEyedropper(false);}
+  function cancelCustom(){if(customLoading)return;setCustomOpen(false);setCustomError('');if(recipe?.engine==='wave'&&analysis)update(r=>({...r,engine:'balanced',auto:suggest(analysis,r.hints,'balanced')}));}
   function autoEnhance(){if(!canEdit||video||rendering)return;const id=++request.current;latest.current=id;setBusy(t('Analysing photo enhancement…'));worker.current?.postMessage({type:'enhance',gen:generation.current,request:id,recipe});}
   function enhance(key:'contrast'|'clarity'|'sharpness',value:number){update(r=>({...r,enhancement:{...DEFAULT_ENHANCEMENT,...r.enhancement,[key]:value}}),false);}
   async function exportPhoto(saveAs=false,chooseNewFolder=false,downloadOnly=false){
@@ -265,8 +293,8 @@ export default function App() {
     update(r=>({...r,manual:{...r.manual,neutral:r.manual.neutral.map((v,i)=>clamp(v*target/rgb[i],.25,4)) as [number,number,number]}}));
     setEyedropper(false);notify(t("Neutral point applied. Undo if the selected area was not white or grey."));
   }
-  async function readRecipe(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0];e.target.value='';if(!file)return;try{if(file.size>20000)throw new Error(t("Recipe file is too large."));const next=parseRecipe(JSON.parse(await file.text()));update(()=>next);notify(t("Recipe applied."));}catch(err){notify(err instanceof Error?err.message:t("Could not read the recipe."));}}
-  async function removePhoto(p:Photo){if(exporting||folderLoading)return;if(folderBrowser)setFolderBrowser(null);await deletePhoto(p.id).catch(()=>setStorageWarning(true));URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(p.id===active){setActive(photos.find(x=>x.id!==p.id)?.id??null);setReady(false);}}
+  async function readRecipe(e:ChangeEvent<HTMLInputElement>){const file=e.target.files?.[0],targetId=activeRef.current;e.target.value='';if(!file||!targetId)return;try{if(file.size>20000)throw new Error(t("Recipe file is too large."));const next=parseRecipe(JSON.parse(await file.text())),target=photoRef.current.find(p=>p.id===targetId);if(!target)return;const updated={...target,recipe:next,past:target.recipe?[...target.past.slice(-59),clone(target.recipe)]:target.past,future:[]};setPhotos(all=>all.map(p=>p.id===targetId?{...p,recipe:next,past:p.recipe?[...p.past.slice(-59),clone(p.recipe)]:p.past,future:[]}:p));persist(updated);notify(t("Recipe applied."));}catch(err){notify(err instanceof Error?err.message:t("Could not read the recipe."));}}
+  async function removePhoto(p:Photo){if(exporting||folderLoading)return;if(folderBrowser)setFolderBrowser(null);const removingActive=p.id===active;if(removingActive){const gen=++generation.current;worker.current?.postMessage({type:'unload',gen});setBusy('');setReady(false);setRendering(false);setAnalysis(null);setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);}URL.revokeObjectURL(p.url);setPhotos(all=>all.filter(x=>x.id!==p.id));if(removingActive)setActive(photos.find(x=>x.id!==p.id)?.id??null);await deletePhoto(p.id).catch(()=>setStorageWarning(true));}
   return <><div hidden={about} className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
     <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><Waves size={23}/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<LanguageSelect/></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
       <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/>{video?t("Export video"):t("Export photo")}</button></div></header>
@@ -275,7 +303,7 @@ export default function App() {
     <main className="studio">
       <aside className="library"><div className="section-title"><span>{t("YOUR PHOTOS")}</span><span className="count">{photos.length.toString().padStart(2,'0')}</span></div>
         <button className="import-tile" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>{t("Add to your collection")}</span><small>{t("Photos · DNG · MP4 · MOV")}</small></button>
-        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||folderLoading||busy!==''} onClick={()=>selectPhoto(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting} title={t("Remove local copy")} aria-label={t("Remove {0}",[p.file.name])} onClick={()=>removePhoto(p)}><X size={12}/></button></div>)}</div>
+        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||folderLoading||busy!==''||customOpen||customLoading} onClick={()=>selectPhoto(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting||customOpen||customLoading} title={t("Remove local copy")} aria-label={t("Remove {0}",[p.file.name])} onClick={()=>removePhoto(p)}><X size={12}/></button></div>)}</div>
         {samples.length>0&&<><div className="section-title sample-heading"><span>{t("YOUR DIVE SAMPLES")}</span><span className="count">09</span></div><div className="sample-list">{samples.map((s,i)=><button key={s.name} disabled={exporting||sampleBusy||busy!==''} onClick={()=>sample(s.name)}><img src={'/__thumb/'+encodeURIComponent(s.name)} alt=""/><span><strong>{s.label}</strong><small>{t("Dive study")} {String(i+1).padStart(2,'0')}</small></span><Plus size={13}/></button>)}</div></>}
       </aside>
       <section className="workspace">
@@ -326,8 +354,8 @@ export default function App() {
         <a className="about-footer" href="#about">{t("About & guide")}</a>
       </aside>
     </main>
-    {saveDialog&&<div className="modal-shade"><div className="export-dialog save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><h2 id="save-title">{t("Save as")}</h2><label>{t("Filename")}<input autoFocus aria-label={t("Export filename")} value={saveName} onChange={e=>setSaveName(e.target.value)}/></label><p>{outputFolder?t("Folder: {0}",[outputFolder.name]):sourceFolder?t("Source folder: {0}",[sourceFolder.name]):t("Choose a folder to save your restored file.")} {t("Existing names get a number.")}</p><button className="button primary" disabled={!saveName.trim()||exporting} onClick={()=>exportPhoto(true)}>{outputFolder||sourceFolder?t("Save copy"):t("Choose folder and save")}</button>{(outputFolder||sourceFolder)&&<button className="button secondary" disabled={exporting} onClick={()=>exportPhoto(true,true)}>{t("Choose another folder…")}</button>}<button className="button secondary" disabled={exporting} onClick={()=>setSaveDialog(false)}>{t("Cancel")}</button></div></div>}
-    {customOpen&&<div className="modal-shade"><div className="export-dialog research-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-title"><h2 id="custom-title">{t("Load other ONNX model")}</h2><p>{t("Choose a self-contained RGB image-to-image model (up to 64 MB). This adapter supports one float32 NCHW input and output at 256 × 256. Other layouts, sizes, extra inputs and super-resolution models need a different adapter.")}</p><p>{t("Use the model’s documented colour ranges below. Your file stays on this device and must be loaded again after a reload.")}</p>{recipe?.customModel&&<p>{t("Recipe model:")} {recipe.customModel.name}</p>}<label>{t("ONNX file")}<input aria-label={t("ONNX model file")} type="file" accept=".onnx" disabled={customLoading} onChange={e=>{setCustomFile(e.target.files?.[0]??null);setCustomError('');}}/></label><div className="context-grid"><label>{t("Input range")}<select aria-label={t("Model input range")} value={inputRange} disabled={customLoading} onChange={e=>setInputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label><label>{t("Output range")}<select aria-label={t("Model output range")} value={outputRange} disabled={customLoading} onChange={e=>setOutputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label></div><label className="research-consent"><input type="checkbox" checked={customAccepted} disabled={customLoading} onChange={e=>setCustomAccepted(e.target.checked)}/> {t("I have permission to use this model and will follow its licence.")}</label>{customError&&<p className="model-error" role="alert">{message(customError)}</p>}<button className="button primary" disabled={!customAccepted||!customFile||customLoading} onClick={()=>{if(!customFile)return;setCustomError('');setCustomLoading(true);worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,inputRange,outputRange});}}>{customLoading?t("Validating model…"):t("Load model")}</button><button className="button secondary" disabled={customLoading} onClick={()=>{setCustomOpen(false);setCustomError('');if(recipe?.engine==='wave'&&analysis)update(r=>({...r,engine:'balanced',auto:suggest(analysis,r.hints,'balanced')}));}}>{t("Cancel")}</button></div></div>}
+    {saveDialog&&<div className="modal-shade"><div className="export-dialog save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><h2 id="save-title">{t("Save as")}</h2><label>{t("Filename")}<input aria-label={t("Export filename")} value={saveName} onChange={e=>setSaveName(e.target.value)}/></label><p>{outputFolder?t("Folder: {0}",[outputFolder.name]):sourceFolder?t("Source folder: {0}",[sourceFolder.name]):t("Choose a folder to save your restored file.")} {t("Existing names get a number.")}</p><button className="button primary" disabled={!saveName.trim()||exporting} onClick={()=>exportPhoto(true)}>{outputFolder||sourceFolder?t("Save copy"):t("Choose folder and save")}</button>{(outputFolder||sourceFolder)&&<button className="button secondary" disabled={exporting} onClick={()=>exportPhoto(true,true)}>{t("Choose another folder…")}</button>}<button className="button secondary" disabled={exporting} onClick={()=>setSaveDialog(false)}>{t("Cancel")}</button></div></div>}
+    {customOpen&&<div className="modal-shade"><div className="export-dialog research-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-title"><h2 id="custom-title">{t("Load other ONNX model")}</h2><p>{t("Choose a self-contained RGB image-to-image model (up to 64 MB). This adapter supports one float32 NCHW input and output at 256 × 256. Other layouts, sizes, extra inputs and super-resolution models need a different adapter.")}</p><p>{t("Use the model’s documented colour ranges below. Your file stays on this device and must be loaded again after a reload.")}</p>{recipe?.customModel&&<p>{t("Recipe model:")} {recipe.customModel.name}</p>}<label>{t("ONNX file")}<input aria-label={t("ONNX model file")} type="file" accept=".onnx" disabled={customLoading} onChange={e=>{setCustomFile(e.target.files?.[0]??null);setCustomError('');}}/></label><div className="context-grid"><label>{t("Input range")}<select aria-label={t("Model input range")} value={inputRange} disabled={customLoading} onChange={e=>setInputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label><label>{t("Output range")}<select aria-label={t("Model output range")} value={outputRange} disabled={customLoading} onChange={e=>setOutputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label></div><label className="research-consent"><input type="checkbox" checked={customAccepted} disabled={customLoading} onChange={e=>setCustomAccepted(e.target.checked)}/> {t("I have permission to use this model and will follow its licence.")}</label>{customError&&<p className="model-error" role="alert">{message(customError)}</p>}<button className="button primary" disabled={!customAccepted||!customFile||customLoading} onClick={()=>{if(!customFile)return;setCustomError('');setCustomLoading(true);worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,inputRange,outputRange});}}>{customLoading?t("Validating model…"):t("Load model")}</button><button className="button secondary" disabled={customLoading} onClick={cancelCustom}>{t("Cancel")}</button></div></div>}
     {storageWarning&&<div className="storage-warning" role="status">{t("Local storage is unavailable or full. Export your edits before closing.")}<button aria-label={t("Dismiss storage warning")} onClick={()=>setStorageWarning(false)}><X size={14}/></button></div>}
     {notice&&<div className="toast" role="status"><span>{message(notice)}</span><button aria-label={t("Dismiss message")} onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {exporting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><span className="brand-icon"><Waves size={25}/></span><h2 id="export-title">{t("Exporting")} {video?t("video"):t("photo")}</h2><p>{saving?t("Saving your restored file…"):video?t("Processing video frames locally. Keep this app open."):t("Rendering your photo at the selected resolution.")}</p><progress max="100" value={progress}/><span>{progress}%</span><button className="button secondary" disabled={saving} onClick={cancelExport}>{t("Cancel export")}</button></div></div>}

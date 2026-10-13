@@ -11,7 +11,7 @@ async function acceptShare(request){
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   const addedAt=Date.now();
   const records=files.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000}));
-  await new Promise((resolve,reject)=>{const t=db.transaction('photos','readwrite');for(const record of records)t.objectStore('photos').put(record);t.oncomplete=resolve;t.onerror=()=>reject(t.error);});db.close();
+  try{await new Promise((resolve,reject)=>{const t=db.transaction('photos','readwrite');for(const record of records)t.objectStore('photos').put(record);t.oncomplete=resolve;const fail=()=>reject(t.error??new Error('Could not save shared files.'));t.onerror=fail;t.onabort=fail;});}finally{db.close();}
   for(const client of await self.clients.matchAll({type:'window'}))client.postMessage({type:'shared-photos',id:records[0]?.id});
   return Response.redirect(new URL(BASE+'?shared='+encodeURIComponent(records[0]?.id??''),request.url),303);
 }
@@ -26,6 +26,8 @@ self.addEventListener('fetch',event=>{
     // These are fixed same-origin build assets. Ignore dev/preview server CORS Vary headers.
     const cached=await cache.match(url.pathname===BASE?BASE+'index.html':url.pathname,{ignoreVary:true});
     if(cached)return cached;
-    try{const response=await fetch(event.request);if(response.ok&&OPTIONAL.includes(url.pathname))await cache.put(url.pathname,response.clone());return response;}catch{if((event.request.mode==='navigate'&&url.pathname.startsWith(BASE)))return await cache.match(BASE+'index.html',{ignoreVary:true});throw new Error('Asset unavailable offline.');}
+    let response;try{response=await fetch(event.request);}catch{if(event.request.mode==='navigate'&&url.pathname.startsWith(BASE))return await cache.match(BASE+'index.html',{ignoreVary:true});throw new Error('Asset unavailable offline.');}
+    if(response.ok&&OPTIONAL.includes(url.pathname))try{await cache.put(url.pathname,response.clone());}catch{/* Optional model caching must not block the fetched asset. */}
+    return response;
   })());
 });

@@ -10,6 +10,7 @@ import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancem
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
+let latestPreviewRequest=0;
 let sourceFile:File|null=null,exportSource:ImageBitmap|null=null,sourceInfo:PhotoInfo|null=null;
 let decoding:AbortController|null=null;
 let mode:PhotoResolution='auto',device:PhotoDevice={mobile:false};
@@ -33,6 +34,7 @@ async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Ar
 const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message,transfer);
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
+  if(type==='render'||type==='enhance')latestPreviewRequest=request;
   try {
     if(type==='custom-model') {
       customTask=customTask.catch(()=>{}).then(async()=>{const {loadCustomModel}=await import('./models');customModel=await loadCustomModel(data);fields.delete('wave');return customModel;});
@@ -54,17 +56,18 @@ ctx.onmessage=async({data})=>{
       send({type:'loaded',gen,width:sourceInfo.sourceWidth,height:sourceInfo.sourceHeight,analysis:analyse(pixels.data,pixels.width,pixels.height),original,photo:sourceInfo},[original]);
     } else if(type==='enhance' && gen===generation && pixels) {
       const input=pixels,recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
-      if(gen!==generation)return;
+      if(gen!==generation||request!==latestPreviewRequest)return;
       const base=field?transferField(input.data,input.width,input.height,field):undefined;
       send({type:'enhancement-ready',gen,request,enhancement:suggestEnhancement(renderPixels(input.data,recipe,base))});
     } else if(type==='render' && gen===generation && pixels) {
       const recipe=data.recipe as Recipe;
       const input=pixels,field=await neural(recipe,gen,request);
-      if(gen!==generation)return;
+      if(gen!==generation||request!==latestPreviewRequest)return;
       const base=field?transferField(input.data,input.width,input.height,field):undefined;
       const canvas=new OffscreenCanvas(input.width,input.height);
       const corrected=renderPixels(input.data,recipe,base),settings=recipe.enhancement;
-      const points=settings&&settings.black===0&&settings.white===1?suggestEnhancement(corrected):settings;
+      const enabled=settings&&(settings.contrast||settings.clarity||settings.sharpness);
+      const points=enabled&&settings.black===0&&settings.white===1?suggestEnhancement(corrected):settings;
       const resolved=settings&&points?{...settings,black:points.black,white:points.white}:settings;
       const finished=enhancePixels(corrected,input.width,input.height,resolved,sourceInfo?.exportWidth,sourceInfo?.exportHeight);
       canvas.getContext('2d')!.putImageData(new ImageData(finished,input.width,input.height),0,0);
@@ -82,7 +85,7 @@ ctx.onmessage=async({data})=>{
       const bitmap=exportSource??source;
       const settings=(data.recipe as Recipe).enhancement;
       let resolved=settings;
-      if(settings&&settings.black===0&&settings.white===1){
+      if(settings&&(settings.contrast||settings.clarity||settings.sharpness)&&settings.black===0&&settings.white===1){
         const preview=pixels!,previewBase=field?transferField(preview.data,preview.width,preview.height,field):undefined;
         const {black,white}=suggestEnhancement(renderPixels(preview.data,data.recipe,previewBase));resolved={...settings,black,white};
       }
@@ -112,6 +115,7 @@ ctx.onmessage=async({data})=>{
     } else if(type==='cancel') {generation=gen;decoding?.abort();}
     else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();}
   } catch(error) {
+    if((type==='render'||type==='enhance')&&request!==latestPreviewRequest)return;
     send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.'});
   }
 };

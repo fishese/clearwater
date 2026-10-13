@@ -10,13 +10,14 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Photo finishing | enhancement-check.mjs |
 | Metadata | metadata-check.mjs |
 | Navigation / saving | browsing-check.mjs |
+| Async UI state | ui-state-check.mjs (synthetic fixtures) |
 | Controls / adapter | controls-check.mjs |
 | Video / AI video | video-check.mjs, video-ai-check.mjs |
 | Guide | about-check.mjs |
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 53 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 59 tests.
 
 ## Languages
 
@@ -62,3 +63,15 @@ Keep public handoff/maintenance concise; editor README holds the detailed featur
 Check git status/staged paths and diff whitespace before committing. Create checkpoints before major processing changes. Prefer revert commits for published regressions, rebuilding both platforms. Never discard unrelated edits or reset user data. Diagnose colour ranges, orientation, preview/export parity, generation IDs and buffer lifetime before changing algorithms.
 
 Photo finishing: preserve old recipe defaults, global preview-derived tonal endpoints, luminance-based colour ratios, alpha weights and export halo rows. Never analyse black/white points independently per strip. Test portrait and landscape halo-strip parity, low-noise flat regions, transparent pixels and neural-engine finishing. Spatial finishing is deliberately unavailable for video pending temporal/performance work.
+
+## Reliability review (October 2026)
+
+The audit added regression coverage for superseded photo previews, disabled-enhancement processing, optional-cache quota failures, aborted share transactions, and Android temporary-share cleanup. UI fixes bind asynchronous recipe imports to their original photo, keep incoming shares from switching away during export/model loading, and unload processing when the last photo is removed. Keep these checks when refactoring state or workers.
+
+Remaining improvements, in priority order:
+
+- Touch accessibility: preserve the compact visual design while considering larger invisible touch targets for small icon buttons. Dialog Tab/Escape handling now has browser regression coverage; include screen-reader and physical-keyboard checks on devices.
+- Extreme photo exports: benchmark peak memory on actual phones before changing strip sizing. At the maximum legal width, a 448-row enhancement strip contains 14.7 million pixels; each RGBA/Float32 buffer is 56 MiB, and several coexist. Smaller strips trade memory for repeated halo processing. Existing Auto/Reduced options remain the practical fallback; the Full ceiling is not a memory guarantee.
+- Large libraries: profile hundreds of imports and folder visits, then consider a bounded thumbnail list and library storage usage/cleanup controls. Do not silently remove originals or recipes to reclaim space.
+
+Browser checks and mocked Android bridges cannot verify real SAF provider dialogs, phone memory pressure or device-specific HEVC support. Keep those in the manual device smoke test. A clean dependency advisory scan is a point-in-time result, not a security audit.
