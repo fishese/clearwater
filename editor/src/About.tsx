@@ -1,6 +1,6 @@
 import {t,useLanguage,LanguageSelect} from './i18n';
 import {useEffect,useRef} from 'react';
-import {ArrowLeft,Waves} from 'lucide-react';
+import {ArrowLeft} from 'lucide-react';
 import type {CustomModel} from './core/types';
 
 const local=(path:string)=>import.meta.env.BASE_URL+path;
@@ -10,7 +10,7 @@ export default function About({onClose,customModel}:{onClose:()=>void;customMode
  const heading=useRef<HTMLHeadingElement>(null);
  useEffect(()=>{heading.current?.focus();const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[onClose]);
  return <main className="about-page" aria-labelledby="about-title">
-  <header className="about-header"><span className="brand"><Waves size={22}/> clearwater<span className="brand-dot">.</span></span><LanguageSelect/><button className="button secondary" onClick={onClose}><ArrowLeft size={15}/> {t("Back to editor")}</button></header>
+  <header className="about-header"><span className="brand"><span className="brand-icon"><img src={local("icon-192.png")} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></span><LanguageSelect/><button className="button secondary" onClick={onClose}><ArrowLeft size={15}/> {t("Back to editor")}</button></header>
   <article className="about-content">
    <h1 id="about-title" ref={heading} tabIndex={-1}>{t("About & guide")}</h1>
    <p className="about-intro">{t("Underwater photo and video colour correction, processed on your device. Start with a suggestion, compare it with the original, then adjust the result to suit the scene.")}</p>
