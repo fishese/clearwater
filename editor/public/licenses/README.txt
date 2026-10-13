@@ -23,3 +23,13 @@ Rebuild with the pinned binding repository's packages/libraw.wasm/scripts/build.
 the source archive's LibRaw submodule must be populated from the LibRaw source archive above.
 ClearWater does not modify the distributed decoder binary or its sources.
 Typed-cstruct 0.10.2 supports the bindings (MIT); see LICENSE-typed-cstruct.txt.
+
+AndroidX Media3 Transformer: Android-only HDR-to-SDR working-copy conversion.
+Unmodified AndroidX Media3 libraries, Apache License 2.0.
+Source: https://github.com/androidx/media
+Licence: LICENSE-AndroidX-Media3.txt
+
+WWE-UIE: supplied underwater image enhancement model weights converted from the authors' published UIEB best_model.pth checkpoint.
+Copyright the WWE-UIE authors. Source: https://github.com/chingheng0808/WWE-UIE/tree/fd0697558203f9f849800cc13b804116bb3f921c
+The repository and checkpoint are distributed under Apache License 2.0; see LICENSE-WWE-UIE.txt.
+The ONNX conversion provenance, checkpoint/model hashes and PyTorch/ONNX parity are recorded in ../models/manifest.json.

@@ -15,7 +15,6 @@ Reported quantitative results (Table I, PDF page 6):
 | Model | PSNR | SSIM | UIQM | UCIQE |
 | --- | ---: | ---: | ---: | ---: |
 | FUnIE-GAN | 15.635 | 0.738 | 3.222 | 0.518 |
-| Deep WaveNet | 21.095 | 0.892 | 3.158 | 0.537 |
 | UIEC2-Net | 23.493 | 0.883 | 3.249 | 0.548 |
 | Shallow-UWnet | 15.913 | 0.747 | 2.936 | 0.469 |
 | ADCCA-GAN | 22.236 | 0.905 | 3.316 | 0.554 |

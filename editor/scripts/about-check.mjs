@@ -15,7 +15,7 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement.id),'about-title');
  await page.getByRole('link',{name:'Editing controls',exact:true}).click();
  assert.ok(page.url().endsWith('#about-controls'));
- for(const name of ['Shallow-UWnet','FUnIE-GAN'])assert.ok(await page.getByRole('heading',{name:new RegExp(name)}).isVisible());
+ for(const name of ['Shallow-UWnet','FUnIE-GAN','WWE-UIE'])assert.ok(await page.getByRole('heading',{name:new RegExp(name)}).isVisible());
  for(const a of await page.locator('.about-content a').all()){
   const href=await a.getAttribute('href');
   if(href.includes('/models/')||href.includes('/licenses/'))assert.equal((await page.request.get(new URL(href,url).href)).status(),200,href);

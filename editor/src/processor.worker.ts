@@ -18,12 +18,12 @@ let fields=new Map<ModelName,Promise<Float32Array>>();
 let customModel:CustomModel|undefined;
 let customTask:Promise<unknown>=Promise.resolve();
 async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Array|undefined> {
-  if(recipe.engine!=='shallow'&&recipe.engine!=='funie'&&recipe.engine!=='wave')return;
+  if(recipe.engine!=='shallow'&&recipe.engine!=='funie'&&recipe.engine!=='wwe'&&recipe.engine!=='wave')return;
   if(recipe.engine==='wave')await customTask;
   const name=recipe.engine,cache=fields,bitmap=source!;
   if(name==='wave'&&(!customModel||(recipe.customModel&&(recipe.customModel.sha256!==customModel.sha256||recipe.customModel.inputRange!==customModel.inputRange||recipe.customModel.outputRange!==customModel.outputRange))))throw new Error('Load the matching custom ONNX file and range settings for this recipe.');
   if(!cache.has(name)) {
-    send({type:'model-status',gen,request,message:`Loading and running ${name==='shallow'?'Shallow-UWnet':name==='wave'?'custom ONNX model':'FUnIE-GAN'}…`});
+    send({type:'model-status',gen,request,message:`Loading and running ${{shallow:'Shallow-UWnet',funie:'FUnIE-GAN',wwe:'WWE-UIE',wave:'custom ONNX model'}[name]}…`});
     const snapshot=new OffscreenCanvas(256,256),c=snapshot.getContext('2d')!;
     c.imageSmoothingQuality='high';c.drawImage(bitmap,0,0,256,256);
     const promise=import('./models').then(m=>m.inferField(name,snapshot));

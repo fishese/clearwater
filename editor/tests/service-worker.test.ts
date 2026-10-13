@@ -4,7 +4,7 @@ import {describe,expect,it,vi} from 'vitest';
 const template=await readFile(new URL('../scripts/sw.template.js',import.meta.url),'utf8');
 function worker(cache:CacheLike,fetcher:(request:Request)=>Promise<Response>,indexedDB:Record<string,unknown>={}){
  const listeners=new Map<string,(event:any)=>void>();
- const self={location:{origin:'https://clearwater.test'},addEventListener:(name:string,listener:(event:any)=>void)=>listeners.set(name,listener)};
+ const self={location:{origin:'https://clearwater.test'},clients:{matchAll:vi.fn(async()=>[])},addEventListener:(name:string,listener:(event:any)=>void)=>listeners.set(name,listener)};
  const caches={open:vi.fn(async()=>cache)};
  const source=template.replace('__CACHE_NAME__','"clearwater-test"').replace('__BASE__','"/"').replace('__PRECACHE__','[]').replace('__OPTIONAL__','["/model.wasm"]');
  new Function('self','caches','fetch','URL','Response','File','indexedDB','crypto',source)(self,caches,fetcher,URL,Response,File,indexedDB,crypto);
@@ -46,5 +46,19 @@ describe('service worker optional asset caching',()=>{
   onFetch({request:new Request('https://clearwater.test/share',{method:'POST',body:form}),respondWith(value:Promise<Response>){response=value;}});
   const result=await response!;
   expect(result.status).toBe(507);expect(database.close).toHaveBeenCalledOnce();
+ });
+
+ it('keeps incoming shares marked as queued until the app promotes them',async()=>{
+  const saved:Record<string,unknown>[]=[];
+  const transaction:any={objectStore:()=>({put:(record:Record<string,unknown>)=>saved.push(record)}),error:null};
+  const database={transaction:vi.fn(()=>{setTimeout(()=>transaction.oncomplete?.(),0);return transaction;}),close:vi.fn()};
+  const openRequest:any={result:database};
+  const indexedDB={open:vi.fn(()=>{setTimeout(()=>openRequest.onsuccess?.(),0);return openRequest;})};
+  const {onFetch}=worker({match:vi.fn(async()=>undefined),put:vi.fn()},vi.fn(async()=>new Response()),indexedDB);
+  const form=new FormData();form.append('photos',new File(['photo'],'shared.jpg',{type:'image/jpeg'}));
+  let response:Promise<Response>|undefined;
+  onFetch({request:new Request('https://clearwater.test/share',{method:'POST',body:form}),respondWith(value:Promise<Response>){response=value;}});
+  const result=await response!;
+  expect(result.status).toBe(303);expect(saved).toHaveLength(1);expect(saved[0].pendingShare).toBe(true);expect(database.close).toHaveBeenCalledOnce();
  });
 });

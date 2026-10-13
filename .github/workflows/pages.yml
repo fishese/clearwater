@@ -26,11 +26,12 @@ jobs:
           cache-dependency-path: editor/package-lock.json
       - run: npm ci
         working-directory: editor
+      - uses: actions/configure-pages@v5
+        id: pages
       - run: npm test && npm run build
         working-directory: editor
         env:
-          VITE_BASE_PATH: /clearwater/
-      - uses: actions/configure-pages@v5
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: editor/dist

@@ -35,8 +35,8 @@ export function analyse(data: Uint8ClampedArray, width: number, height: number):
 }
 
 export function suggest(a: Analysis, hints: Hints, engine: Recipe['engine']='balanced'): Suggestion {
-  if(engine==='shallow'||engine==='funie'||engine==='wave') return {gains:[1,1,1],redMix:0,haze:0,highlights:0,mode:'gentle',
-    explanation:`${engine==='shallow'?'Shallow-UWnet':engine==='wave'?'Custom ONNX model':'FUnIE-GAN'} runs on the original photo. Its 256 × 256 colour correction is transferred to the original resolution. Dive hints are used by Balanced restoration only; use manual controls to refine AI results.`};
+  if(engine==='shallow'||engine==='funie'||engine==='wwe'||engine==='wave') return {gains:[1,1,1],redMix:0,haze:0,highlights:0,mode:'gentle',
+    explanation:`${engine==='shallow'?'Shallow-UWnet':engine==='wwe'?'WWE-UIE':engine==='wave'?'Custom ONNX model':'FUnIE-GAN'} runs on the original photo. Its 256 × 256 colour correction is transferred to the original resolution. Dive hints are used by Balanced restoration only; use manual controls to refine AI results.`};
   const [r,g,b]=a.mean;
   if(engine==='baseline') return {
     gains:[clamp(128/Math.max(r,1),.5,2),clamp(128/Math.max(g,1),.8,1.5),clamp(128/Math.max(b,1),.8,1.2)],
@@ -83,7 +83,7 @@ export function makeRecipe(a:Analysis,hints:Hints={...DEFAULT_HINTS}):Recipe {
  * Haze is bounded global veil/contrast reduction, not physical depth reconstruction.
  */
 export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:Uint8ClampedArray):Uint8ClampedArray {
-  if((recipe.engine==='shallow'||recipe.engine==='funie'||recipe.engine==='wave')&&!neuralBase) throw new Error('AI correction is not ready.');
+  if((recipe.engine==='shallow'||recipe.engine==='funie'||recipe.engine==='wwe'||recipe.engine==='wave')&&!neuralBase) throw new Error('AI correction is not ready.');
   if(neuralBase&&neuralBase.length!==input.length) throw new Error('AI correction dimensions do not match.');
   const out=new Uint8ClampedArray(input.length);
   const {auto:a,manual:m,strength:s}=recipe;
@@ -127,7 +127,7 @@ export function parseRecipe(value:unknown): Recipe {
   const triple=(v:unknown,lo:number,hi:number)=>Array.isArray(v)&&v.length===3&&v.every(n=>finite(n,lo,hi));
   if(r.enhancement!==undefined&&(!r.enhancement||!(['contrast','clarity','sharpness'] as const).every(k=>finite(r.enhancement![k],0,100))||!finite(r.enhancement.black,0,.2)||!finite(r.enhancement.white,.6,1)||(r.enhancement.brightness!==undefined&&!finite(r.enhancement.brightness,-100,100))||(r.enhancement.autoApplied!==undefined&&typeof r.enhancement.autoApplied!=='boolean')))throw new Error('Invalid photo enhancement settings.');
   if(r.customModel&&(!/^[a-f0-9]{64}$/.test(r.customModel.sha256)||typeof r.customModel.name!=='string'||r.customModel.name.length>255||!['unit','signed'].includes(r.customModel.inputRange)||!['unit','signed'].includes(r.customModel.outputRange)))throw new Error('Invalid custom model settings.');
-  if(r.version!==1 || !['balanced','baseline','shallow','funie','wave'].includes(r.engine) || !finite(r.strength,0,1) ||
+  if(r.version!==1 || !['balanced','baseline','shallow','funie','wwe','wave'].includes(r.engine) || !finite(r.strength,0,1) ||
     !r.hints || !['auto','underwater','surface'].includes(r.hints.scene) || !['auto','blue','green'].includes(r.hints.water) ||
     !['auto','yes','no'].includes(r.hints.filter) || !(r.hints.depth===null||finite(r.hints.depth,0,100)) ||
     !r.auto || !triple(r.auto.gains,0,5) || !finite(r.auto.redMix,0,2) || !finite(r.auto.haze,-.2,.2) || !finite(r.auto.highlights,-1,1) ||

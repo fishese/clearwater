@@ -1,11 +1,14 @@
 # Model provenance
 
-Shallow-UWnet and FUnIE-GAN ONNX files are converted from author-published checkpoints. The adjacent MIT licence files must accompany redistribution. `manifest.json` records SHA-256 hashes, sizes and PyTorch/ONNX numerical parity. Both use fixed RGB NCHW `[1,3,256,256]` inputs.
+Shallow-UWnet, FUnIE-GAN and WWE-UIE ONNX files are converted from author-published checkpoints. The adjacent MIT licences for Shallow-UWnet/FUnIE-GAN and ../licenses/LICENSE-WWE-UIE.txt (Apache-2.0) must accompany redistribution. `manifest.json` records SHA-256 hashes, sizes and PyTorch/ONNX numerical parity. All three use fixed RGB NCHW `[1,3,256,256]` inputs.
 
 | Model | Source | Input / output |
 | --- | --- | --- |
 | Shallow-UWnet | [Author repository](https://github.com/mkartik/Shallow-UWnet/tree/dfd4adfe3e5a5b41b65ac8047069bb155b6cc8e6), README-linked Drive checkpoint `1QmOR8Ar3LqS5Pj0GG3I-798Yyj9xswet` | `[0,1]` RGB; output clipped to `[0,1]` |
 | FUnIE-GAN | [Author PyTorch sample](https://github.com/xahidbuffon/FUnIE-GAN/tree/8f934c834c94e007b00866186b9ee624dc2b7b69/PyTorch), `models/funie_generator.pth` | `[-1,1]` RGB; output mapped to `[0,1]` |
+| WWE-UIE | [Author repository](https://github.com/chingheng0808/WWE-UIE/tree/fd0697558203f9f849800cc13b804116bb3f921c), README-linked UIEB checkpoint `1c80kkDbgpLD1MtqVLql1Y1NQVD7IzxiO` | `[0,1]` RGB; output clipped to `[0,1]` |
+
+WWE-UIE combines adaptive white balance, Haar wavelet decomposition and gradient-aware edge guidance. ClearWater uses the published UIEB `myModel(3,32,use_white_balance=True)` checkpoint with the author’s 256×256 test size. Its full-resolution application remains ClearWater’s residual colour-transfer workflow. Checkpoint and ONNX hashes are recorded in manifest.json; no paper benchmark or phone-speed claim is made.
 
 The PyTorch FUnIE sample is not the official TF-Keras paper-reproduction checkpoint. No claim of reproducing paper metrics is made. Browser high-quality canvas resizing approximates author resizing; it is not pixel-identical to Pillow's resampler.
 

@@ -10,7 +10,7 @@ async function acceptShare(request){
   const files=form.getAll('photos').filter(file=>file instanceof File && file.size<=512*1024*1024 && (/\.(jpe?g|png|heic|heif|dng|mp4|mov)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif','image/dng','image/x-adobe-dng','video/mp4','video/quicktime'].includes(file.type)));
   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',1);r.onupgradeneeded=()=>r.result.createObjectStore('photos',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
   const addedAt=Date.now();
-  const records=files.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000}));
+  const records=files.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000,pendingShare:true}));
   try{await new Promise((resolve,reject)=>{const t=db.transaction('photos','readwrite');for(const record of records)t.objectStore('photos').put(record);t.oncomplete=resolve;const fail=()=>reject(t.error??new Error('Could not save shared files.'));t.onerror=fail;t.onabort=fail;});}finally{db.close();}
   for(const client of await self.clients.matchAll({type:'window'}))client.postMessage({type:'shared-photos',id:records[0]?.id});
   return Response.redirect(new URL(BASE+'?shared='+encodeURIComponent(records[0]?.id??''),request.url),303);

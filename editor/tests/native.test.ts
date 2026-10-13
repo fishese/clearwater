@@ -1,11 +1,13 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
-vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:()=>bridge}));
-import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel} from '../src/native';
+const hdrBridge=vi.hoisted(()=>({beginHdrInput:vi.fn(),writeHdrInputChunk:vi.fn(),finishHdrInput:vi.fn(),convertHdrToSdr:vi.fn(),cancelHdrConversion:vi.fn(),deleteHdrWorkingCopy:vi.fn(),addListener:vi.fn()}));
+vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:(name:string)=>name==='ClearWaterHdr'?hdrBridge:bridge}));
+import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy} from '../src/native';
+import {convertHdrImportRequest} from '../src/hdr-import';
 import {writeFile} from '../src/file-save';
 
 describe('Android file bridge',()=>{
- beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);});
+ beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});});
  it('streams a multi-chunk photo without changing its bytes',async()=>{
   const folder=await chooseAndroidFolder(),handle=await folder.getFileHandle('photo.jpg',{create:true});
   const bytes=Uint8Array.from({length:700000},(_,i)=>i%251);
@@ -72,5 +74,29 @@ describe('Android file bridge',()=>{
   bridge.getRememberedModel.mockResolvedValue({present:true,hasFile:true,size:3,config});
   bridge.readModelChunk.mockRejectedValue(new Error('Read failed'));
   await expect(readRememberedAndroidModel()).resolves.toEqual({config,blob:null});
+ });
+ it('streams HDR source bytes in bounded chunks and returns a generated SDR working-copy name',async()=>{
+  const sourceBytes=Uint8Array.from({length:700000},(_,i)=>i%251),source=new File([sourceBytes],'IMG_0421.MOV',{type:'video/quicktime'}),fetch=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(new Blob(['sdr-video'],{type:'video/mp4'})));
+  try{
+   const progress:number[]=[],copy=await convertHdrImportRequest(source,()=>true,value=>progress.push(value),()=>{});
+   if(!copy)throw new Error('The current HDR request should return its converted copy.');
+   expect(hdrBridge.beginHdrInput).toHaveBeenCalledWith({name:'IMG_0421.MOV',size:source.size});expect(hdrBridge.writeHdrInputChunk).toHaveBeenCalledTimes(3);
+   const restored=Buffer.concat(hdrBridge.writeHdrInputChunk.mock.calls.map(([chunk])=>Buffer.from(chunk.data,'base64')));expect(restored.equals(Buffer.from(sourceBytes))).toBe(true);
+   expect(hdrBridge.finishHdrInput).toHaveBeenCalledWith({id:'hdr-1',abort:false});expect(copy.file.name).toBe('hdr-working-copy.mp4');expect(copy.file.name).not.toBe(source.name);
+   expect(hdrBridge.deleteHdrWorkingCopy).toHaveBeenCalledWith({id:'hdr-1'});expect(progress.some(value=>value>0)).toBe(true);
+  }finally{fetch.mockRestore();}
+ });
+ it('aborts the staged source when conversion is cancelled during chunked input',async()=>{
+  const source=new File([new Uint8Array(400000)],'capture.mov',{type:'video/quicktime'});
+  await expect(createAndroidHdrWorkingCopy(source,()=>{},id=>{void cancelAndroidHdrWorkingCopy(id);})).rejects.toMatchObject({name:'AbortError'});
+  expect(hdrBridge.finishHdrInput).toHaveBeenCalledWith({id:'hdr-1',abort:true});expect(hdrBridge.convertHdrToSdr).not.toHaveBeenCalled();
+ });
+ it('discards a converted working copy when its originating photo is no longer current',async()=>{
+  const source=new File(['original'],'capture.mov',{type:'video/quicktime'});let current=true,complete:(value:{id:string;uri:string})=>void=()=>{};
+  hdrBridge.convertHdrToSdr.mockImplementation(()=>new Promise(resolve=>{complete=resolve;}));
+  const pending=convertHdrImportRequest(source,()=>current,()=>{},()=>{});
+  await vi.waitFor(()=>expect(hdrBridge.convertHdrToSdr).toHaveBeenCalledOnce());current=false;complete({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});
+  const fetch=vi.spyOn(globalThis,'fetch').mockResolvedValue(new Response(new Blob(['sdr'])));
+  try{await expect(pending).resolves.toBeNull();expect(hdrBridge.deleteHdrWorkingCopy).toHaveBeenCalledWith({id:'hdr-1'});}finally{fetch.mockRestore();}
  });
 });

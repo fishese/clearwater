@@ -12,7 +12,7 @@ let generation=0,lastRequest=0,pixels:ImageData|undefined,frameTime=-1,start=0,i
 const send=(data:unknown,transfer:Transferable[]=[])=>ctx.postMessage(data,transfer);
 let customModel:CustomModel|undefined,customTask:Promise<unknown>=Promise.resolve(),aiQueue:Promise<unknown>=Promise.resolve();
 const nodes=new Map<string,ColourNode>(),pendingNodes=new Map<string,Promise<ColourNode>>();
-const isAI=(recipe:Recipe)=>['shallow','funie','wave'].includes(recipe.engine);
+const isAI=(recipe:Recipe)=>['shallow','funie','wwe','wave'].includes(recipe.engine);
 const settings=(recipe:Recipe)=>recipe.videoCorrection??{mode:'sampled' as const,interval:5 as const,referenceTime:0};
 function timesFor(recipe:Recipe,duration:number){const config=settings(recipe);return config.mode==='fixed'?[Math.min(config.referenceTime,Math.max(0,duration-.001))]:sampleTimes(duration,config.interval);}
 async function getNode(recipe:Recipe,time:number,gen:number,request:number):Promise<ColourNode>{
@@ -49,11 +49,14 @@ ctx.onmessage=async({data})=>{
    if(data.blob.size>MAX_VIDEO_BYTES)throw new Error('This first video version supports clips up to 512 MB.');
    const opened=new Input({source:new BlobSource(data.blob),formats:[MP4,QTFF]});opening=opened;
    const video=await decodeFrame(opened.getPrimaryVideoTrack());if(!video)throw new Error('No video track was found in this MP4/MOV file.');
-   if(await video.hasHighDynamicRange())throw new Error('HDR/Dolby Vision video needs tone mapping, which is not ready yet. Use an SDR copy; on iPhone, record with HDR Video turned off.');
-   if(!(await decodeFrame(video.canDecode())))throw new Error(`This device cannot decode ${await video.getCodec()??'this codec'}. iPhone HEVC/MOV support depends on the device. Try an H.264 SDR copy.`);
    const duration=await opened.computeDuration(),width=await video.getDisplayWidth(),height=await video.getDisplayHeight();
    if(!Number.isFinite(duration)||duration<=0||duration>MAX_VIDEO_SECONDS+.01)throw new Error('Video clips can be up to 10 minutes long.');
    if(width*height>34_000_000)throw new Error('This video resolution is too large for the editor. Use a smaller copy.');
+   if(await video.hasHighDynamicRange()){
+    if(gen===generation){opened.dispose();opening=undefined;send({type:'hdr-needed',gen,width,height,duration,name:typeof data.blob.name==='string'?data.blob.name:''});}
+    return;
+   }
+   if(!(await decodeFrame(video.canDecode())))throw new Error(`This device cannot decode ${await video.getCodec()??'this codec'}. iPhone HEVC/MOV support depends on the device. Try an H.264 SDR copy.`);
    const stats=await video.computePacketStats(100),[outputWidth,outputHeight]=videoSize(width,height);
    const first=Math.max(0,await video.getFirstTimestamp());
    const metadata:VideoInfo={duration:Math.max(.001,duration-first),codec:await video.getCodec()??'unknown',hasAudio:!!(await opened.getPrimaryAudioTrack()),outputWidth,outputHeight,frameRate:Math.min(30,Math.max(1,stats.averagePacketRate||30))};

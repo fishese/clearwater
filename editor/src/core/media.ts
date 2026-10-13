@@ -13,4 +13,4 @@ export function videoSize(width:number,height:number,maxLong=1920,maxShort=1080)
  return [Math.max(2,Math.floor(width*scale/2)*2),Math.max(2,Math.floor(height*scale/2)*2)];
 }
 export function videoTime(seconds:number){const whole=Math.max(0,Math.floor(seconds));return `${Math.floor(whole/60)}:${String(whole%60).padStart(2,'0')}`;}
-export interface VideoInfo {duration:number;codec:string;hasAudio:boolean;outputWidth:number;outputHeight:number;frameRate:number}
+export interface VideoInfo {duration:number;codec:string;hasAudio:boolean;outputWidth:number;outputHeight:number;frameRate:number;hdrToneMapped?:boolean}

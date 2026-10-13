@@ -17,11 +17,14 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Saved custom model | custom-model-check.mjs (bundled model as the test input) |
 | Controls / adapter | controls-check.mjs |
 | Video / AI video | video-check.mjs, video-ai-check.mjs |
+| Android HDR import | hdr-import-check.mjs (synthetic tagged clip and mocked native bridge; device testing still required) |
+| Collection clearing | clear-collection-check.mjs |
+| WWE-UIE parity / editing | wwe-model-check.mjs (export parity fixture required) |
 | Guide | about-check.mjs |
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 64 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 70 tests.
 
 ## Languages
 
@@ -33,7 +36,7 @@ Workers and stored recipe explanations stay in English; use message() at present
 
 ## Web release
 
-Commit and push main. `.github/workflows/pages.yml` builds with `VITE_BASE_PATH=/clearwater/` and publishes `editor/dist`. Verify the exact commit's workflow before claiming deployment. Test nested workers/WASM/model URLs on Pages, not just localhost.
+Commit and push main. `.github/workflows/pages.yml` reads the deployment base path from `actions/configure-pages` before building (`/clearwater/` for the project URL, `/` for a custom domain) and publishes `editor/dist`. Custom-domain and project URLs have separate browser storage; imported libraries and user models do not migrate automatically. Changing the Pages custom domain requires rerunning this workflow; the previously built asset paths do not change automatically. Verify the exact commit's workflow before claiming deployment. Test nested workers/WASM/model URLs on Pages, not just localhost.
 
 Service-worker lists are build-generated. Preserve optional-asset caching. The update icon saves the latest recipe, activates a new worker and reloads. Offline failure must retain files/edits; `update.html` recovers stale installs. Never clear IndexedDB to update.
 
@@ -54,7 +57,7 @@ Project configuration explicitly uses the standard Android debug keystore, not p
 
 ## Dependencies, licences and data
 
-Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices. Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
+Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices; WWE-UIE carries Apache-2.0 notices and pinned checkpoint/export hashes. Android HDR conversion uses unmodified Media3 1.11.1 (Apache-2.0). Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
 
 LibRaw bindings pinned at @colorhythm/libraw-wasm 1.1.1 / LibRaw 0.22.1. Keep MIT bindings, chosen CDDL notices, copyright and matching source archives. Mediabunny source/licence material is bundled too. Attribution is in About and public licence/model notes; do not remove source offerings to reduce size.
 
@@ -83,3 +86,7 @@ Remaining improvements, in priority order:
 Browser checks and mocked Android bridges cannot verify real SAF provider dialogs, phone memory pressure or device-specific HEVC support. Keep those in the manual device smoke test. A clean dependency advisory scan is a point-in-time result, not a security audit.
 
 Branding: supplied rounded SVG is `editor/public/icon.svg`; supplied 16/32/192/512 PNGs serve favicons/PWA, and 180px serves Apple touch icons. The square master is `editor/branding/icon-square-1024.png`. Android legacy launcher sizes are 48/72/96/144/192px; round variants use a circular alpha mask. Adaptive foreground canvases are 108/162/216/324/432px, with square artwork centred at two-thirds canvas width (72dp within 108dp) so launcher masks keep the fish visible. Splash PNGs retain their existing dimensions, with a centred icon at 30% of the shorter side on #101c20. Original supplied variants stay in the ignored reference folder. Review launcher masks on a device when replacing artwork.
+
+HDR validation: native compilation and mocked bridge/protocol tests do not prove device tone-mapping quality. Test original iPhone MOV clips on an Android 10+ phone: bright highlights, dark water, rotated portrait, long clips, audio sync, cancel during staging/conversion, removal/reselection, and original file preservation. The comparison uses the converted SDR copy. Keep the web HDR rejection helpful, and never reinterpret HDR values as SDR.
+
+Collection clearing must remove only app library records and recipes, preserve pending shares and independent settings/model storage, and leave external files untouched. Cover transaction failure, pending writes, reload and all three locale layouts. Generated IDE/release files and signing credentials are not release source files.

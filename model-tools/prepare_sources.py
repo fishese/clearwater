@@ -16,11 +16,16 @@ def fetch(url,path,sha=None):
 
 shallow='https://raw.githubusercontent.com/mkartik/Shallow-UWnet/dfd4adfe3e5a5b41b65ac8047069bb155b6cc8e6/'
 funie='https://raw.githubusercontent.com/xahidbuffon/FUnIE-GAN/8f934c834c94e007b00866186b9ee624dc2b7b69/'
+wwe='https://raw.githubusercontent.com/chingheng0808/WWE-UIE/fd0697558203f9f849800cc13b804116bb3f921c/'
 fetch(shallow+'model.py',sources/'model.py')
 fetch(funie+'PyTorch/nets/funiegan.py',sources/'funiegan.py')
+fetch(wwe+'model.py',sources/'wwe_model.py','ac3e1ff534bc81d0ee5d6779c5ff02ae8bbd725ed0bb7064b3a4e06313f99d57')
+fetch(wwe+'LICENSE',sources/'LICENSE-WWE-UIE','c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4')
 fetch(funie+'PyTorch/models/funie_generator.pth',weights/'funie_generator.pth','e4fcb50e03868f1683c244b1c125def30df335ec43d9bb001b8700c03b8f2bd6')
 gdown.download(id='1QmOR8Ar3LqS5Pj0GG3I-798Yyj9xswet',output=str(weights/'shallow.ckpt'))
 assert hashlib.sha256((weights/'shallow.ckpt').read_bytes()).hexdigest()=='16c090a847e990bfd56a6466fd36f5595cc3a4c514a5ce941caa1a1806441835'
+gdown.download(id='1c80kkDbgpLD1MtqVLql1Y1NQVD7IzxiO',output=str(weights/'wwe_uieb_best_model.pth'))
+assert hashlib.sha256((weights/'wwe_uieb_best_model.pth').read_bytes()).hexdigest()=='36c3e59e556ed69a31e3f83ae7e15b86409eeb951de049ebc2207728c210027d'
 if args.research:
     wave='https://raw.githubusercontent.com/pksvision/Deep-WaveNet-Underwater-Image-Restoration/e6893b5782d22bb0ab0f58696fbc1ccda7f7b911/'
     fetch(wave+'uie_uieb/models.py',sources/'wavenet.py')

@@ -4,6 +4,15 @@ import {mediaLimit,supportedMedia} from './core/media';
 import type {CustomModel} from './core/types';
 
 type SharedPhoto={id:string;path:string;name:string;type:string};
+interface NativeHdr {
+ beginHdrInput(options:{name:string;size:number}):Promise<{id:string}>;
+ writeHdrInputChunk(options:{id:string;data:string}):Promise<void>;
+ finishHdrInput(options:{id:string;abort:boolean}):Promise<void>;
+ convertHdrToSdr(options:{id:string}):Promise<{id:string;uri:string}>;
+ cancelHdrConversion(options:{id:string}):Promise<void>;
+ deleteHdrWorkingCopy(options:{id:string}):Promise<void>;
+ addListener(name:'hdrConversionProgress',listener:(event:{id:string;progress:number})=>void):Promise<PluginListenerHandle>;
+}
 export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
 export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
@@ -26,7 +35,32 @@ interface NativeFiles {
  forgetRememberedModel():Promise<void>;
 }
 const files=registerPlugin<NativeFiles>('ClearWaterFiles');
+const hdr=registerPlugin<NativeHdr>('ClearWaterHdr');
+const cancelledHdrJobs=new Set<string>();
 export const isAndroid=()=>Capacitor.getPlatform()==='android';
+function base64Chunk(bytes:Uint8Array){let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);return btoa(binary);}
+export async function createAndroidHdrWorkingCopy(source:File,onProgress:(progress:number)=>void,onJob:(id:string)=>void):Promise<{id:string;file:File}> {
+ if(!isAndroid())throw new Error('HDR video conversion is available in the Android app.');
+ if(source.size<=0||source.size>512*1024*1024)throw new Error('HDR videos must be no larger than 512 MB.');
+ const {id}=await hdr.beginHdrInput({name:source.name,size:source.size});onJob(id);let staged=false,outputReady=false;let listener:PluginListenerHandle|undefined;
+ try{
+  for(let offset=0;offset<source.size;offset+=256*1024){if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');const bytes=new Uint8Array(await source.slice(offset,offset+256*1024).arrayBuffer());await hdr.writeHdrInputChunk({id,data:base64Chunk(bytes)});onProgress(Math.round((offset+bytes.length)/source.size*5));}
+  if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');
+  await hdr.finishHdrInput({id,abort:false});staged=true;
+  listener=await hdr.addListener('hdrConversionProgress',event=>{if(event.id===id)onProgress(5+Math.round(Math.max(0,Math.min(100,event.progress))*.95));});
+  if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');
+  const result=await hdr.convertHdrToSdr({id});outputReady=true;
+  const response=await fetch(Capacitor.convertFileSrc(result.uri));if(!response.ok)throw new Error('Could not read the SDR working copy.');
+  const blob=await response.blob();if(!blob.size)throw new Error('The SDR working copy was empty.');
+  return {id,file:new File([blob],'hdr-working-copy.mp4',{type:'video/mp4'})};
+ }finally{
+  cancelledHdrJobs.delete(id);if(listener)await listener.remove().catch(()=>{});
+  if(!staged)await hdr.finishHdrInput({id,abort:true}).catch(()=>{});
+  else if(!outputReady)await hdr.cancelHdrConversion({id}).catch(()=>{});
+  if(outputReady)await hdr.deleteHdrWorkingCopy({id}).catch(()=>{});
+ }
+}
+export async function cancelAndroidHdrWorkingCopy(id:string){cancelledHdrJobs.add(id);await hdr.cancelHdrConversion({id}).catch(()=>{});}
 export async function readRememberedAndroidModel():Promise<{config:CustomModel;blob:Blob|null}|null>{
  const info=await files.getRememberedModel();if(!info.present||!info.config)return null;
  if(!info.hasFile||!info.size||info.size>64*1024*1024)return {config:info.config,blob:null};

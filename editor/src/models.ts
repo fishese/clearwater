@@ -4,7 +4,7 @@ import wasmModuleUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-th
 import {validateImageTensor,validateImageOutput} from './core/model-contract';
 import type {CustomModel} from './core/types';
 
-export type ModelName='shallow'|'funie'|'wave';
+export type ModelName='shallow'|'funie'|'wwe'|'wave';
 ort.env.wasm.wasmPaths={wasm:wasmUrl,mjs:wasmModuleUrl};
 ort.env.wasm.numThreads=1;
 ort.env.wasm.proxy=false;
@@ -26,7 +26,7 @@ async function session(name:ModelName) {
   if(!sessions.has(name)) {
     const pending=(async()=>{
       const response=await fetch(`${import.meta.env.BASE_URL}models/${name}.onnx`);
-      if(!response.ok)throw new Error(`Could not load ${name==='shallow'?'Shallow-UWnet':'FUnIE-GAN'}. Check the model files and retry.`);
+      if(!response.ok)throw new Error(`Could not load ${{shallow:'Shallow-UWnet',funie:'FUnIE-GAN',wwe:'WWE-UIE',wave:'custom ONNX model'}[name]}. Check the model files and retry.`);
       return ort.InferenceSession.create(await response.arrayBuffer(),{executionProviders:['wasm'],graphOptimizationLevel:'all'});
     })();
     sessions.set(name,pending);
