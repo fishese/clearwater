@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Update ClearWater</title>
+<style>body{background:#101a1e;color:#d9e9e3;font:15px system-ui;max-width:440px;margin:12vh auto;padding:24px}h1{font-size:24px}button{background:#a9dfcc;color:#122923;padding:12px 18px;border:0;border-radius:6px;font:inherit;cursor:pointer}p{line-height:1.5}small{color:#94afa5}</style>
+<h1>Update ClearWater</h1><p>Download the latest web app and reopen it. Your locally saved files and edits are kept.</p><button id="update">Update and open</button><p id="status" role="status"></p><small>Finish any active export before updating. Internet access is required.</small>
+<script>
+const button=document.querySelector('#update'),status=document.querySelector('#status'),base=new URL('./',location.href);
+button.onclick=async()=>{
+ button.disabled=true;status.textContent='Checking for updates…';let timer;
+ try{
+  if(!navigator.onLine)throw new Error('Connect to the internet and try again.');
+  if(!('serviceWorker' in navigator))throw new Error('This browser cannot update the offline app.');
+  const registration=await navigator.serviceWorker.register(new URL('sw.js',base),{updateViaCache:'none'});await registration.update();
+  const worker=registration.waiting||registration.installing;
+  if(!worker){location.replace(base);return;}
+  await new Promise((resolve,reject)=>{
+   timer=setTimeout(()=>finish(new Error('Update timed out. Please try again.')),60000);
+   function finish(error){clearTimeout(timer);worker.removeEventListener('statechange',change);navigator.serviceWorker.removeEventListener('controllerchange',controlled);error?reject(error):resolve();}
+   function controlled(){if(navigator.serviceWorker.controller===worker)finish();}
+   function change(){if(worker.state==='installed')worker.postMessage({type:'ACTIVATE_UPDATE'});else if(worker.state==='activated')finish();else if(worker.state==='redundant')finish(new Error('Could not download the update. Please try again.'));}
+   worker.addEventListener('statechange',change);navigator.serviceWorker.addEventListener('controllerchange',controlled);change();
+  });location.replace(base);
+ }catch(error){status.textContent=error.message||'Could not update. Please try again.';button.disabled=false;}finally{clearTimeout(timer);}
+};
+</script></html>

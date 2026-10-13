@@ -5,5 +5,5 @@ import {isAndroid} from './native';
 
 createRoot(document.getElementById('root')!).render(<App/>);
 if(import.meta.env.PROD && !isAndroid() && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(console.error);
+  navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{updateViaCache:'none'}).catch(console.error);
 }

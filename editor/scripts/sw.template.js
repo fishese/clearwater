@@ -2,6 +2,7 @@ const BASE=__BASE__;
 const CACHE='__CACHE_NAME__';
 const ASSETS=__PRECACHE__;
 const OPTIONAL=__OPTIONAL__;
+self.addEventListener('message',event=>{if(event.data?.type==='ACTIVATE_UPDATE')event.waitUntil(self.skipWaiting());});
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith(CACHE.slice(0,20))&&name!==CACHE)await caches.delete(name);await self.clients.claim();})());});
 async function acceptShare(request){
