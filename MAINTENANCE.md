@@ -79,7 +79,7 @@ The audit added regression coverage for superseded photo previews, disabled-enha
 
 Remaining improvements, in priority order:
 
-- Touch accessibility: controls now use wider hit areas (44px sliders, mostly 40px icon actions, 36px toolbar widths on the narrowest layout), with wrapping for long folder counters. Include screen-reader, physical-keyboard and real-phone checks; avoid overlapping invisible hit boxes when changing the compact layout.
+- Touch accessibility: controls now use wider hit areas (44px sliders, mostly 40px icon actions, 36px toolbar widths on the narrowest layout), with wrapping for long folder counters. Include screen-reader, physical-keyboard and real-phone checks; avoid overlapping invisible hit boxes when changing the compact layout. Desktop mouse removal is a 24px action in a separate thumbnail filename row; touch layouts retain larger targets. Keep the collection heading/count separate from its clear action, and custom-model Load/Forget actions on one row.
 - Extreme photo exports: benchmark peak memory on actual phones before changing strip sizing. At the maximum legal width, a 448-row enhancement strip contains 14.7 million pixels; each RGBA/Float32 buffer is 56 MiB, and several coexist. Smaller strips trade memory for repeated halo processing. Existing Auto/Reduced options remain the practical fallback; the Full ceiling is not a memory guarantee.
 - Large libraries: profile hundreds of imports and folder visits, then consider a bounded thumbnail list and library storage usage/cleanup controls. Do not silently remove originals or recipes to reclaim space.
 

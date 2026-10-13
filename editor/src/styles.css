@@ -266,3 +266,19 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 /* Supplied artwork already contains its rounded silhouette. */
 .brand-icon{background:transparent;border-radius:0;overflow:hidden}.brand-icon img{display:block;width:100%;height:100%;object-fit:contain}
 .collection-heading{gap:7px;letter-spacing:1px;flex-wrap:nowrap}.collection-heading>span:first-child{min-width:0;white-space:nowrap}.collection-heading .count{flex:0 0 auto}.clear-collection-button{min-height:40px;min-width:40px;padding:0 7px;border:1px solid #34494d;border-radius:5px;color:#9bb4ae;font-size:9px;letter-spacing:0;line-height:1.15;white-space:normal;flex:0 0 auto}.clear-collection-button:hover:not(:disabled){background:#1b2d2e;border-color:#799a8c}.clear-collection-button.large-collection{border-color:#786747;color:#dbc99e;background:#28271f}.clear-collection-button.large-collection:hover:not(:disabled){border-color:#b6a16d;background:#333023}.clear-dialog{align-items:stretch;width:min(420px,calc(100vw - 24px));padding:26px 24px}.clear-dialog h2{margin:0 0 12px;align-self:flex-start}.clear-dialog>p{font-size:12px;line-height:1.65;align-self:flex-start}.clear-dialog .clear-error{color:#f0bcab;margin-top:12px}.clear-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:24px;flex-wrap:wrap}.clear-actions .button{min-height:40px}
+
+/* Keep independent library actions out of the photo loading area. */
+.model-actions{display:flex;align-items:center;gap:12px;min-width:0}
+.model-actions>.text-button{flex:1;min-width:0;text-align:left;line-height:1.4;white-space:normal}
+@media(min-width:901px){
+ .collection-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px}
+ .collection-heading .count{justify-self:end}
+ .collection-heading .clear-collection-button{grid-column:1/-1;justify-self:end;min-height:32px;padding:0 8px}
+}
+@media(min-width:901px) and (hover:hover) and (pointer:fine){
+ .photo-select{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start}
+ .photo-select img{height:calc(100% - 26px);display:block;flex:none}
+ .photo-select>span:last-child{min-height:26px;padding:4px 29px 4px 5px;line-height:18px;background:#15262a}
+ .remove-photo{top:auto;bottom:1px;right:1px;width:24px;height:24px;border-radius:4px;background:transparent;opacity:1}
+ .remove-photo:hover:not(:disabled){background:#344443;color:#f2d2c6}
+}
