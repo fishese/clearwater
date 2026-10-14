@@ -1,3 +1,4 @@
+import {changeLanguage,readLanguage} from './settings-helpers.mjs';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -30,7 +31,7 @@ try {
         const page = await browser.newPage({ viewport: { width, height: 900 } });
         await page.addInitScript((hasFolderPicker) => Object.defineProperty(window, 'showDirectoryPicker', { value: hasFolderPicker ? async () => ({}) : undefined }), folderMode);
         await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-        await page.locator('.language-select').first().selectOption(language);
+        await changeLanguage(page,language);
         const imageData = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 48; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#28778c'; ctx.fillRect(0, 0, canvas.width, canvas.height); return canvas.toDataURL().split(',')[1]; });
         const uploadLabel = { en: 'Choose photos', 'zh-HK': '選擇相片', ja: '写真を選択' }[language];
         await page.getByLabel(uploadLabel, { exact: true }).setInputFiles({ name: 'touch-target.png', mimeType: 'image/png', buffer: Buffer.from(imageData, 'base64') });

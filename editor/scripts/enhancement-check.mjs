@@ -1,3 +1,4 @@
+import {changeLanguage,readLanguage} from './settings-helpers.mjs';
 import {chromium} from 'playwright';
 import {mkdir,readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
@@ -19,7 +20,7 @@ try{
  await page.getByRole('combobox',{name:'File format'}).selectOption('png');const wait=page.waitForEvent('download');await page.getByRole('button',{name:'Download instead',exact:true}).click();const d=await wait,bytes=await readFile(await d.path());
  const diff=await page.evaluate(async bytes=>{const b=await createImageBitmap(new Blob([new Uint8Array(bytes)])),canvas=new OffscreenCanvas(b.width,b.height),ctx=canvas.getContext('2d');ctx.drawImage(b,0,0);const output=ctx.getImageData(0,0,b.width,b.height).data,preview=document.querySelector('canvas[aria-label="Edited photo"]').getContext('2d').getImageData(0,0,b.width,b.height).data;let max=0;for(let i=0;i<output.length;i++)max=Math.max(max,Math.abs(output[i]-preview[i]));return max;},Array.from(bytes));assert.equal(diff,0);
  await action('Clear enhancement');assert.equal(await hash(),before);
- for(const locale of ['zh-HK','ja','en']){await page.locator('.brand-cluster .language-select').selectOption(locale);await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+ for(const locale of ['zh-HK','ja','en']){await changeLanguage(page,locale);await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
  if(process.env.CHECK_SAMPLES==='1'){
   const names=await page.evaluate(()=>fetch('/__samples').then(r=>r.json()));
   for(let index=0;index<Math.min(names.length,Number(process.env.CHECK_SAMPLE_LIMIT??names.length));index++){

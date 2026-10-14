@@ -1,12 +1,13 @@
 import {readFile} from 'node:fs/promises';
 import {describe,expect,it,vi} from 'vitest';
 
+const modelHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('model bytes'))),v=>v.toString(16).padStart(2,'0')).join('');
 const template=await readFile(new URL('../scripts/sw.template.js',import.meta.url),'utf8');
 function worker(cache:CacheLike,fetcher:(request:Request)=>Promise<Response>,indexedDB:Record<string,unknown>={}){
  const listeners=new Map<string,(event:any)=>void>();
  const self={location:{origin:'https://clearwater.test'},clients:{matchAll:vi.fn(async()=>[])},addEventListener:(name:string,listener:(event:any)=>void)=>listeners.set(name,listener)};
  const caches={open:vi.fn(async()=>cache)};
- const source=template.replace('__CACHE_NAME__','"clearwater-test"').replace('__BASE__','"/"').replace('__PRECACHE__','[]').replace('__OPTIONAL__','["/model.wasm"]');
+ const source=template.replace('__CACHE_NAME__','"clearwater-test"').replace('__BASE__','"/"').replace('__PRECACHE__','[]').replace('__OPTIONAL__','["/model.wasm"]').replace('__OPTIONAL_HASHES__',JSON.stringify({'/model.wasm':modelHash}));
  new Function('self','caches','fetch','URL','Response','File','indexedDB','crypto',source)(self,caches,fetcher,URL,Response,File,indexedDB,crypto);
  return {onFetch:listeners.get('fetch')!,caches};
 }

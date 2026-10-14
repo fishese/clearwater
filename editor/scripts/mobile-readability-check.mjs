@@ -1,3 +1,4 @@
+import {changeLanguage,readLanguage} from './settings-helpers.mjs';
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import {mkdir} from 'node:fs/promises';
@@ -8,8 +9,8 @@ await mkdir(new URL('../../analysis/photo-check/',import.meta.url),{recursive:tr
 try{
  for(const language of ['en','zh-HK','ja']){
   const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(url);await page.locator('.brand-cluster .language-select').selectOption(language);
-  assert.deepEqual(await page.locator('.brand-cluster .language-select option').allTextContents(),['EN','中','日']);
+  await page.goto(url);await changeLanguage(page,language);
+  assert.deepEqual(await changeLanguage(page,language),['EN','中','日']);
   const png=await page.evaluate(async()=>{const c=new OffscreenCanvas(96,72);c.getContext('2d').fillRect(0,0,96,72);return Array.from(new Uint8Array(await (await c.convertToBlob()).arrayBuffer()));});
   await page.locator('input[type=file][multiple]').setInputFiles({name:'mobile-type.png',mimeType:'image/png',buffer:Buffer.from(png)});
   await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});

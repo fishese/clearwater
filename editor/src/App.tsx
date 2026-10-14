@@ -1,6 +1,6 @@
-import {t,message,useLanguage,LanguageSelect} from './i18n';
-import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { Camera as CameraIcon, Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
+import {t,message,useLanguage} from './i18n';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { Settings as SettingsIcon, Camera as CameraIcon, Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut, Maximize2, Minimize2, RefreshCw } from 'lucide-react';
 import { clamp, makePhotoRecipe, makeRecipe, parseRecipe, suggest } from './core/engine';
 import { DEFAULT_MANUAL,DEFAULT_ENHANCEMENT, type Analysis, type Adjustments, type Hints, type Recipe, type CustomModel } from './core/types';
 import { clearPhotos, deletePhoto, listPhotos, promoteSharedPhotos, savePhoto, type StoredPhoto } from './storage';
@@ -11,6 +11,7 @@ import {nextBackAction,type BackState} from './back-navigation';
 import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
 import About from './About';
+import Settings from './Settings';
 import Camera,{type CameraHandle,type CameraSaveResult} from './Camera';
 import {isVideo,isRaw,supportedMedia,mediaLimit,videoTime,type VideoInfo} from './core/media';
 import {useStableTabScroll} from './use-stable-tab-scroll';
@@ -40,6 +41,8 @@ export default function App() {
   const [about,setAbout]=useState(()=>window.location.hash.startsWith('#about'));
   useEffect(()=>{const change=()=>setAbout(window.location.hash.startsWith('#about'));window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
   function closeAbout(){window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);setAbout(false);}
+  const [settingsOpen,setSettingsOpen]=useState(false);
+  const closeSettings=useCallback(()=>setSettingsOpen(false),[]);
   const [cameraOpen,setCameraOpen]=useState(false),cameraRef=useRef<CameraHandle>(null),cameraLastCapture=useRef<string|null>(null),cameraSession=useRef(0);
   const [updating,setUpdating]=useState(false);
   const [keepMetadata,setKeepMetadata]=useState(true);
@@ -51,7 +54,7 @@ export default function App() {
   const [enhancementTab,setEnhancementTab]=useState<'colour'|'light'|'clarity'|'effects'>('colour');
   const [narrowControls,setNarrowControls]=useState(()=>window.matchMedia('(max-width: 650px)').matches);
   useEffect(()=>{const media=window.matchMedia('(max-width: 650px)'),change=()=>setNarrowControls(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[]);
-  useEffect(()=>{if(!expanded||cameraOpen)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[expanded,cameraOpen]);
+  useEffect(()=>{if(!expanded||cameraOpen||settingsOpen)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[expanded,cameraOpen,settingsOpen]);
   const [photos,setPhotos]=useState<Photo[]>([]),[active,setActive]=useState<string|null>(null);
   const [clearCollectionOpen,setClearCollectionOpen]=useState(false),[clearingCollection,setClearingCollection]=useState(false);
   const collectionEpoch=useRef(0),clearingCollectionRef=useRef(false),pendingPhotoWrites=useRef<Set<string>>(new Set()),clearDialogRef=useRef<HTMLDivElement>(null),clearCancelRef=useRef<HTMLButtonElement>(null),clearOpenerRef=useRef<HTMLButtonElement>(null),deferredShareIds=useRef<Set<string>>(new Set()),deferredFiles=useRef<File[][]>([]);
@@ -368,7 +371,7 @@ export default function App() {
       bottomEdge=Math.max(bounds.top+56,bottomEdge);const next={right:Math.round(Math.max(8,window.innerWidth-bounds.right+8)),bottom:Math.round(Math.max(8,window.innerHeight-bottomEdge+8))};setZoomControlPosition(current=>current.right===next.right&&current.bottom===next.bottom?current:next);};
     const observer=new ResizeObserver(place);if(stage.current)observer.observe(stage.current);if(controlsPanel.current)observer.observe(controlsPanel.current);window.addEventListener('resize',place);window.addEventListener('scroll',place,true);place();return()=>{observer.disconnect();window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
   },[expanded,narrowControls,adjustmentsOpen]);
-  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(!cameraOpen&&(e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();if(canEdit)history(e.shiftKey?'redo':'undo');}};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[active,canEdit,cameraOpen]);
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(!settingsOpen&&!cameraOpen&&(e.ctrlKey||e.metaKey)&&e.key==='z'&&!['INPUT','SELECT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();if(canEdit)history(e.shiftKey?'redo':'undo');}};window.addEventListener('keydown',onKey);return ()=>window.removeEventListener('keydown',onKey);},[active,canEdit,cameraOpen,settingsOpen]);
   async function sample(name:string){
     if(exporting||sampleBusy)return;setSampleBusy(true);
     try{const response=await fetch('/__sample/'+encodeURIComponent(name));if(!response.ok)throw new Error(t("Sample unavailable."));const blob=await response.blob();addFiles([new File([blob],name,{type:blob.type})]);}
@@ -474,9 +477,9 @@ export default function App() {
       if(shareIds.length){const epoch=collectionEpoch.current;promoteSharedPhotos(shareIds).then(()=>listPhotos()).then(items=>{if(epoch!==collectionEpoch.current)return;const added=items.filter(p=>shareIds.includes(p.id)&&!photoRef.current.some(existing=>existing.id===p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}));if(added.length)setPhotos(all=>[...all,...added]);}).catch(()=>setStorageWarning(true));}
     }
   }
-  const backStateRef=useRef<BackState>({activeWork:false,clearDialog:false,customDialog:false,saveDialog:false,folderBrowser:false,neutralPicker:false,about:false,camera:false,adjustmentsOpen:false,expanded:false,narrowControls:false,controlTab:'correction',correctionTab:'engine',lastBackAt:0,now:0});
-  backStateRef.current={activeWork:!!(busy||exporting||saving||hdrConverting||customLoading||clearingCollection||sampleBusy||rendering||updating||folderLoading),clearDialog:clearCollectionOpen,customDialog:customOpen,saveDialog,folderBrowser:!!folderBrowser,neutralPicker:eyedropper,about,camera:cameraOpen,adjustmentsOpen,expanded,narrowControls,controlTab,correctionTab,lastBackAt:lastBackAt.current,now:Date.now()};
-  useEffect(()=>{lastBackAt.current=0;if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;setNotice(current=>current===t('Back again to exit app')?'':current);},[cameraOpen,about,clearCollectionOpen,customOpen,saveDialog,eyedropper,expanded,adjustmentsOpen,controlTab,correctionTab,folderBrowser,busy,exporting,saving,hdrConverting,customLoading,clearingCollection,sampleBusy,rendering,updating,folderLoading]);
+  const backStateRef=useRef<BackState>({activeWork:false,clearDialog:false,customDialog:false,saveDialog:false,folderBrowser:false,neutralPicker:false,about:false,camera:false,settings:false,adjustmentsOpen:false,expanded:false,narrowControls:false,controlTab:'correction',correctionTab:'engine',lastBackAt:0,now:0});
+  backStateRef.current={activeWork:!!(busy||exporting||saving||hdrConverting||customLoading||clearingCollection||sampleBusy||rendering||updating||folderLoading),clearDialog:clearCollectionOpen,customDialog:customOpen,saveDialog,folderBrowser:!!folderBrowser,neutralPicker:eyedropper,about,camera:cameraOpen,settings:settingsOpen,adjustmentsOpen,expanded,narrowControls,controlTab,correctionTab,lastBackAt:lastBackAt.current,now:Date.now()};
+  useEffect(()=>{lastBackAt.current=0;if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;setNotice(current=>current===t('Back again to exit app')?'':current);},[settingsOpen,cameraOpen,about,clearCollectionOpen,customOpen,saveDialog,eyedropper,expanded,adjustmentsOpen,controlTab,correctionTab,folderBrowser,busy,exporting,saving,hdrConverting,customLoading,clearingCollection,sampleBusy,rendering,updating,folderLoading]);
   useEffect(()=>{
     const dispose=listenForAndroidBack(()=>{
       const now=Date.now(),state={...backStateRef.current,lastBackAt:lastBackAt.current,now};
@@ -496,6 +499,7 @@ export default function App() {
       switch(action){
         case 'busy':notify(t('Keep the app open while work is active.'));break;
         case 'camera':cameraRef.current?.requestClose();break;
+        case 'settings':setSettingsOpen(false);break;
         case 'about':closeAbout();break;
         case 'clear-dialog':closeClearCollection();break;
         case 'custom-dialog':cancelCustom();break;
@@ -511,8 +515,8 @@ export default function App() {
     return ()=>{dispose();if(exitPromptTimer.current)clearTimeout(exitPromptTimer.current);exitPromptTimer.current=null;lastBackAt.current=0;};
   },[]);
   const expandButton=<button className="expand-view-button" disabled={!photo} aria-label={expanded?t("Exit expanded view"):t("Expand photo")} title={expanded?t("Exit expanded view (Esc)"):t("Expand photo")} aria-pressed={expanded} onClick={()=>{expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setExpanded(!expanded);setZoom(1);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button>;
-  return <><div hidden={about||cameraOpen} className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
-    <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<LanguageSelect/></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
+  return <><div hidden={about||cameraOpen||settingsOpen} className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
+    <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<button className="settings-launch" aria-label={t("Settings")} title={t("Settings")} onClick={()=>setSettingsOpen(true)}><SettingsIcon size={17}/></button></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
       <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||hdrConverting||clearingCollection} onClick={()=>{cameraSession.current++;cameraLastCapture.current=null;setCameraOpen(true);}}><CameraIcon size={16}/></button><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" aria-label={video?t("Export video"):t("Export photo")} disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/><span className="export-action-label">{video?t("Export video"):t("Export photo")}</span></button></div></header>
     <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,video/mp4,video/quicktime,.heic,.heif,.dng,.mp4,.mov" aria-label={t("Choose photos")} onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
     <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label={t("Choose recipe")} onChange={readRecipe}/>
@@ -606,7 +610,8 @@ export default function App() {
     {notice&&<div className="toast" role="status"><span>{message(notice)}</span><button aria-label={t("Dismiss message")} onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {hdrConverting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="hdr-conversion-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="hdr-conversion-title">{t("Converting HDR video to SDR")}</h2><p>{t("Preparing HDR video…")}</p><progress max="100" value={hdrProgress}/><span>{hdrProgress}%</span><button className="button secondary" onClick={()=>void cancelHdrWorkingCopy()}>{t("Cancel conversion")}</button></div></div>}
     {exporting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="export-title">{t("Exporting")} {video?t("video"):t("photo")}</h2><p>{saving?t("Saving your restored file…"):video?t("Processing video frames locally. Keep this app open."):t("Rendering your photo at the selected resolution.")}</p><progress max="100" value={progress}/><span>{progress}%</span><button className="button secondary" disabled={saving} onClick={cancelExport}>{t("Cancel export")}</button></div></div>}
-  </div>{about&&<About onClose={closeAbout} customModel={customModel}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>{if(cameraLastCapture.current)setActive(cameraLastCapture.current);setCameraOpen(false);}} onCapture={saveCameraCapture}/>}</>;
+  </div>{about&&!settingsOpen&&<About onClose={closeAbout} customModel={customModel} onOpenSettings={()=>setSettingsOpen(true)}/>}
+  {settingsOpen&&<Settings parentAbout={about} onClose={closeSettings}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>{if(cameraLastCapture.current)setActive(cameraLastCapture.current);setCameraOpen(false);}} onCapture={saveCameraCapture}/>}</>;
 }
 
 

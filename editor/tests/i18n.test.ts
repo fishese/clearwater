@@ -10,7 +10,7 @@ describe('localisation',()=>{
    expect(Object.keys(catalogs[language]).sort()).toEqual(keys);
    for(const key of keys){expect(catalogs[language][key].trim()).not.toBe('');expect(catalogs[language][key].match(/\{\d+\}/g)?.sort()??[]).toEqual(key.match(/\{\d+\}/g)?.sort()??[]);}
   }
-  for(const file of ['App.tsx','About.tsx','i18n.tsx']){
+  for(const file of ['App.tsx','About.tsx','Settings.tsx','OfflineModels.tsx','Camera.tsx','i18n.tsx']){
    const source=ts.createSourceFile(file,readFileSync(new URL('../src/'+file,import.meta.url),'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
    const visit=(node:ts.Node)=>{if(ts.isCallExpression(node)&&node.expression.getText(source)==='t'&&node.arguments[0]&&ts.isStringLiteral(node.arguments[0]))expect(keys).toContain(node.arguments[0].text);ts.forEachChild(node,visit);};visit(source);
   }
