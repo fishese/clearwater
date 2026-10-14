@@ -26,6 +26,14 @@ export function cameraRecordingLimitReached(elapsedMs: number, bytes: number, bu
   return elapsedMs >= (budget?.maxMs ?? CAMERA_MAX_RECORDING_MS) || bytes >= (budget?.maxBytes ?? CAMERA_MAX_RECORDING_BYTES);
 }
 
+/** Quantize progress to the values visible in the camera UI, avoiding renders for every media chunk/frame. */
+export function cameraRecordingUiProgress(elapsedMs: number, bytes: number, maxBytes: number): { elapsedMs: number; bytePercent: number } {
+  return {
+    elapsedMs: Math.floor(Math.max(0, elapsedMs) / 1000) * 1000,
+    bytePercent: maxBytes > 0 ? Math.max(0, Math.min(100, Math.floor(Math.max(0, bytes) / maxBytes * 100))) : 0,
+  };
+}
+
 /** Combine corrected preview video with optional microphone audio, excluding the raw camera stream. */
 export function cameraRecordingTracks(
   correctedPreview: Pick<MediaStream, 'getVideoTracks'>,

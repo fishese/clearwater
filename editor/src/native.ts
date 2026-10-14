@@ -49,7 +49,12 @@ const back=registerPlugin<NativeBack>('ClearWaterBack');
 let backListeners=0;
 const cancelledHdrJobs=new Set<string>();
 export const isAndroid=()=>Capacitor.getPlatform()==='android';
-function base64Chunk(bytes:Uint8Array){let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);return btoa(binary);}
+function base64Chunk(bytes:Uint8Array){
+ const parts:string[]=[];
+ // Keep each argument list bounded while converting a whole write chunk at once.
+ for(let offset=0;offset<bytes.length;offset+=0x8000)parts.push(String.fromCharCode(...bytes.subarray(offset,offset+0x8000)));
+ return btoa(parts.join(''));
+}
 export async function createAndroidHdrWorkingCopy(source:File,onProgress:(progress:number)=>void,onJob:(id:string)=>void):Promise<{id:string;file:File}> {
  if(!isAndroid())throw new Error('HDR video conversion is available in the Android app.');
  if(source.size<=0||source.size>512*1024*1024)throw new Error('HDR videos must be no larger than 512 MB.');
@@ -149,7 +154,7 @@ function fileHandle(uri:string,name:string,created=false,size?:number):LocalFile
  return {name,size,getFile:async()=>{const response=await fetch(Capacitor.convertFileSrc(uri));if(!response.ok)throw new Error('Cannot read source file.');return new File([await response.blob()],name);},async createWritable(){
    if(!created)throw new Error('Existing files cannot be overwritten.');
    const {id}=await files.beginWrite({uri});
-   return {async write(blob){for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);await files.writeChunk({id,data:btoa(binary)});}},async close(){await files.finishWrite({id,abort:false});},async abort(){await files.finishWrite({id,abort:true});}};
+   return {async write(blob){for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}},async close(){await files.finishWrite({id,abort:false});},async abort(){await files.finishWrite({id,abort:true});}};
  }};
 }
 function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {

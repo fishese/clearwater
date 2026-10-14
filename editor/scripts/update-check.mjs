@@ -36,13 +36,14 @@ try{
  assert.equal(updateStyle.borderTopWidth,'0px');assert.equal(updateStyle.borderStyle,'none');assert.equal(updateStyle.boxShadow,'none');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));console.log('PASS recovery from stale worker and compact unframed update icon');
  await update.click();await page.getByRole('status').filter({hasText:'latest version'}).waitFor();
+ const openWarmthControl=async()=>{await page.locator('[data-control-tab="enhancement"]').click();await page.locator('[data-control-subtab="colour"]').click();return page.getByRole('slider',{name:'Warmth',exact:true});};
  // Store a real photo and make an edit immediately before requesting activation.
  const png=await page.evaluate(async()=>{const c=new OffscreenCanvas(64,64);c.getContext('2d').fillRect(0,0,64,64);return Array.from(new Uint8Array(await (await c.convertToBlob()).arrayBuffer()));});
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'update-test.png',mimeType:'image/png',buffer:Buffer.from(png)});
  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
- await page.getByRole('slider',{name:'Warmth',exact:true}).focus();await page.keyboard.press('End');
+ const warmth=await openWarmthControl();await warmth.focus();await page.keyboard.press('End');
  version=2;await update.click();await page.waitForEvent('load');await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
- assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).inputValue(),'100');assert.ok((await page.locator('.filename').innerText()).includes('update-test.png'));console.log('PASS update activation/reload preserves photo and latest edits');
- await context.setOffline(true);await page.getByRole('button',{name:'Update app',exact:true}).click();await page.getByRole('status').filter({hasText:'Connect to the internet'}).waitFor();assert.equal(await page.getByRole('button',{name:'Update app',exact:true}).isEnabled(),true);assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).inputValue(),'100');
+ const warmthAfterReload=await openWarmthControl();assert.equal(await warmthAfterReload.inputValue(),'100');assert.ok((await page.locator('.filename').innerText()).includes('update-test.png'));console.log('PASS update activation/reload preserves photo and latest edits');
+ await context.setOffline(true);await page.getByRole('button',{name:'Update app',exact:true}).click();await page.getByRole('status').filter({hasText:'Connect to the internet'}).waitFor();assert.equal(await page.getByRole('button',{name:'Update app',exact:true}).isEnabled(),true);const warmthOffline=await openWarmthControl();assert.equal(await warmthOffline.inputValue(),'100');
  assert.deepEqual(errors,[]);console.log('PASS offline update fails safely without clearing files or edits');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

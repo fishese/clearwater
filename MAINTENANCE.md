@@ -25,7 +25,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 81 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 107 tests.
 
 ## Languages
 
@@ -116,3 +116,13 @@ Camera recording settings are persisted separately from per-file recipes. Snapsh
 `camera-settings-check.mjs` verifies persistence and EN/Chinese/Japanese responsive option rows, then advances a synthetic recording clock to test the 3-minute automatic stop without waiting for a long recording. Real 3/5-minute phone recording remains the thermal/audio test.
 
 Quality checks: Auto must resolve High on Android and Standard on web, while explicit overrides persist. Budget estimates/byte guards must reflect the selected profile and keep camera inputs below the 512 MiB import ceiling. Verify actual negotiated stream sizes and corrected-canvas caps rather than upscaling smaller cameras. Profile frame/bitrate targets are requests; phone codec, dropped frames and thermal behaviour require device testing. Preserve JPEG quality through both raw capture and visible gallery encoding.
+
+## Release 1.0.2 review and iOS feasibility
+
+The camera progress display updates only for visible whole seconds/percentages; exact references still enforce time/byte limits. Android bridge base64 encoding uses bounded 32 KiB batches inside existing 256 KiB writes, reducing transient string operations without changing the wire format. Settings camera radio groups have accessible names; guide index/release-note links have larger touch targets. The update browser check must open Enhancement / Colour before interacting with Warmth.
+
+An iOS port is feasible but is not implemented or device-validated. Keep its work separate from the Android stable release. Capacitor 8 requires Xcode 26+ on macOS (iOS deployment minimum 15); the editor's actual supported iOS version must also be determined by OffscreenCanvas, WebCodecs, WASM and camera tests. GitHub's standard hosted macOS runners can build a device-targeted unsigned app for a sideloading IPA; this public repository qualifies for free standard runner usage under current GitHub rules. Windows Sideloadly handles local signing/install, not compilation. Free Apple Personal Team profiles expire after seven days; Sideloadly documents up to one year with a paid developer account. Refresh before travel; expiry is separate from offline editing support. Keep Apple credentials out of repository/CI when signing locally.
+
+Suggested first milestone: add @capacitor/ios matching core, generate an iOS shell and manually dispatched macOS build workflow, package all bundled models, disable web service-worker update/cache UI on every native platform, and set camera/microphone privacy descriptions. Validate file import, workers/WASM, camera capture, MP4 encoder availability and foreground/background handling on a physical iPhone. Start with photo editing and export through native share/save. Android MediaStore/SAF, share intake, linked gallery updates/deletion, HDR conversion and Back plugins have no iOS implementations; an iOS Files/Photos bridge and permissions are separate work. Do not advertise Android gallery behavior on iOS until implemented. Prefer recent iOS for the first test build, and feature-detect unavailable video features.
+
+Sources checked 14 October 2026: [Capacitor 8 requirements](https://capacitorjs.com/docs/updating/8-0), [GitHub hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), [Apple account limits](https://developer.apple.com/help/account/basics/about-your-developer-account), [Sideloadly FAQ](https://sideloadly.io/faq.html).

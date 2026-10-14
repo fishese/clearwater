@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, cameraRecordingTracks, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
+import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
 import { analyse } from '../src/core/engine';
 
 describe('camera capture helpers', () => {
@@ -29,6 +29,13 @@ describe('camera capture helpers', () => {
     expect(cameraRecordingLimitReached(60_000, CAMERA_MAX_RECORDING_BYTES, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(false);
     expect(cameraRecordingLimitReached(180_000, 0, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(true);
     expect(cameraRecordingLimitReached(0, CAMERA_MAX_RECORDING_BYTES * 3, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(true);
+  });
+
+  it('quantizes recording UI progress to displayed seconds and whole byte percentages', () => {
+    expect(cameraRecordingUiProgress(1_999, 10_999, 100_000)).toEqual({ elapsedMs: 1_000, bytePercent: 10 });
+    expect(cameraRecordingUiProgress(-1, -1, 100_000)).toEqual({ elapsedMs: 0, bytePercent: 0 });
+    expect(cameraRecordingUiProgress(100_000, 120_000, 100_000)).toEqual({ elapsedMs: 100_000, bytePercent: 100 });
+    expect(cameraRecordingUiProgress(100, 20, 0)).toEqual({ elapsedMs: 0, bytePercent: 0 });
   });
 
   it('records corrected preview video and microphone audio without raw camera video', () => {

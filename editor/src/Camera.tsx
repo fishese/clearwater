@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from 'react';
 import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff } from 'lucide-react';
-import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
+import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
 import { cameraQualityProfile } from './core/camera-quality';
 import { cameraRecordingBudget, getCameraSettings, subscribeCameraSettings } from './core/camera-settings';
@@ -97,7 +97,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [recording, setRecording] = useState(false);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
-  const [recordingBytes, setRecordingBytes] = useState(0);
+  const [recordingBytePercent, setRecordingBytePercent] = useState(0);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [photoPending, setPhotoPending] = useState(false);
   const [recordPending, setRecordPending] = useState(false);
@@ -250,7 +250,9 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
               lastAnalysisAt = time;
             }
             if (isRecording && time - lastUiAt >= 200) {
-              setRecordingElapsed(performance.now() - recordingStartedRef.current);
+              const progress = cameraRecordingUiProgress(performance.now() - recordingStartedRef.current, recordingBytesRef.current, recordingBudget.maxBytes);
+              setRecordingElapsed(progress.elapsedMs);
+              setRecordingBytePercent(progress.bytePercent);
               lastUiAt = time;
             }
           } catch (cause) {
@@ -434,7 +436,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       frozenRecipeRef.current = frozen;
       chunksRef.current = [];
       recordingBytesRef.current = 0;
-      setRecordingBytes(0);
+      setRecordingBytePercent(0);
       setRecordingElapsed(0);
       discardRecordingRef.current = false;
       recorderRef.current = recorder;
@@ -442,7 +444,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         if (!event.data.size) return;
         chunksRef.current.push(event.data);
         recordingBytesRef.current += event.data.size;
-        setRecordingBytes(recordingBytesRef.current);
+        const progress = cameraRecordingUiProgress(performance.now() - recordingStartedRef.current, recordingBytesRef.current, recordingBudget.maxBytes);
+        setRecordingBytePercent(progress.bytePercent);
         if (cameraRecordingLimitReached(performance.now() - recordingStartedRef.current, recordingBytesRef.current, recordingBudget)) stopRecording(false);
       };
       recorder.onerror = () => {
@@ -511,7 +514,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   };
 
   const timeLimit = Math.min(recordingBudget.maxMs, recordingElapsed);
-  const byteLimitPercent = Math.min(100, recordingBytes / recordingBudget.maxBytes * 100);
+  const byteLimitPercent = recordingBytePercent;
 
   return <div className="camera-page" role="dialog" aria-modal="true" aria-labelledby="camera-title" onKeyDown={onKeyDown}>
     <header className="camera-header">

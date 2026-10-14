@@ -8,7 +8,7 @@ function Source({href,children}:{href:string;children:React.ReactNode}){return <
 export default function About({onClose,customModel,onOpenSettings}:{onClose:()=>void;customModel:CustomModel|null;onOpenSettings:()=>void}){
  useLanguage();
  const heading=useRef<HTMLHeadingElement>(null);
- useEffect(()=>{heading.current?.focus();const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[onClose]);
+ useEffect(()=>{heading.current?.focus();const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();onClose();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[onClose]);
  return <main className="about-page" aria-labelledby="about-title">
   <header className="about-header"><span className="brand"><span className="brand-icon"><img src={local("icon-192.png")} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></span><button className="settings-launch" aria-label={t("Settings")} title={t("Settings")} onClick={onOpenSettings}><SettingsIcon size={17}/></button><button className="button secondary" onClick={onClose}><ArrowLeft size={15}/> {t("Back to editor")}</button></header>
   <article className="about-content">
