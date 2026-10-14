@@ -1,0 +1,74 @@
+name: iOS unsigned device build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-device-ipa:
+    name: Build unsigned iPhone IPA
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - name: Install locked dependencies
+        working-directory: editor
+        run: npm ci
+      - name: Run shared unit tests
+        working-directory: editor
+        run: npm test
+      - name: Select and verify Xcode 26.6
+        run: |
+          set -euo pipefail
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version | tee "$RUNNER_TEMP/xcode-version.txt"
+          grep -q '^Xcode 26\.6' "$RUNNER_TEMP/xcode-version.txt"
+      - name: Build root-relative web assets and sync iOS only
+        working-directory: editor
+        run: npm run ios:sync
+      - name: Resolve Capacitor Swift packages
+        working-directory: editor
+        run: xcodebuild -resolvePackageDependencies -project ios/App/App.xcodeproj -scheme App
+      - name: Build unsigned physical-device app
+        working-directory: editor
+        run: >-
+          xcodebuild -project ios/App/App.xcodeproj -scheme App
+          -configuration Release -sdk iphoneos -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/clearwater-ios-build"
+          CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+          build
+      - name: Verify app and package IPA
+        working-directory: editor
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/clearwater-ios-build/Build/Products/Release-iphoneos/App.app"
+          PACKAGE="$RUNNER_TEMP/clearwater-ipa"
+          OUT="$RUNNER_TEMP/clearwater-unsigned.ipa"
+          node scripts/ios-package-check.mjs --app "$APP"
+          mkdir -p "$PACKAGE/Payload"
+          ditto "$APP" "$PACKAGE/Payload/ClearWater.app"
+          (cd "$PACKAGE" && /usr/bin/zip -qry "$OUT" Payload)
+          node scripts/ios-package-check.mjs --ipa "$OUT"
+          cp "$OUT" "$GITHUB_WORKSPACE/ClearWater-unsigned.ipa"
+          shasum -a 256 "$GITHUB_WORKSPACE/ClearWater-unsigned.ipa" > "$GITHUB_WORKSPACE/ClearWater-unsigned.ipa.sha256"
+          printf 'commit=%s\nworkflow=%s\nrun=%s\n' "$GITHUB_SHA" "$GITHUB_WORKFLOW" "$GITHUB_RUN_ID" > "$GITHUB_WORKSPACE/ios-build-commit.txt"
+          cat "$RUNNER_TEMP/xcode-version.txt" >> "$GITHUB_WORKSPACE/ios-build-commit.txt"
+      - name: Upload unsigned IPA and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClearWater-iOS-unsigned-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            ClearWater-unsigned.ipa
+            ClearWater-unsigned.ipa.sha256
+            ios-build-commit.txt

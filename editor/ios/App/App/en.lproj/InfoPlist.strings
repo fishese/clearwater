@@ -1,0 +1,4 @@
+/* Camera and media permission explanations shown by iOS. */
+"NSCameraUsageDescription" = "ClearWater uses the camera to capture and restore underwater photos and videos.";
+"NSMicrophoneUsageDescription" = "ClearWater uses the microphone when you choose to record video with audio.";
+"NSPhotoLibraryAddUsageDescription" = "ClearWater can save enhanced captures to Photos when you choose Save to Photos.";

@@ -12,7 +12,13 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
+  ios-sideload:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ios-native-camera'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ios-build.yml
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

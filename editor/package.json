@@ -9,11 +9,14 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "android:sync": "node scripts/android-sync.mjs",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "ios:sync": "node scripts/ios-sync.mjs",
+    "ios:open": "cap open ios"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "8.5.3",
     "@colorhythm/libraw-wasm": "1.1.1",
     "exifr": "^7.1.3",
     "heic-to": "^1.0.0",
