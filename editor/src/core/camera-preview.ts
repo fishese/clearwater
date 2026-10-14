@@ -1,11 +1,15 @@
 import type { Recipe } from './types';
+import type { CameraQualityProfile } from './camera-quality';
 
-const MAX_WIDTH = 1280;
-const MAX_HEIGHT = 720;
+const DEFAULT_PREVIEW_LIMITS = { maxWidth: 1280, maxHeight: 720 } as const;
 type CameraPreviewSource = Exclude<CanvasImageSource, SVGImageElement>;
 
-export function getCameraPreviewSize(width: number, height: number): [number, number] {
-  const scale = Math.min(1, MAX_WIDTH / width, MAX_HEIGHT / height);
+export function getCameraPreviewSize(
+  width: number,
+  height: number,
+  limits: Pick<CameraQualityProfile, 'maxWidth' | 'maxHeight'> = DEFAULT_PREVIEW_LIMITS,
+): [number, number] {
+  const scale = Math.min(1, limits.maxWidth / width, limits.maxHeight / height);
   return [Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))];
 }
 
@@ -70,7 +74,10 @@ function compileShader(gl: WebGLRenderingContext, type: number, source: string):
   return shader;
 }
 
-export function createCameraPreview(canvas: HTMLCanvasElement): {
+export function createCameraPreview(
+  canvas: HTMLCanvasElement,
+  limits: Pick<CameraQualityProfile, 'maxWidth' | 'maxHeight'> = DEFAULT_PREVIEW_LIMITS,
+): {
   render(source: CameraPreviewSource, width: number, height: number, recipe: Recipe): void;
   dispose(): void;
 } {
@@ -144,7 +151,7 @@ export function createCameraPreview(canvas: HTMLCanvasElement): {
     render(source, width, height, recipe) {
       if (disposed) throw new Error('Live correction preview has been disposed.');
       if (contextLost || gl.isContextLost()) throw new Error('Live correction WebGL context was lost.');
-      const [w, h] = getCameraPreviewSize(width, height);
+      const [w, h] = getCameraPreviewSize(width, height, limits);
       const downscaling = w !== width || h !== height;
       if (downscaling) {
         if (uploadCanvas.width !== w) uploadCanvas.width = w;

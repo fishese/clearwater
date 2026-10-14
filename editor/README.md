@@ -163,7 +163,7 @@ Expanded Fit aligns the photo near the top with a small inset while retaining co
 
 ### Camera prototype
 
-On main, the header camera button opens a local Balanced live preview. Take a JPEG or MP4 (optional microphone). Photos retain untouched originals; videos record the corrected canvas directly, up to 720p30, and reopen at zero restoration strength to avoid a second correction. Settings offers 1/3/5-minute limits with approximate memory and storage estimates. No raw video backup is kept. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
+On main, the header camera button opens a local Balanced live preview. Take a JPEG or MP4 (optional microphone). Photos retain untouched originals; videos record the corrected canvas directly, Auto at up to 1080p30 / 12 Mbps on Android or 720p30 / 5 Mbps on web, and reopen at zero restoration strength to avoid a second correction. Settings offers Auto/Standard/High quality and 1/3/5-minute limits with approximate memory and storage estimates. No raw video backup is kept. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
 
 This approach avoids AI inference per frame and uses the GPU for preview; corrected video is rendered at export. MP4 recording is device-dependent ([MediaRecorder support](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported_static)). Native CameraX capture would be a later option for full-sensor photos, more codec control and longer recording.
 

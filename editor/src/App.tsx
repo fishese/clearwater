@@ -212,7 +212,7 @@ export default function App() {
     if(isAndroid()&&file.type==='image/jpeg')file=new File([file],`clearwater-camera-${id}.jpg`,{type:file.type,lastModified:file.lastModified});
     const stored:StoredPhoto={id,file,recipe:clone(recipe),addedAt:Date.now(),...(isAndroid()?{cameraCapture:{...(details?.enhancedVideo?{enhancedVideo:true}:{})}}:{})};
     let rendered:File=file;
-    if(file.type.startsWith('image/')){rendered=await renderCameraPhoto(file,recipe);stored.thumbnail=await cameraThumbnail(rendered);}
+    if(file.type.startsWith('image/')){rendered=await renderCameraPhoto(file,recipe,details?.jpegQuality);stored.thumbnail=await cameraThumbnail(rendered);}
     let collection=false,device=false;
     // Commit the untouched original before exposing the enhanced gallery file.
     try{await savePhoto(stored);collection=true;}catch{setStorageWarning(true);}

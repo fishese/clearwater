@@ -2,8 +2,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff } from 'lucide-react';
 import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
+import { cameraQualityProfile } from './core/camera-quality';
 import { cameraRecordingBudget, getCameraSettings, subscribeCameraSettings } from './core/camera-settings';
 import { analyse } from './core/engine';
+import { isAndroid } from './native';
 import type { Recipe } from './core/types';
 import { t, useLanguage } from './i18n';
 
@@ -12,7 +14,7 @@ export interface CameraHandle {
 }
 
 export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
-export interface CameraCaptureDetails { enhancedVideo?: boolean }
+export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number }
 
 interface CameraProps {
   onCapture: (file: File, recipe: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult>;
@@ -21,7 +23,6 @@ interface CameraProps {
 
 const ANALYSIS_WIDTH = 64;
 const ANALYSIS_HEIGHT = 48;
-const JPEG_QUALITY = 0.94;
 
 function cameraErrorKey(error: unknown): string {
   const name = (error as { name?: string } | null)?.name;
@@ -54,7 +55,8 @@ function recipeForFrame(video: HTMLVideoElement, strength: number): Recipe {
 export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ onCapture, onClose }, ref) {
   useLanguage();
   const cameraSettings = useSyncExternalStore(subscribeCameraSettings, getCameraSettings);
-  const recordingBudget = cameraRecordingBudget(cameraSettings.minutes);
+  const [qualityProfile] = useState(() => cameraQualityProfile(cameraSettings.quality, isAndroid()));
+  const recordingBudget = cameraRecordingBudget(cameraSettings.minutes, qualityProfile);
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const loupeRef = useRef<HTMLCanvasElement>(null);
@@ -183,8 +185,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         audio: false,
         video: {
           facingMode: { ideal: nextFacing },
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
+          width: { ideal: qualityProfile.maxWidth, max: qualityProfile.maxWidth },
+          height: { ideal: qualityProfile.maxHeight, max: qualityProfile.maxHeight },
           frameRate: { ideal: 30, max: 30 },
         },
       });
@@ -202,7 +204,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       video.srcObject = stream;
       video.muted = true;
       video.playsInline = true;
-      const preview = createCameraPreview(canvas);
+      const preview = createCameraPreview(canvas, qualityProfile);
       previewRef.current = preview;
       await video.play();
       if (!aliveRef.current || generation !== generationRef.current) {
@@ -273,7 +275,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setReady(false);
       setStarting(false);
     }
-  }, [facing, recording, strength, releaseCamera]);
+  }, [facing, recording, strength, releaseCamera, qualityProfile]);
 
   startCameraRef.current = startCamera;
 
@@ -383,8 +385,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     }
     try {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('Photo capture failed.')), 'image/jpeg', JPEG_QUALITY));
-      await saveCapture(new File([blob], `clearwater-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }), frozenRecipe);
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('Photo capture failed.')), 'image/jpeg', qualityProfile.jpegQuality));
+      await saveCapture(new File([blob], `clearwater-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }), frozenRecipe, { jpegQuality: qualityProfile.jpegQuality });
     } catch {
       setError('Photo capture failed.');
     } finally {
@@ -393,7 +395,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       photoPendingRef.current = false;
       if (aliveRef.current) setPhotoPending(false);
     }
-  }, [saveCapture, recording, strength]);
+  }, [saveCapture, recording, strength, qualityProfile]);
 
   const startRecording = useCallback(async () => {
     const canvas = previewCanvasRef.current;
@@ -427,7 +429,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       const previewStream = canvas.captureStream(30);
       previewCaptureStreamRef.current = previewStream;
       const combined = new MediaStream(cameraRecordingTracks(previewStream, audio));
-      const recorder = new MediaRecorder(combined, { mimeType: selectedMimeType, videoBitsPerSecond: 5_000_000, ...(microphoneEnabled ? { audioBitsPerSecond: 128_000 } : {}) });
+      const recorder = new MediaRecorder(combined, { mimeType: selectedMimeType, videoBitsPerSecond: qualityProfile.videoBitrate, ...(microphoneEnabled ? { audioBitsPerSecond: qualityProfile.audioBitrate } : {}) });
       const frozen = structuredClone(recipeRef.current ?? recipeForFrame(videoRef.current!, strength / 100));
       frozenRecipeRef.current = frozen;
       chunksRef.current = [];
@@ -483,7 +485,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setError('Could not start recording.');
       setRecording(false);
     } finally { startingRecordingRef.current = false; if (aliveRef.current) setRecordPending(false); }
-  }, [microphoneEnabled, recordingBudget, saveCapture, recording, stopAudio, stopPreviewCapture, stopRecording, strength, videoMimeType]);
+  }, [microphoneEnabled, qualityProfile, recordingBudget, saveCapture, recording, stopAudio, stopPreviewCapture, stopRecording, strength, videoMimeType]);
 
   const stopFromUser = useCallback(() => stopRecording(false), [stopRecording]);
   const flipCamera = useCallback(() => {
