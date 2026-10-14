@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B10000010000000000000001 /* NativeSceneBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000020000000000000001 /* NativeSceneBridgeTests.swift */; };
+		B10000010000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000020000000000000003 /* XCTest.framework */; };
 		A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000001 /* ClearWaterBridgeViewController.swift */; };
 		A10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A10000030000000000000001 /* InfoPlist.strings */; };
 		A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000002 /* ClearWaterExportPlugin.swift */; };
@@ -22,6 +24,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B10000020000000000000001 /* NativeSceneBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSceneBridgeTests.swift; sourceTree = "<group>"; };
+		B10000020000000000000002 /* AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000020000000000000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A10000020000000000000001 /* ClearWaterBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterBridgeViewController.swift; sourceTree = "<group>"; };
 		A10000020000000000000002 /* ClearWaterExportPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterExportPlugin.swift; sourceTree = "<group>"; };
 		A10000040000000000000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -62,6 +67,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000050000000000000001 /* AppTests Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000010000000000000002 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -70,6 +83,7 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				B10000030000000000000001 /* AppTests */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -78,8 +92,17 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				B10000020000000000000002 /* AppTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B10000030000000000000001 /* AppTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000020000000000000001 /* NativeSceneBridgeTests.swift */,
+			);
+			path = AppTests;
 			sourceTree = "<group>";
 		};
 		504EC3061FED79650016851F /* App */ = {
@@ -124,7 +147,42 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B10000060000000000000001 /* AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000090000000000000001 /* Build configuration list for PBXNativeTarget "AppTests" */;
+			buildPhases = (
+				B10000050000000000000003 /* AppTests Sources */,
+				B10000050000000000000001 /* AppTests Frameworks */,
+				B10000050000000000000002 /* AppTests Resources */,
+			);
+			buildRules = ();
+			dependencies = (
+				B10000070000000000000001 /* App target dependency */,
+			);
+			name = AppTests;
+			productName = AppTests;
+			productReference = B10000020000000000000002 /* AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXContainerItemProxy section */
+		B10000080000000000000001 /* Container proxy for App */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 504EC3031FED79650016851F;
+			remoteInfo = App;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		B10000070000000000000001 /* App target dependency */ = {
+			isa = PBXTargetDependency;
+			target = 504EC3031FED79650016851F /* App */;
+			targetProxy = B10000080000000000000001 /* Container proxy for App */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		504EC2FC1FED79650016851F /* Project object */ = {
@@ -137,6 +195,11 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+					};
+					B10000060000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 504EC3031FED79650016851F;
 					};
 				};
 			};
@@ -159,6 +222,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				B10000060000000000000001 /* AppTests */,
 			);
 		};
 /* End PBXProject section */
@@ -168,8 +232,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */,
-				A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */,
+				A10000010000000000000002 /* InfoPlist.strings in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
@@ -179,6 +242,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B10000050000000000000002 /* AppTests Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -186,9 +255,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000010000000000000002 /* InfoPlist.strings in Resources */,
+				A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */,
+				A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B10000050000000000000003 /* AppTests Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000010000000000000001 /* NativeSceneBridgeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -367,6 +445,45 @@
 			};
 			name = Release;
 		};
+		B100000A0000000000000001 /* AppTests Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fishese.clearwater.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/App.app/App";
+			};
+			name = Debug;
+		};
+		B100000A0000000000000002 /* AppTests Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.fishese.clearwater.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/App.app/App";
+			};
+			name = Release;
+		};
+		B100000B0000000000000001 /* Test project Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { IPHONEOS_DEPLOYMENT_TARGET = 26.0; SDKROOT = iphoneos; };
+			name = Debug;
+		};
+		B100000B0000000000000002 /* Test project Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { IPHONEOS_DEPLOYMENT_TARGET = 26.0; SDKROOT = iphoneos; };
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -384,6 +501,24 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000090000000000000001 /* Build configuration list for PBXNativeTarget "AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B100000A0000000000000001 /* AppTests Debug */,
+				B100000A0000000000000002 /* AppTests Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B10000090000000000000002 /* Build configuration list for PBXProject "AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B100000B0000000000000001 /* Test project Debug */,
+				B100000B0000000000000002 /* Test project Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
