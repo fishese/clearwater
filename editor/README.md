@@ -163,7 +163,7 @@ Expanded Fit aligns the photo near the top with a small inset while retaining co
 
 ### Camera prototype
 
-On `codex/camera-prototype`, the header camera button opens a local Balanced live preview. Take a JPEG or a short MP4 (optional microphone); originals and editable correction settings go into the existing editor. Export saves the correction. Recording uses a fixed correction and stops at 60 seconds or 64 MiB. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
+On main, the header camera button opens a local Balanced live preview. Take a JPEG or MP4 (optional microphone). Photos retain untouched originals; videos record the corrected canvas directly, up to 720p30, and reopen at zero restoration strength to avoid a second correction. Settings offers 1/3/5-minute limits with approximate memory and storage estimates. No raw video backup is kept. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
 
 This approach avoids AI inference per frame and uses the GPU for preview; corrected video is rendered at export. MP4 recording is device-dependent ([MediaRecorder support](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported_static)). Native CameraX capture would be a later option for full-sensor photos, more codec control and longer recording.
 
@@ -177,7 +177,7 @@ Web Settings links to the latest signed stable Android APK using `https://github
 
 ### Linked camera gallery photos
 
-New Android camera JPEGs appear enhanced in Pictures/ClearWater, using the selected Balanced correction and white balance. The app keeps untouched originals and editable settings in private storage. Save to gallery updates that same image; Save as exports a separate copy, and Export original makes an unchanged backup. Videos stay original in the gallery until explicitly saved with correction. Older captures are left unchanged because no gallery URI was recorded.
+New Android camera JPEGs appear enhanced in Pictures/ClearWater, using the selected Balanced correction and white balance. The app keeps untouched originals and editable settings in private storage. Save to gallery updates that same image; Save as exports a separate copy, and Export original makes an unchanged backup. New videos show the correction immediately; the private editing source is the same enhanced capture. Later edits can update that gallery file. Older captures are left unchanged because no gallery URI was recorded.
 
 Clear collection preserves linked camera originals/edits. Restore camera collection in Settings recovers their entries without duplicating gallery images. Confirmed deletion of a linked capture removes its gallery image and private original; ordinary imports still remove only the app copy. On Android 11+, gallery trash hides entries while keeping recovery data. Confirmed permanent deletion cleans up originals and settings; inaccessible providers or missing permissions retain data. Source checks work only where a usable Android URI is known. Back up originals before uninstalling/clearing app data.
 

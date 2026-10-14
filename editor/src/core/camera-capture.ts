@@ -1,5 +1,6 @@
 import { makeRecipe } from './engine';
 import { pickNeutralFromPixels } from './white-balance';
+import type { CameraRecordingBudget } from './camera-settings';
 import type { Analysis, Recipe, Suggestion } from './types';
 
 export const CAMERA_VIDEO_MIME_TYPES = [
@@ -21,8 +22,16 @@ export function chooseCameraVideoMimeType(isSupported: (mimeType: string) => boo
   return (withAudio ? CAMERA_AUDIO_VIDEO_MIME_TYPES : CAMERA_VIDEO_MIME_TYPES).find(isSupported) ?? null;
 }
 
-export function cameraRecordingLimitReached(elapsedMs: number, bytes: number): boolean {
-  return elapsedMs >= CAMERA_MAX_RECORDING_MS || bytes >= CAMERA_MAX_RECORDING_BYTES;
+export function cameraRecordingLimitReached(elapsedMs: number, bytes: number, budget?: Pick<CameraRecordingBudget, 'maxMs' | 'maxBytes'>): boolean {
+  return elapsedMs >= (budget?.maxMs ?? CAMERA_MAX_RECORDING_MS) || bytes >= (budget?.maxBytes ?? CAMERA_MAX_RECORDING_BYTES);
+}
+
+/** Combine corrected preview video with optional microphone audio, excluding the raw camera stream. */
+export function cameraRecordingTracks(
+  correctedPreview: Pick<MediaStream, 'getVideoTracks'>,
+  microphone?: Pick<MediaStream, 'getAudioTracks'> | null,
+): MediaStreamTrack[] {
+  return [...correctedPreview.getVideoTracks(), ...(microphone?.getAudioTracks() ?? [])];
 }
 
 /** Gradually follow changing scene analysis to avoid visible balance jumps. */

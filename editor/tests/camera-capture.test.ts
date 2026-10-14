@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
+import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, cameraRecordingTracks, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
 import { analyse } from '../src/core/engine';
 
 describe('camera capture helpers', () => {
@@ -26,6 +26,21 @@ describe('camera capture helpers', () => {
     expect(cameraRecordingLimitReached(59_999, CAMERA_MAX_RECORDING_BYTES - 1)).toBe(false);
     expect(cameraRecordingLimitReached(60_000, 0)).toBe(true);
     expect(cameraRecordingLimitReached(0, 64 * 1024 * 1024)).toBe(true);
+    expect(cameraRecordingLimitReached(60_000, CAMERA_MAX_RECORDING_BYTES, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(false);
+    expect(cameraRecordingLimitReached(180_000, 0, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(true);
+    expect(cameraRecordingLimitReached(0, CAMERA_MAX_RECORDING_BYTES * 3, { maxMs: 180_000, maxBytes: CAMERA_MAX_RECORDING_BYTES * 3 })).toBe(true);
+  });
+
+  it('records corrected preview video and microphone audio without raw camera video', () => {
+    const rawCamera = { id: 'raw-camera' } as MediaStreamTrack;
+    const correctedPreview = { id: 'corrected-preview' } as MediaStreamTrack;
+    const microphone = { id: 'microphone' } as MediaStreamTrack;
+    const tracks = cameraRecordingTracks(
+      { getVideoTracks: () => [correctedPreview] } as unknown as MediaStream,
+      { getAudioTracks: () => [microphone] } as unknown as MediaStream,
+    );
+    expect(tracks).toEqual([correctedPreview, microphone]);
+    expect(tracks).not.toContain(rawCamera);
   });
 
   it('keeps Balanced defaults, applies the requested strength and eases analysis changes', () => {

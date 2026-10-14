@@ -1,7 +1,7 @@
 import type { Recipe } from './core/types';
 import { newestPhotos } from './core/library-order';
 
-export interface CameraCapture { uri?:string; name?:string; renderedSha256?:string }
+export interface CameraCapture { uri?:string; name?:string; renderedSha256?:string; enhancedVideo?:boolean }
 export interface StoredPhoto {
   id:string; file:File; recipe?:Recipe; thumbnail?:string; addedAt?:number; pendingShare?:boolean;
   cameraCapture?:CameraCapture; sourceUri?:string;
