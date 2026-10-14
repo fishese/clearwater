@@ -167,10 +167,18 @@ On `codex/camera-prototype`, the header camera button opens a local Balanced liv
 
 This approach avoids AI inference per frame and uses the GPU for preview; corrected video is rendered at export. MP4 recording is device-dependent ([MediaRecorder support](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported_static)). Native CameraX capture would be a later option for full-sensor photos, more codec control and longer recording.
 
-Camera mode stays open between shots. Android 10+ also saves untouched originals to Pictures/ClearWater (photos) or Movies/ClearWater (video); Android 7-9 uses app-specific storage. Local collection entries retain editable correction recipes. Use White balance to tap a neutral patch; Reset white balance resumes automatic scene analysis. Gallery files remain original captures: use editor Export to save the corrected result.
+Camera mode stays open between shots. Android 10+ saves enhanced JPEGs to Pictures/ClearWater and original video streams to Movies/ClearWater; Android 7-9 uses app-specific storage. Local collection entries retain editable correction recipes. Use White balance to tap a neutral patch; Reset white balance resumes automatic scene analysis. Gallery files remain original captures: use editor Export to save the corrected result.
 
 ## Settings and Android install link
 
 Open the gear beside the brand for language and web offline model preferences. Automatic downloading applies to installed/Home Screen launches and can use mobile data; disable it for manual-only downloading. Individual model checkboxes control caching. Unchecking removes that cached model without changing photos, recipes or custom ONNX storage; using the model again can download it on demand. Completed files survive interruption and unchanged files are reused across updates. Browser retention is best effort; check readiness before travel.
 
 Web Settings links to the latest signed stable Android APK using `https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk`, with separate release notes. Stable releases must include that constant asset filename; experimental debug APKs keep their own names.
+
+### Linked camera gallery photos
+
+New Android camera JPEGs appear enhanced in Pictures/ClearWater, using the selected Balanced correction and white balance. The app keeps untouched originals and editable settings in private storage. Save to gallery updates that same image; Save as exports a separate copy, and Export original makes an unchanged backup. Videos stay original in the gallery until explicitly saved with correction. Older captures are left unchanged because no gallery URI was recorded.
+
+Clear collection preserves linked camera originals/edits. Restore camera collection in Settings recovers their entries without duplicating gallery images. Confirmed deletion of a linked capture removes its gallery image and private original; ordinary imports still remove only the app copy. On Android 11+, gallery trash hides entries while keeping recovery data. Confirmed permanent deletion cleans up originals and settings; inaccessible providers or missing permissions retain data. Source checks work only where a usable Android URI is known. Back up originals before uninstalling/clearing app data.
+
+The collection shows newest additions first. Preview text and controls suppress long-press selection without changing compare, zoom or picker gestures.

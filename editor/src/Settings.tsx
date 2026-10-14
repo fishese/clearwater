@@ -6,7 +6,7 @@ import OfflineModels from './OfflineModels';
 import {isAndroid} from './native';
 
 const models:[OfflineModel,string,string][]=[['wwe','WWE-UIE','3.1 MB'],['shallow','Shallow-UWnet','0.9 MB'],['funie','FUnIE-GAN','28.1 MB']];
-export default function Settings({onClose,parentAbout}:{onClose:()=>void;parentAbout:boolean}){
+export default function Settings({onClose,parentAbout,onRestoreCamera,restoringCamera=false}:{onClose:()=>void;parentAbout:boolean;onRestoreCamera?:()=>void;restoringCamera?:boolean}){
  useLanguage();
  const heading=useRef<HTMLHeadingElement>(null),settings=useSyncExternalStore(subscribeOfflineModels,getOfflineSettings);
  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;heading.current?.focus();const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}};window.addEventListener('keydown',escape);return()=>{window.removeEventListener('keydown',escape);if(previous?.isConnected)previous.focus({preventScroll:true});};},[onClose]);
@@ -23,6 +23,7 @@ export default function Settings({onClose,parentAbout}:{onClose:()=>void;parentA
    </>}
   </section>
   {!isAndroid()&&<section><h2>{t('Android app')}</h2><p>{t('Install the latest signed release APK on Android. Updates use the same link.')}</p><div className="settings-install"><a className="button primary" href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk">{t('Install Android (APK)')}</a><a href="https://github.com/fishese/clearwater/releases/latest" target="_blank" rel="noreferrer">{t('Release notes')}</a></div></section>}
+  {isAndroid()&&onRestoreCamera&&<section><h2>{t('Camera originals')}</h2><p>{t('Clear collection keeps linked camera originals and edits. Restore them here without creating another gallery image.')}</p><button className="button secondary" disabled={restoringCamera} onClick={onRestoreCamera}>{restoringCamera?t('Restoring…'):t('Restore camera collection')}</button></section>}
   <section><h2>{t('Saved edits & models')}</h2><p>{t('Each collection item keeps its own edits and engine choice. Custom ONNX files and settings are remembered on this device; use Forget saved model under Correction Engine to remove them.')}</p></section>
  </main>;
 }

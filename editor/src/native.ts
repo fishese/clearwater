@@ -26,6 +26,9 @@ interface NativeFiles {
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
  createCapture(options:{name:string;type:string}):Promise<{uri:string;name:string;destination:string}>;
+ beginCameraUpdate(options:{uri:string}):Promise<{id:string}>;
+ deleteCameraCapture(options:{uri:string}):Promise<void>;
+ probeAndroidSources(options:{uris:string[]}):Promise<{states:Record<string,'present'|'missing'|'unavailable'|'trashed'>}>;
  beginWrite(options:{uri:string}):Promise<{id:string}>;
  writeChunk(options:{id:string;data:string}):Promise<void>;
  finishWrite(options:{id:string;abort:boolean}):Promise<void>;
@@ -102,20 +105,45 @@ export function listenForAndroidBack(onBack:()=>void):()=>void{
  return ()=>{if(stopped)return;stopped=true;backListeners=Math.max(0,backListeners-1);if(backListeners===0)void back.setEnabled({enabled:false}).catch(()=>{});if(listener)void listener.remove().catch(()=>{});};
 }
 export const exitAndroidApp=()=>back.exitApp();
-export async function saveAndroidCameraCapture(file:File):Promise<void>{
+export async function saveAndroidCameraCapture(file:File):Promise<{uri:string;name:string;destination:string}>{
  if(!isAndroid())throw new Error('Camera captures can only be saved from the Android app.');
  const type=file.type.toLowerCase();
  const video=type==='video/mp4';
  if(!video&&type!=='image/jpeg')throw new Error('Camera captures must be JPEG photos or MP4 videos.');
  if(file.size<=0)throw new Error('The camera capture is empty.');
- const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
- const name=`ClearWater_${stamp}_${crypto.randomUUID()}.${video?'mp4':'jpg'}`;
- const {uri}=await files.createCapture({name,type:video?'video/mp4':'image/jpeg'});
- const {id}=await files.beginWrite({uri});let committed=false;
+ const generatedName=()=>{const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');return `ClearWater_${stamp}_${crypto.randomUUID()}.${video?'mp4':'jpg'}`;};
+ const supplied=file.name;
+ const safeCameraName=/^clearwater-camera-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jpg$/i.test(supplied);
+ const legacyName=/^ClearWater_\d{8}T\d{6}Z_[0-9a-f-]{36}\.(?:jpg|mp4)$/i.test(supplied)&&supplied.toLowerCase().endsWith(video?'.mp4':'.jpg');
+ const name=safeCameraName&&!video||legacyName?supplied:generatedName();
+ const created=await files.createCapture({name,type:video?'video/mp4':'image/jpeg'});
+ const {id}=await files.beginWrite({uri:created.uri});let committed=false;
  try{
   for(let offset=0;offset<file.size;offset+=256*1024){const bytes=new Uint8Array(await file.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}
   await files.finishWrite({id,abort:false});committed=true;
  }finally{if(!committed)await files.finishWrite({id,abort:true}).catch(()=>{});}
+ return created;
+}
+export async function deleteAndroidCameraCapture(uri:string):Promise<void>{
+ if(!isAndroid())throw new Error('Camera captures can only be deleted from the Android app.');
+ await files.deleteCameraCapture({uri});
+}
+export async function replaceAndroidCameraCapture(uri:string,blob:Blob):Promise<void>{
+ if(!isAndroid())throw new Error('Camera captures can only be updated from the Android app.');
+ if(!uri||blob.size<=0)throw new Error('The updated camera photo is empty.');
+ const {id}=await files.beginCameraUpdate({uri});let committed=false;
+ try{
+  for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}
+  await files.finishWrite({id,abort:false});committed=true;
+ }finally{if(!committed)await files.finishWrite({id,abort:true}).catch(()=>{});}
+}
+export async function probeAndroidSources(uris:readonly string[]):Promise<Record<string,'present'|'missing'|'unavailable'|'trashed'>>{
+ const unique=[...new Set(uris.filter(uri=>typeof uri==='string'&&uri.length>0))];
+ if(!isAndroid())return Object.fromEntries(unique.map(uri=>[uri,'unavailable']));
+ if(!unique.length)return {};
+ const result=await files.probeAndroidSources({uris:unique});
+ const valid=new Set(['present','missing','unavailable','trashed']);
+ return Object.fromEntries(unique.map(uri=>[uri,valid.has(result?.states?.[uri])?result.states[uri]:'unavailable']));
 }
 function fileHandle(uri:string,name:string,created=false,size?:number):LocalFileHandle {
  return {name,size,getFile:async()=>{const response=await fetch(Capacitor.convertFileSrc(uri));if(!response.ok)throw new Error('Cannot read source file.');return new File([await response.blob()],name);},async createWritable(){

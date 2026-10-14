@@ -29,7 +29,7 @@ await page.waitForFunction(()=>document.querySelector('.filename')?.textContent.
 await page.waitForFunction(()=>!document.querySelector('.top-actions .primary').disabled);console.log('OFFLINE SHARE TARGET saved and opened the incoming file');
 const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Save recipe',exact:true}).click();const download=await downloadPromise;assert.equal(download.suggestedFilename(),'clearwater-recipe.json');
 await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.photo-tile').length===2);console.log('OFFLINE library persistence passed');
-const sharedId=await page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',1);r.onsuccess=()=>{const db=r.result,q=db.transaction('photos').objectStore('photos').getAll();q.onsuccess=()=>{resolve(q.result.find(p=>p.file.name==='shared-test.png').id);db.close();};q.onerror=()=>reject(q.error);};}));
+const sharedId=await page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('clearwater-library',2);r.onsuccess=()=>{const db=r.result,q=db.transaction('photos').objectStore('photos').getAll();q.onsuccess=()=>{resolve(q.result.find(p=>p.file.name==='shared-test.png').id);db.close();};q.onerror=()=>reject(q.error);};}));
 await page.goto('http://127.0.0.1:4173/?shared='+encodeURIComponent(sharedId));
 await page.waitForFunction(()=>document.querySelector('.filename')?.textContent.includes('shared-test.png'));console.log('Fresh share navigation selects the incoming photo');
 assert.deepEqual(errors,[]);await browser.close();console.log('PWA checks passed.');

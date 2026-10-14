@@ -9,6 +9,7 @@ import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.util.Base64;
 import android.util.AtomicFile;
@@ -31,8 +32,9 @@ public class ClearWaterFilesPlugin extends Plugin {
     private final List<JSObject> shares = new ArrayList<>();
     private String shareError;
     private static class WriteSession {
-        final Uri uri; final OutputStream stream; final boolean mediaStore;
-        WriteSession(Uri uri, OutputStream stream, boolean mediaStore) { this.uri=uri; this.stream=stream; this.mediaStore=mediaStore; }
+        final Uri uri; final OutputStream stream; final boolean mediaStore, cameraCapture, cameraUpdate; final File stageFile, backupFile;
+        WriteSession(Uri uri, OutputStream stream, boolean mediaStore, boolean cameraCapture) { this(uri,stream,mediaStore,cameraCapture,false,null,null); }
+        WriteSession(Uri uri, OutputStream stream, boolean mediaStore, boolean cameraCapture, boolean cameraUpdate, File stageFile, File backupFile) { this.uri=uri;this.stream=stream;this.mediaStore=mediaStore;this.cameraCapture=cameraCapture;this.cameraUpdate=cameraUpdate;this.stageFile=stageFile;this.backupFile=backupFile; }
     }
     private static class ModelWriteSession {
         final AtomicFile atomic; final File target; final FileOutputStream stream; final long expected; final String slot; long written;
@@ -40,6 +42,16 @@ public class ClearWaterFilesPlugin extends Plugin {
     }
     private File modelFile(String slot) { return new File(getContext().getFilesDir(), "custom-model-"+slot+".onnx"); }
     private android.content.SharedPreferences modelPreferences() { return getContext().getSharedPreferences("clearwater-custom-model", android.content.Context.MODE_PRIVATE); }
+    private android.content.SharedPreferences cameraPreferences() { return getContext().getSharedPreferences("clearwater-camera-captures", android.content.Context.MODE_PRIVATE); }
+    private boolean rememberCameraCapture(String uri) {
+        Set<String> entries=new HashSet<>(cameraPreferences().getStringSet("owned",Collections.emptySet()));entries.add(uri);
+        return cameraPreferences().edit().putStringSet("owned",entries).commit();
+    }
+    private boolean ownsCameraCapture(String uri) { return cameraPreferences().getStringSet("owned",Collections.emptySet()).contains(uri); }
+    private boolean forgetCameraCapture(String uri) {
+        Set<String> entries=new HashSet<>(cameraPreferences().getStringSet("owned",Collections.emptySet()));entries.remove(uri);
+        return cameraPreferences().edit().putStringSet("owned",entries).commit();
+    }
     private JSONObject modelDescriptor() throws Exception {
         String value=modelPreferences().getString("descriptor",null);if(value==null)return null;
         JSONObject descriptor=new JSONObject(value);String sha=descriptor.optString("sha256"),name=descriptor.optString("name"),input=descriptor.optString("inputRange"),output=descriptor.optString("outputRange"),slot=descriptor.optString("slot");long size=descriptor.optLong("size",-1);
@@ -192,8 +204,18 @@ public class ClearWaterFilesPlugin extends Plugin {
         Uri uri=Uri.parse(value);boolean mediaStore=isCapture&&"content".equals(uri.getScheme());OutputStream stream;
         try {stream="file".equals(uri.getScheme())?new FileOutputStream(new File(uri.getPath()),false):getContext().getContentResolver().openOutputStream(uri,"wt");if(stream==null)throw new IOException("Could not open new photo.");}
         catch(Exception error){if(isCapture)deleteCapture(uri);else deleteDocument(uri);throw error;}
-        String id=UUID.randomUUID().toString();writes.put(id,new WriteSession(uri,stream,mediaStore));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
+        String id=UUID.randomUUID().toString();writes.put(id,new WriteSession(uri,stream,mediaStore,isCapture));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
     }catch(Exception error){call.reject("Could not open new photo for writing.",error);}}); }
+    @PluginMethod public void beginCameraUpdate(PluginCall call) { io.execute(()->{File stage=null,backup=null;try {
+        String value=call.getString("uri");if(value==null||!ownsCameraCapture(value))throw new IOException("This camera photo is not owned by ClearWater.");
+        Uri uri=Uri.parse(value);if(!("content".equals(uri.getScheme())&&"media".equals(uri.getAuthority()))&&!("file".equals(uri.getScheme())&&isLegacyCaptureFile(new File(uri.getPath()))))throw new IOException("Invalid camera photo URI.");
+        File dir=new File(getContext().getCacheDir(),"camera-updates");if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("Could not prepare camera photo update.");
+        String id=UUID.randomUUID().toString();stage=new File(dir,id+".stage");backup=new File(dir,id+".backup");
+        try(InputStream input="file".equals(uri.getScheme())?new FileInputStream(new File(uri.getPath())):getContext().getContentResolver().openInputStream(uri);OutputStream output=new FileOutputStream(backup)) {
+            if(input==null)throw new IOException("Could not read the current camera photo.");byte[] buffer=new byte[65536];int count;while((count=input.read(buffer))!=-1)output.write(buffer,0,count);
+        }
+        OutputStream stream=new FileOutputStream(stage);writes.put(id,new WriteSession(uri,stream,false,false,true,stage,backup));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
+    }catch(Exception error){if(stage!=null)stage.delete();if(backup!=null)backup.delete();call.reject("Could not prepare camera photo update.",error);}}); }
     @PluginMethod public void writeChunk(PluginCall call) { io.execute(()->{try {
         WriteSession session=writes.get(call.getString("id"));String data=call.getString("data");
         if(session==null || data==null || data.length()>350000)throw new IOException("Invalid write session or chunk.");
@@ -202,13 +224,89 @@ public class ClearWaterFilesPlugin extends Plugin {
     @PluginMethod public void finishWrite(PluginCall call) { io.execute(()->{
         WriteSession session=writes.remove(call.getString("id"));if(session==null){call.reject("Write session is closed.");return;}
         boolean abort=call.getBoolean("abort",false);
-        try {session.stream.close();if(abort)deleteWriteTarget(session);else if(session.mediaStore){ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.IS_PENDING,0);if(getContext().getContentResolver().update(session.uri,values,null,null)!=1)throw new IOException("Could not publish the gallery capture.");}call.resolve();}
-        catch(Exception error){deleteWriteTarget(session);call.reject("Could not finish saving photo.",error);}
+        try {session.stream.close();if(session.cameraUpdate){if(!abort)commitCameraUpdate(session);cleanupCameraUpdate(session);}else if(abort)deleteWriteTarget(session);else if(session.mediaStore){ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.IS_PENDING,0);if(getContext().getContentResolver().update(session.uri,values,null,null)!=1)throw new IOException("Could not publish the gallery capture.");}if(!abort&&session.cameraCapture&&!rememberCameraCapture(session.uri.toString()))throw new IOException("Could not save camera capture ownership.");call.resolve();}
+        catch(Exception error){if(session.cameraUpdate)cleanupCameraUpdate(session);else deleteWriteTarget(session);call.reject("Could not finish saving photo.",error);}
+    }); }
+    private void copyToUri(File source,Uri target) throws IOException {
+        try(InputStream input=new FileInputStream(source);OutputStream output="file".equals(target.getScheme())?new FileOutputStream(new File(target.getPath()),false):getContext().getContentResolver().openOutputStream(target,"wt")) {
+            if(output==null)throw new IOException("Could not open the camera photo.");byte[] buffer=new byte[65536];int count;while((count=input.read(buffer))!=-1)output.write(buffer,0,count);output.flush();
+        }
+    }
+    private void commitCameraUpdate(WriteSession session) throws IOException {
+        if(session.stageFile==null||!session.stageFile.isFile()||session.stageFile.length()==0)throw new IOException("The updated camera photo is empty.");
+        try {copyToUri(session.stageFile,session.uri);if("content".equals(session.uri.getScheme())){ContentValues modified=new ContentValues();modified.put(MediaStore.MediaColumns.DATE_MODIFIED,System.currentTimeMillis()/1000);getContext().getContentResolver().update(session.uri,modified,null,null);getContext().getContentResolver().notifyChange(session.uri,null);}}
+        catch(Exception error) {
+            try {copyToUri(session.backupFile,session.uri);}catch(Exception rollback){error.addSuppressed(rollback);}
+            if(error instanceof IOException)throw (IOException)error;throw new IOException("Could not replace the camera photo.",error);
+        }
+    }
+    private void cleanupCameraUpdate(WriteSession session) {if(session.stageFile!=null)session.stageFile.delete();if(session.backupFile!=null)session.backupFile.delete();}
+    private File legacyCaptureDirectory(boolean video) {
+        File base=getContext().getExternalFilesDir(video?Environment.DIRECTORY_MOVIES:Environment.DIRECTORY_PICTURES);
+        if(base==null)base=getContext().getFilesDir();
+        return new File(base,"ClearWater");
+    }
+    private boolean isLegacyCaptureFile(File file) {
+        try {
+            String path=file.getCanonicalPath(),name=file.getName();
+            if(!name.matches("(?i)(?:ClearWater_\\d{8}T\\d{6}Z_[0-9a-f-]{36}\\.(?:jpg|mp4)|clearwater-camera-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.jpg)"))return false;
+            for(boolean video:new boolean[]{false,true})if(file.getCanonicalFile().getParentFile().equals(legacyCaptureDirectory(video).getCanonicalFile()))return true;
+        } catch(Exception ignored) {}
+        return false;
+    }
+    private String probeSource(Uri uri) {
+        try {
+            String scheme=uri.getScheme();
+            if("file".equals(scheme)) {
+                File file=new File(uri.getPath());if(!isLegacyCaptureFile(file))return "unavailable";
+                return file.isFile()?"present":"missing";
+            }
+            if(!"content".equals(scheme))return "unavailable";
+            boolean media="media".equals(uri.getAuthority())&&Build.VERSION.SDK_INT>=30;
+            Cursor cursor=null;
+            try {
+                String[] columns=media?new String[]{MediaStore.MediaColumns._ID,MediaStore.MediaColumns.IS_TRASHED}:new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE};
+                if(media){Bundle args=new Bundle();args.putInt(MediaStore.QUERY_ARG_MATCH_TRASHED,MediaStore.MATCH_INCLUDE);args.putInt(MediaStore.QUERY_ARG_MATCH_PENDING,MediaStore.MATCH_INCLUDE);cursor=getContext().getContentResolver().query(uri,columns,args,null);}
+                else cursor=getContext().getContentResolver().query(uri,columns,null,null,null);
+            } catch(Exception unsupportedColumn) {
+                if(media)return "unavailable"; // Never mistake a hidden trash row for permanent deletion.
+                cursor=getContext().getContentResolver().query(uri,new String[]{"_id"},null,null,null);
+            }
+            if(cursor==null)return "unavailable";
+            try {
+                if(!cursor.moveToFirst())return "missing";
+                int trashed=cursor.getColumnIndex(MediaStore.MediaColumns.IS_TRASHED);
+                if(trashed>=0&&!cursor.isNull(trashed)&&cursor.getInt(trashed)!=0)return "trashed";
+                return "present";
+            } finally {cursor.close();}
+        } catch(Exception error) {return "unavailable";}
+    }
+    @PluginMethod public void probeAndroidSources(PluginCall call) { io.execute(()->{
+        try {
+            JSArray input=call.getArray("uris");if(input==null)throw new IOException("Missing source URIs.");
+            JSObject states=new JSObject();for(int i=0;i<input.length();i++)try{String value=input.getString(i);if(value==null||value.isEmpty())continue;states.put(value,value.length()>8192?"unavailable":probeSource(Uri.parse(value)));}catch(Exception invalidEntry){/* Keep malformed entries isolated from the rest of the batch. */}
+            JSObject result=new JSObject();result.put("states",states);call.resolve(result);
+        } catch(Exception error) {call.reject("Could not inspect photo sources.",error);}
+    }); }
+    @PluginMethod public void deleteCameraCapture(PluginCall call) { io.execute(()->{
+        String value=call.getString("uri");try {
+            if(value==null||!ownsCameraCapture(value))throw new IOException("This camera photo is not owned by ClearWater.");
+            Uri uri=Uri.parse(value);String scheme=uri.getScheme();
+            if("file".equals(scheme)) {
+                File file=new File(uri.getPath());if(!isLegacyCaptureFile(file))throw new IOException("Invalid camera photo path.");
+                if(file.exists()&&!file.delete())throw new IOException("Could not delete the camera photo.");
+            } else if("content".equals(scheme)&&"media".equals(uri.getAuthority())) {
+                int deleted=getContext().getContentResolver().delete(uri,null,null);
+                if(deleted==0&&!"missing".equals(probeSource(uri)))throw new IOException("Could not delete the camera photo.");
+            } else throw new IOException("Invalid camera photo URI.");
+            if(!forgetCameraCapture(value))throw new IOException("Could not clear camera photo ownership.");
+            call.resolve();
+        } catch(Exception error) {call.reject("Could not delete this camera photo.",error);}
     }); }
     private void deleteDocument(Uri uri){try{DocumentsContract.deleteDocument(getContext().getContentResolver(),uri);}catch(Exception ignored){}}
     private void deleteCapture(Uri uri){try{if("content".equals(uri.getScheme()))getContext().getContentResolver().delete(uri,null,null);else if("file".equals(uri.getScheme()))new File(uri.getPath()).delete();}catch(Exception ignored){}}
     private void deleteWriteTarget(WriteSession session){if(session.mediaStore||"file".equals(session.uri.getScheme()))deleteCapture(session.uri);else deleteDocument(session.uri);}
-    private void cleanupWrite(WriteSession session){try{session.stream.close();}catch(Exception ignored){}deleteWriteTarget(session);}
+    private void cleanupWrite(WriteSession session){try{session.stream.close();}catch(Exception ignored){}if(session.cameraUpdate)cleanupCameraUpdate(session);else deleteWriteTarget(session);}
     private String displayName(Uri uri,String fallback) {
         try(Cursor cursor=getContext().getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(cursor!=null && cursor.moveToFirst())return cursor.getString(0);}catch(Exception ignored){}return fallback;
     }
