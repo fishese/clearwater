@@ -4,6 +4,7 @@ import {nextBackAction,type BackState} from '../src/back-navigation';
 const state=(overrides:Partial<BackState>={}):BackState=>({activeWork:false,clearDialog:false,customDialog:false,saveDialog:false,folderBrowser:false,neutralPicker:false,about:false,adjustmentsOpen:false,expanded:false,narrowControls:false,controlTab:'correction',correctionTab:'engine',lastBackAt:0,now:10,...overrides});
 
 describe('system Back action selection',()=>{
+ it('closes camera before hidden editor views',()=>{expect(nextBackAction(state({camera:true,expanded:true,about:true}))).toBe('camera');});
  it('keeps active processing and saves safe, while About returns to the editor',()=>{
   expect(nextBackAction(state({activeWork:true}))).toBe('busy');
   expect(nextBackAction(state({activeWork:true,about:true}))).toBe('about');

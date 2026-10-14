@@ -160,3 +160,9 @@ Android HDR import uses Media3 1.11.1 to create an SDR working copy on compatibl
 Clear collection removes imported thumbnails, app copies and saved edits after confirmation, leaving originals and exported files on the device untouched. The button gains a subtle highlight at 100 items. Pending web shares survive a clear; saved models, language and output-folder choice are retained.
 
 Expanded Fit aligns the photo near the top with a small inset while retaining corner zoom, pinch and pan controls. Android Back dismisses the current safe view before leaving the editor; root exit requires two presses within two seconds. Active work remains open. Reset all uses the current photo/video defaults; Auto restore retains the chosen engine and follow-up choice.
+
+### Camera prototype
+
+On `codex/camera-prototype`, the header camera button opens a local Balanced live preview. Take a JPEG or a short MP4 (optional microphone); originals and editable correction settings go into the existing editor. Export saves the correction. Recording uses a fixed correction and stops at 60 seconds or 64 MiB. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
+
+This approach avoids AI inference per frame and uses the GPU for preview; corrected video is rendered at export. MP4 recording is device-dependent ([MediaRecorder support](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported_static)). Native CameraX capture would be a later option for full-sensor photos, more codec control and longer recording.

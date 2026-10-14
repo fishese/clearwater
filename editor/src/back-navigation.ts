@@ -1,6 +1,6 @@
 export type BackAction =
  | 'busy' | 'clear-dialog' | 'custom-dialog' | 'save-dialog' | 'folder-browser'
- | 'neutral-picker' | 'about' | 'adjustments' | 'expanded' | 'correction-tab'
+ | 'neutral-picker' | 'camera' | 'about' | 'adjustments' | 'expanded' | 'correction-tab'
  | 'engine-tab' | 'confirm-exit' | 'exit';
 
 export interface BackState {
@@ -11,6 +11,7 @@ export interface BackState {
  folderBrowser:boolean;
  neutralPicker:boolean;
  about:boolean;
+ camera?:boolean;
  adjustmentsOpen:boolean;
  expanded:boolean;
  narrowControls:boolean;
@@ -21,6 +22,7 @@ export interface BackState {
 }
 
 export function nextBackAction(state:BackState):BackAction {
+ if(state.camera)return 'camera';
  if(state.about)return 'about';
  if(state.activeWork)return 'busy';
  if(state.clearDialog)return 'clear-dialog';
