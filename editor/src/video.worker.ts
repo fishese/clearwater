@@ -3,6 +3,7 @@ import {Input,BlobSource,MP4,QTFF,CanvasSink,Conversion,Output,Mp4OutputFormat,B
 import {analyse,renderPixels,parseRecipe} from './core/engine';
 import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,MAX_VIDEO_OUTPUT_BYTES,videoBitrate,videoSize,type VideoInfo} from './core/media';
 import {fitColour,colourHistogram,colourAt,applyColour,sampleTimes,bracket,type ColourNode} from './core/video-colour';
+import {pickNeutralFromPixels} from './core/white-balance';
 import type {Recipe,CustomModel} from './core/types';
 import type {ModelName} from './models';
 
@@ -66,6 +67,19 @@ ctx.onmessage=async({data})=>{
    if(gen!==generation){opened.dispose();opening=undefined;return;}
    const image=wrapped.canvas.getContext('2d')!.getImageData(0,0,previewWidth,previewHeight);input=opened;opening=undefined;track=video;start=first;info=metadata;sink=reader;pixels=image;frameTime=0;
    const original=bitmap(image);send({type:'loaded',gen,width,height,video:info,analysis:analyse(image.data,image.width,image.height),original},[original]);
+  }else if(type==='sample-neutral'&&gen===generation){
+   const recipe=ensureRecipe(data.recipe),time=Number(data.time)||0,image=frameTime===time&&pixels?pixels:await frame(time);if(gen!==generation)return;
+   let base:Uint8ClampedArray|undefined;
+   if(isAI(recipe)){const [a,b]=bracket(timesFor(recipe,info!.duration),time),left=await getNode(recipe,a,gen,request),right=await getNode(recipe,b,gen,request);if(gen!==generation)return;base=applyColour(image.data,colourAt(left,right,time,image.data));}
+   const centerX=Math.max(0,Math.min(image.width-1,Math.round(data.x))),centerY=Math.max(0,Math.min(image.height-1,Math.round(data.y)));
+   const left=Math.max(0,centerX-1),top=Math.max(0,centerY-1),right=Math.min(image.width,centerX+2),bottom=Math.min(image.height,centerY+2);
+   const patch=new Uint8ClampedArray((right-left)*(bottom-top)*4),patchBase=base?new Uint8ClampedArray(patch.length):undefined;
+   for(let y=top;y<bottom;y++)for(let x=left;x<right;x++){
+    const from=(y*image.width+x)*4,to=((y-top)*(right-left)+x-left)*4;
+    patch.set(image.data.subarray(from,from+4),to);if(base&&patchBase)patchBase.set(base.subarray(from,from+4),to);
+   }
+   const picked=pickNeutralFromPixels(patch,recipe,patchBase);
+   send({type:'neutral-picked',gen,request,neutral:picked?.manual.neutral??null});
   }else if(type==='render'&&gen===generation){
    const id=request;lastRequest=id;const recipe=ensureRecipe(data.recipe),time=Number(data.time)||0;
    const image=frameTime===time&&pixels?pixels:await frame(time);if(gen!==generation||id!==lastRequest)return;

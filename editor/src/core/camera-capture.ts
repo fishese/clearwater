@@ -1,4 +1,5 @@
-import { makeRecipe, renderPixels } from './engine';
+import { makeRecipe } from './engine';
+import { pickNeutralFromPixels } from './white-balance';
 import type { Analysis, Recipe, Suggestion } from './types';
 
 export const CAMERA_VIDEO_MIME_TYPES = [
@@ -52,14 +53,7 @@ export function stopStreamTracks(stream?: Pick<MediaStream, 'getTracks'> | null)
   }
 }
 
-/** Neutralise a small raw-camera patch using the current displayed correction. */
+/** Camera patches have no neural model; use the same replacement math as the editor. */
 export function pickCameraNeutral(pixels:Uint8ClampedArray,recipe:Recipe):Recipe|null {
-  const corrected=renderPixels(pixels,recipe),mean=[0,0,0];let count=0;
-  for(let i=0;i<corrected.length;i+=4){if(corrected[i+3]===0)continue;for(let c=0;c<3;c++)mean[c]+=corrected[i+c];count++;}
-  if(!count)return null;
-  for(let c=0;c<3;c++)mean[c]/=count;
-  if(mean.some(v=>v<8||v>245))return null;
-  const target=(mean[0]+mean[1]+mean[2])/3,next=structuredClone(recipe);
-  next.manual.neutral=mean.map((v,c)=>Math.max(.25,Math.min(4,recipe.manual.neutral[c]*target/v))) as [number,number,number];
-  return next;
+  return pickNeutralFromPixels(pixels,recipe);
 }

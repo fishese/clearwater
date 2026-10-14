@@ -79,4 +79,21 @@ describe('photo processor request sequencing',()=>{
   expect(messages.filter(message=>message.type==='exported').map(message=>message.request)).toEqual([32]);
   expect(models.inferField).toHaveBeenCalledTimes(1);
  });
+
+ it('samples an AI corrected photo patch before applying the existing neutral gains',async()=>{
+  const messages:Record<string,unknown>[]=[];
+  const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
+  vi.stubGlobal('self',scope);vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
+  await import('../src/processor.worker');
+  const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
+  await handler({data:{type:'load',gen:1,blob:new Blob()}});
+  const recipe=makeRecipe(analyse(new Uint8ClampedArray([40,80,120,255]),1,1));
+  recipe.engine='wwe';recipe.balancedAfterAI={strength:.3};recipe.manual.neutral=[4,.5,1.7];
+  await handler({data:{type:'sample-neutral',gen:1,request:40,x:1,y:1,recipe}});
+  const picked=messages.find(message=>message.type==='neutral-picked') as {request:number;neutral:number[]|null}|undefined;
+  expect(picked?.request).toBe(40);
+  expect(picked?.neutral).toHaveLength(3);
+  expect(picked?.neutral?.every(value=>Number.isFinite(value)&&value>=.25&&value<=4)).toBe(true);
+  const models=await import('../src/models');expect(models.inferField).toHaveBeenCalledOnce();
+ });
 });

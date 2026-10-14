@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Camera as CameraIcon, Circle, FlipHorizontal, Square, X, Pipette, RotateCcw, Check } from 'lucide-react';
+import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff } from 'lucide-react';
 import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
 import { analyse } from './core/engine';
@@ -53,6 +53,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const loupeRef = useRef<HTMLCanvasElement>(null);
+  const [loupeVisible,setLoupeVisible]=useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -315,6 +317,22 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     finally{savingRef.current=false;if(aliveRef.current)setSavePending(false);}
   },[onCapture]);
 
+  function showPickerLoupe(event:React.PointerEvent<HTMLCanvasElement>){
+    if(!pickingBalance||recordingRef.current||savingRef.current)return;
+    const source=previewCanvasRef.current,loupe=loupeRef.current;
+    if(!source||!loupe||!source.width||!source.height)return;
+    const rect=source.getBoundingClientRect();
+    const x=Math.max(0,Math.min(source.width,(event.clientX-rect.left)/rect.width*source.width));
+    const y=Math.max(0,Math.min(source.height,(event.clientY-rect.top)/rect.height*source.height));
+    const ctx=loupe.getContext('2d');if(!ctx)return;
+    const video=videoRef.current,current=recipeRef.current;
+    if(video&&current)previewRef.current?.render(video,video.videoWidth,video.videoHeight,current);
+    // Fixed-size, event-driven crop: no full-frame readback or extra animation loop.
+    const size=Math.min(36,source.width,source.height);
+    ctx.imageSmoothingEnabled=false;ctx.fillStyle='#091215';ctx.fillRect(0,0,112,112);
+    ctx.drawImage(source,x-size/2,y-size/2,size,size,0,0,112,112);
+    setLoupeVisible(true);
+  }
   function pickBalance(event:React.PointerEvent<HTMLCanvasElement>){
     if(!pickingBalance||recordingRef.current||savingRef.current)return;
     const video=videoRef.current,current=recipeRef.current;
@@ -485,7 +503,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     </header>
     <div className="camera-stage">
       <video ref={videoRef} className="camera-source" muted playsInline aria-hidden="true"/>
-      <canvas ref={previewCanvasRef} className={`camera-preview ${pickingBalance?'picking-balance':''}`} aria-label={t('Balanced preview')} onPointerUp={pickBalance}/>
+      <canvas ref={previewCanvasRef} className={`camera-preview ${pickingBalance?'picking-balance':''}`} aria-label={t('Balanced preview')} onPointerDown={e=>{if(pickingBalance){e.currentTarget.setPointerCapture(e.pointerId);showPickerLoupe(e);}}} onPointerMove={e=>{if(e.buttons)showPickerLoupe(e);}} onPointerUp={pickBalance} onPointerCancel={()=>setLoupeVisible(false)} onLostPointerCapture={()=>setLoupeVisible(false)}/>
+      {pickingBalance&&<div className={`camera-picker-loupe ${loupeVisible?'visible':''}`} aria-hidden="true"><canvas ref={loupeRef} width={112} height={112}/><span/></div>}
       {pickingBalance&&<div className="camera-picker-hint">{t('Tap a white or grey area.')}</div>}
       {(savePending||saveStatus)&&<div className="camera-save-status" role="status">{!savePending&&<Check size={16}/>} {savePending?t('Saving…'):t(saveStatus)}{savedCount>0&&` · ${savedCount}`}</div>}
       {!ready && <div className="camera-loading" aria-live="polite">{starting ? t('Starting camera…') : t('Camera unavailable.')}</div>}
@@ -495,17 +514,16 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     {error && <div className="camera-error" role="alert">{t(error)}{!ready && !starting && <button className="text-button" type="button" onClick={() => void startCamera(facing)}>{t('Retry camera')}</button>}</div>}
     <div className="camera-options">
       <label>{t('Strength')} <output>{strength}%</output><input type="range" aria-label={t('Strength')} min="0" max="100" value={strength} disabled={!ready || recording || recordPending} onChange={event => applyStrength(Number(event.target.value))}/></label>
-      <div className="camera-white-balance"><button type="button" className={`button secondary ${pickingBalance||balanceLocked?'active':''}`} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>setPickingBalance(v=>!v)}><Pipette size={16}/>{pickingBalance?t('Cancel picker'):t('White balance')}</button><button type="button" className="icon-button" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={resetBalance}><RotateCcw size={18}/></button></div>
-      <label className="camera-audio"><input type="checkbox" checked={microphoneEnabled} disabled={recording || starting || recordPending} onChange={event => setMicrophoneEnabled(event.target.checked)}/>{t('Use microphone audio')}</label>
+      <div className="camera-white-balance"><button type="button" className={`camera-control ${pickingBalance||balanceLocked?'active':''}`} aria-label={pickingBalance?t('Cancel picker'):t('White balance')} title={t('White balance')} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>{setPickingBalance(v=>!v);setLoupeVisible(false);}}><Pipette size={28}/></button><button type="button" className="camera-control" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={()=>{setLoupeVisible(false);resetBalance();}}><RotateCcw size={28}/></button><button type="button" className={`camera-control camera-audio ${microphoneEnabled?'active':''}`} aria-label={t('Use microphone audio')} title={t('Use microphone audio')} aria-pressed={microphoneEnabled} disabled={recording||starting||recordPending} onClick={()=>setMicrophoneEnabled(v=>!v)}>{microphoneEnabled?<Mic size={28}/>:<MicOff size={28}/>}</button></div>
       <small>{t('60 second / 64 MB limit')}{recording && ` · ${Math.round(byteLimitPercent)}%`}</small>
     </div>
     {!videoMimeType && <p className="camera-error" role="status">{t('MP4 recording is unavailable on this device. Photos still work.')}</p>}
     <footer className="camera-actions">
-      <button type="button" className="button secondary" disabled={!ready || recording || starting || recordPending || photoPending || savePending} aria-label={t('Flip camera')} onClick={flipCamera}><FlipHorizontal size={17}/>{t('Flip camera')}</button>
-      <button type="button" className="button primary camera-photo" disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void capturePhoto()}><CameraIcon size={18}/>{t('Take photo')}</button>
+      <button type="button" className="camera-control camera-flip" disabled={!ready || recording || starting || recordPending || photoPending || savePending} aria-label={t('Flip camera')} title={t('Flip camera')} onClick={flipCamera}><SwitchCamera size={30}/></button>
+      <button type="button" className="camera-photo" aria-label={t('Take photo')} title={t('Take photo')} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void capturePhoto()}><span aria-hidden="true"/></button>
       {recording
-        ? <button type="button" className="button secondary camera-record" onClick={stopFromUser}><Square size={16} fill="currentColor"/>{t('Stop recording')}</button>
-        : <button type="button" className="button secondary camera-record" disabled={!ready || starting || recordPending || photoPending || savePending || !videoMimeType || (microphoneEnabled && !audioVideoMimeType)} onClick={() => void startRecording()}><Circle size={16} fill="currentColor"/>{t('Record video')}</button>}
+        ? <button type="button" className="camera-record recording" aria-label={t('Stop recording')} title={t('Stop recording')} onClick={stopFromUser}><Square size={25} fill="currentColor"/></button>
+        : <button type="button" className="camera-record" aria-label={t('Record video')} title={t('Record video')} disabled={!ready || starting || recordPending || photoPending || savePending || !videoMimeType || (microphoneEnabled && !audioVideoMimeType)} onClick={() => void startRecording()}><Circle size={30} fill="currentColor"/></button>}
     </footer>
   </div>;
 });

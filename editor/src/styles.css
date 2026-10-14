@@ -365,3 +365,15 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 /* Long-press preview controls compare images instead of selecting their labels. */
 .workspace .canvas-toolbar,.preview-viewport,.workspace-bottom,.expanded-zoom-controls,.camera-stage{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .preview-viewport img,.preview-viewport canvas{-webkit-user-drag:none}
+
+/* Large, icon-only camera targets remain usable through a dive housing. */
+.camera-page .camera-control{width:60px;min-width:60px;height:60px;min-height:60px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid #547275;border-radius:14px;background:#1b3035;color:#d8ecee;touch-action:manipulation}
+.camera-page .camera-control.active{border:2px solid var(--jade);background:#294c43;color:#c1f2dd}
+.camera-options{grid-template-columns:1fr;gap:6px}.camera-options .camera-white-balance{display:flex;justify-content:center;gap:16px}.camera-options .camera-audio{grid-column:auto}.camera-options small{text-align:center}
+.camera-actions{display:flex;justify-content:center;align-items:center;gap:clamp(24px,8vw,64px);padding:6px 0 4px}
+.camera-page .camera-photo{width:88px;min-width:88px;height:88px;min-height:88px;padding:5px;display:grid;place-items:center;border-radius:50%;border:3px solid #e4f2f2;background:transparent;touch-action:manipulation}
+.camera-photo span{display:block;width:100%;height:100%;border-radius:50%;background:#e4f2f2}
+.camera-page .camera-record{width:68px;min-width:68px;height:68px;min-height:68px;border:2px solid #e4f2f2;border-radius:50%;padding:0;display:grid;place-items:center;background:#18292e;color:#ff626b!important;touch-action:manipulation}
+.camera-page .camera-record.recording{background:#49242a}.camera-page button:disabled{opacity:.4}.camera-page button:focus-visible{outline:3px solid var(--jade);outline-offset:3px}.camera-header .icon-button{width:56px;height:56px}
+.camera-picker-loupe{position:absolute;top:12px;right:12px;width:112px;height:112px;border:3px solid #def3ed;border-radius:50%;overflow:hidden;pointer-events:none;display:none;box-shadow:0 2px 12px #0008}.camera-picker-loupe.visible{display:block}.camera-picker-loupe canvas{width:100%;height:100%}.camera-picker-loupe span{position:absolute;inset:0;background:linear-gradient(#ffffffa0,#ffffffa0) center/1px 28px no-repeat,linear-gradient(#ffffffa0,#ffffffa0) center/28px 1px no-repeat}
+@media(max-height:540px) and (min-width:600px){.camera-page{display:grid;grid-template-columns:minmax(0,1fr) 220px;grid-template-rows:auto minmax(0,1fr) auto;gap:6px}.camera-header{grid-column:1/-1}.camera-stage{grid-column:1;grid-row:2/4;min-height:140px}.camera-options{grid-column:2;grid-row:2;align-content:center}.camera-options .camera-white-balance{gap:10px}.camera-actions{grid-column:2;grid-row:3;gap:12px}.camera-page .camera-control{width:56px;min-width:56px;height:56px;min-height:56px}.camera-page .camera-photo{width:76px;min-width:76px;height:76px;min-height:76px}.camera-page .camera-record{width:60px;min-width:60px;height:60px;min-height:60px}.camera-error{grid-column:1/-1}}
