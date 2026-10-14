@@ -9,6 +9,7 @@ try {
  await context.addInitScript(()=>{
   window.webkit={messageHandlers:{bridge:{postMessage(){}}}};
   window.iosExports={};window.iosShared=[];window.iosSWRegistrations=0;
+  window.showDirectoryPicker=async()=>{throw new Error('iOS used browser folder picker');};
   navigator.serviceWorker.register=async()=>{window.iosSWRegistrations++;throw new Error('Native shell registered a worker');};
   const methods=['beginExport','writeExportChunk','finishExport','shareExport','discardExport'];
   window.Capacitor={PluginHeaders:[{name:'ClearWaterExport',methods:methods.map(name=>({name,rtype:'promise'}))}],nativePromise:async(plugin,method,o)=>{

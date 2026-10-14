@@ -46,4 +46,3 @@ export function getPlatformCapabilities():PlatformCapabilities{
  const videoExport=videoEditing&&typeof VideoEncoder!=='undefined'&&(platform!=='ios'||nativeMediaSave);
  return {...platformCapabilities(platform,Capacitor.isNativePlatform(),nativeMediaSave),videoEditing,videoExport};
 }
-

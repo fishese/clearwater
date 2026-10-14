@@ -4,7 +4,8 @@ type PickerWindow=Window&{
   showDirectoryPicker?:(options:{mode:'readwrite'})=>Promise<LocalDirectoryHandle>;
 };
 import {isAndroid,chooseAndroidFolder} from './native';
-export const supportsFolder=()=>isAndroid()||typeof (window as PickerWindow).showDirectoryPicker==='function';
+import {getPlatformCapabilities} from './platform/capabilities';
+export const supportsFolder=()=>isAndroid()||(getPlatformCapabilities().platform==='web'&&typeof (window as PickerWindow).showDirectoryPicker==='function');
 export const chooseFolder=()=>isAndroid()?chooseAndroidFolder():(window as PickerWindow).showDirectoryPicker!({mode:'readwrite'});
 export function restoredName(original:string,format:'jpg'|'png'|'mp4',addRestore=true) {
   const stem=original.replace(/\.[^.]+$/,'').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').replace(/[. ]+$/,'').slice(0,180)||'photo';
