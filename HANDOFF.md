@@ -94,7 +94,7 @@ Standard recording estimates use 5 Mbps video plus up to 128 kbps audio (~39/116
 Camera quality profiles are in core/camera-quality.ts. Auto resolves by platform, with High on Android and Standard on web; explicit choices survive upgrades from older minutes-only settings. Stream negotiation uses ideal resolution with bounded maxima, gracefully allowing a lower actual resolution. WebGL output uses the profile cap without upscaling. High photo JPEG encoding targets 97% versus Standard 94%. These are stream photos, not a native full-sensor camera path.
 
 
-Release 1.0.2 review: camera progress state is quantized to visible seconds/percentages while limits remain precise; Android file chunks use batched base64 encoding. Settings radio groups and guide links have improved accessibility/touch targets. See Maintenance for the iOS sideloading feasibility findings; no native iOS implementation exists yet.
+Release 1.0.2 review: camera progress state is quantized to visible seconds/percentages while limits remain precise; Android file chunks use batched base64 encoding. Settings radio groups and guide links have improved accessibility/touch targets. See Maintenance for the initial iOS sideloading findings and the experimental iOS section below for current shell status.
 
 ## Experimental iOS shell (feature branch only)
 
@@ -107,3 +107,5 @@ Milestone-1 build verified: `bc107a1`, [Actions run 38566623629](https://github.
 Next required user input is physical-phone acceptance: Windows Sideloadly installation, Photos/Files import, offline inference with each supplied model, editing/share cancellation, independent Photos exports and restart retention. Camera stills/GPU Balanced/WB and incremental enhanced MP4 are unimplemented pending this gate. Do not infer phone performance from the CI success.
 
 Phone feedback on milestone-1 IPA: photo editor preview works; Export/share reports unavailable. Root cause is the programmatic SceneDelegate constructing Capacitor's base controller and bypassing local plugin registration. The next IPA must use ClearWaterBridgeViewController for the active scene and run a native launch/bridge regression. Phone export/Photos/cancel and cold-offline gates remain open.
+
+The live native export startup regression passed on ecb0cd8 (run 38578249998): visible app root, plugin detection, and native staged-file transaction. That cold simulator run took about 12 minutes and was cancelled just after the test passed, before device packaging. IPA packaging and simulator checks are now independent jobs; native checks remain enabled by default and may be skipped when rebuilding unchanged, already-tested native code.
