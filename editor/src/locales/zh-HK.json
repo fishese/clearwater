@@ -493,5 +493,15 @@
   "Stream resolution: {0} × {1}": "拍攝解像度：{0} × {1}",
   "Starting camera…": "正在啟動相機…",
   "Camera unavailable.": "相機無法使用。",
-  "Camera uses a local Balanced live preview. Photos and short MP4 recordings keep the original capture with editable correction settings; export from the editor to save the restored result. Photos use stream resolution, without RAW, HDR or GPS/EXIF. Video freezes the correction and records up to 60 seconds or 64 MB. MP4 support depends on the device. Microphone audio is optional. Closing the camera or leaving the app stops camera and microphone access.": "相機使用裝置上的平衡修復即時預覽。相片及短 MP4 影片會保留原始拍攝內容和可調整的修復設定；請在編輯器匯出以儲存修復結果。相片使用串流解像度，不包含 RAW、HDR 或 GPS／EXIF。影片全段使用同一組修復設定，最多錄製 60 秒或 64 MB。MP4 支援視乎裝置而定，並可選擇使用麥克風收音。關閉相機或離開應用程式時，相機及麥克風會停止運作。"
+  "Camera uses a local Balanced live preview. Photos and short MP4 recordings keep the original capture with editable correction settings; export from the editor to save the restored result. Photos use stream resolution, without RAW, HDR or GPS/EXIF. Video freezes the correction and records up to 60 seconds or 64 MB. MP4 support depends on the device. Microphone audio is optional. Closing the camera or leaving the app stops camera and microphone access.": "相機使用裝置上的平衡修復即時預覽。相片及短 MP4 影片會保留原始拍攝內容和可調整的修復設定；請在編輯器匯出以儲存修復結果。相片使用串流解像度，不包含 RAW、HDR 或 GPS／EXIF。影片全段使用同一組修復設定，最多錄製 60 秒或 64 MB。MP4 支援視乎裝置而定，並可選擇使用麥克風收音。關閉相機或離開應用程式時，相機及麥克風會停止運作。",
+  "White balance": "白平衡",
+  "Reset white balance": "重設白平衡",
+  "Tap a white or grey area.": "點選白色或灰色區域。",
+  "Choose a midtone white or grey area.": "請選擇亮度適中的白色或灰色區域。",
+  "Saved on phone.": "已儲存至手機。",
+  "Saved in collection.": "已儲存至相片集。",
+  "Saved in collection. Could not save on phone.": "已儲存至相片集，但無法另存至手機。",
+  "Capture could not be saved. Keep the app open.": "無法儲存拍攝內容，請保持應用程式開啟。",
+  "Saved on phone. Could not save in collection.": "已儲存至手機，但無法儲存至相片集。",
+  "Camera stays open after each capture. Android 10 and later also save originals in Pictures/ClearWater or Movies/ClearWater; older Android versions use app-specific storage. The collection keeps the correction settings for later editing. Browser captures are saved in the local collection. White balance lets you tap a midtone white or grey area in the preview. This locks the current balance until reset, camera switch or camera restart; it changes the preview and editable recipe, not the original file. Export applies the correction.": "每次拍攝後相機會保持開啟。Android 10 或以上亦會將原始檔儲存至 Pictures/ClearWater 或 Movies/ClearWater；較舊版本則使用應用程式專用儲存空間。相片集會保留修復設定，方便稍後編輯。瀏覽器拍攝內容只儲存於本機相片集。白平衡可讓你點選預覽中亮度適中的白色或灰色區域，並保持目前的平衡，直至重設、切換鏡頭或重新啟動相機。這只影響預覽及可調整的設定，不會更改原始檔；匯出時才套用修復。"
 }

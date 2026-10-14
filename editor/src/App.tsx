@@ -6,12 +6,12 @@ import { DEFAULT_MANUAL,DEFAULT_ENHANCEMENT, type Analysis, type Adjustments, ty
 import { clearPhotos, deletePhoto, listPhotos, promoteSharedPhotos, savePhoto, type StoredPhoto } from './storage';
 import {forgetCustomModel,loadRememberedCustomModel,rememberCustomModel} from './custom-model-storage';
 import {supportsFolder,chooseFolder,restoredName,createUniqueFile,writeFile,type LocalDirectoryHandle} from './file-save';
-import {isAndroid,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,type AndroidPhotoFolder} from './native';
+import {isAndroid,saveAndroidCameraCapture,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,type AndroidPhotoFolder} from './native';
 import {nextBackAction,type BackState} from './back-navigation';
 import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
 import About from './About';
-import Camera,{type CameraHandle} from './Camera';
+import Camera,{type CameraHandle,type CameraSaveResult} from './Camera';
 import {isVideo,isRaw,supportedMedia,mediaLimit,videoTime,type VideoInfo} from './core/media';
 import {useStableTabScroll} from './use-stable-tab-scroll';
 
@@ -40,7 +40,7 @@ export default function App() {
   const [about,setAbout]=useState(()=>window.location.hash.startsWith('#about'));
   useEffect(()=>{const change=()=>setAbout(window.location.hash.startsWith('#about'));window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
   function closeAbout(){window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);setAbout(false);}
-  const [cameraOpen,setCameraOpen]=useState(false),cameraRef=useRef<CameraHandle>(null);
+  const [cameraOpen,setCameraOpen]=useState(false),cameraRef=useRef<CameraHandle>(null),cameraLastCapture=useRef<string|null>(null),cameraSession=useRef(0);
   const [updating,setUpdating]=useState(false);
   const [keepMetadata,setKeepMetadata]=useState(true);
   const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0);
@@ -190,6 +190,20 @@ export default function App() {
     const items:Photo[]=accepted.map((file,i)=>({id:crypto.randomUUID(),file,addedAt:addedAt+i/1000,url:URL.createObjectURL(file),past:[],future:[],...(initialRecipe?{recipe:clone(initialRecipe)}:{})}));
     if(items.length){if(!fromFolder){folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);}items.forEach(item=>pendingPhotoWrites.current.add(item.id));setPhotos(all=>[...all,...items]);if(!librarySwitchLock.current){setReady(false);setActive(items[0].id);}items.forEach(persist);}
     return items.map(item=>item.id);
+  }
+  async function saveCameraCapture(file:File,recipe:Recipe):Promise<CameraSaveResult> {
+    const session=cameraSession.current;
+    const stored:StoredPhoto={id:crypto.randomUUID(),file,recipe:clone(recipe),addedAt:Date.now()};
+    if(file.type.startsWith('image/')){
+      try{const bitmap=await createImageBitmap(file);try{const canvas=document.createElement('canvas');const scale=Math.min(160/bitmap.width,160/bitmap.height);canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d')?.drawImage(bitmap,0,0,canvas.width,canvas.height);stored.thumbnail=canvas.toDataURL('image/jpeg',.7);}finally{bitmap.close();}}catch{/* The original can still be saved without a thumbnail. */}
+    }
+    const results=await Promise.allSettled([savePhoto(stored),isAndroid()?saveAndroidCameraCapture(file):Promise.resolve()]);
+    const collection=results[0].status==='fulfilled',device=isAndroid()&&results[1].status==='fulfilled';
+    if(!collection)setStorageWarning(true);
+    // Keep the editor idle during repeated captures; load the latest only on manual exit.
+    setPhotos(all=>[...all,{...stored,url:URL.createObjectURL(file),past:[],future:[]}]);
+    if(cameraSession.current===session)cameraLastCapture.current=stored.id;
+    return {collection,device,deviceExpected:isAndroid()};
   }
   useEffect(()=>{if(!isAndroid())return;let dispose:(()=>void)|undefined,cancelled=false;receiveAndroidPhotos(addFiles,notify).then(cleanup=>{if(cancelled)cleanup();else dispose=cleanup;}).catch(()=>notify(t("Could not enable Android file sharing.")));return()=>{cancelled=true;dispose?.();};},[]);
   useEffect(()=>{
@@ -499,7 +513,7 @@ export default function App() {
   const expandButton=<button className="expand-view-button" disabled={!photo} aria-label={expanded?t("Exit expanded view"):t("Expand photo")} title={expanded?t("Exit expanded view (Esc)"):t("Expand photo")} aria-pressed={expanded} onClick={()=>{expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setExpanded(!expanded);setZoom(1);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button>;
   return <><div hidden={about||cameraOpen} className={`app-shell ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
     <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<LanguageSelect/></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
-      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||hdrConverting||clearingCollection} onClick={()=>setCameraOpen(true)}><CameraIcon size={16}/></button><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" aria-label={video?t("Export video"):t("Export photo")} disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/><span className="export-action-label">{video?t("Export video"):t("Export photo")}</span></button></div></header>
+      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||hdrConverting||clearingCollection} onClick={()=>{cameraSession.current++;cameraLastCapture.current=null;setCameraOpen(true);}}><CameraIcon size={16}/></button><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" aria-label={video?t("Export video"):t("Export photo")} disabled={!canEdit||rendering} onClick={()=>exportPhoto()}><Download size={16}/><span className="export-action-label">{video?t("Export video"):t("Export photo")}</span></button></div></header>
     <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,video/mp4,video/quicktime,.heic,.heif,.dng,.mp4,.mov" aria-label={t("Choose photos")} onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
     <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label={t("Choose recipe")} onChange={readRecipe}/>
     <main className="studio">
@@ -592,7 +606,7 @@ export default function App() {
     {notice&&<div className="toast" role="status"><span>{message(notice)}</span><button aria-label={t("Dismiss message")} onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {hdrConverting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="hdr-conversion-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="hdr-conversion-title">{t("Converting HDR video to SDR")}</h2><p>{t("Preparing HDR video…")}</p><progress max="100" value={hdrProgress}/><span>{hdrProgress}%</span><button className="button secondary" onClick={()=>void cancelHdrWorkingCopy()}>{t("Cancel conversion")}</button></div></div>}
     {exporting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="export-title">{t("Exporting")} {video?t("video"):t("photo")}</h2><p>{saving?t("Saving your restored file…"):video?t("Processing video frames locally. Keep this app open."):t("Rendering your photo at the selected resolution.")}</p><progress max="100" value={progress}/><span>{progress}%</span><button className="button secondary" disabled={saving} onClick={cancelExport}>{t("Cancel export")}</button></div></div>}
-  </div>{about&&<About onClose={closeAbout} customModel={customModel}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>setCameraOpen(false)} onCapture={(file,initialRecipe)=>{const ids=addFiles([file],false,initialRecipe);if(ids.length)setActive(ids[0]);setCameraOpen(false);}}/>}</>;
+  </div>{about&&<About onClose={closeAbout} customModel={customModel}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>{if(cameraLastCapture.current)setActive(cameraLastCapture.current);setCameraOpen(false);}} onCapture={saveCameraCapture}/>}</>;
 }
 
 

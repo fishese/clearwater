@@ -25,6 +25,7 @@ interface NativeFiles {
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string;size?:number}>;
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
+ createCapture(options:{name:string;type:string}):Promise<{uri:string;name:string;destination:string}>;
  beginWrite(options:{uri:string}):Promise<{id:string}>;
  writeChunk(options:{id:string;data:string}):Promise<void>;
  finishWrite(options:{id:string;abort:boolean}):Promise<void>;
@@ -101,6 +102,21 @@ export function listenForAndroidBack(onBack:()=>void):()=>void{
  return ()=>{if(stopped)return;stopped=true;backListeners=Math.max(0,backListeners-1);if(backListeners===0)void back.setEnabled({enabled:false}).catch(()=>{});if(listener)void listener.remove().catch(()=>{});};
 }
 export const exitAndroidApp=()=>back.exitApp();
+export async function saveAndroidCameraCapture(file:File):Promise<void>{
+ if(!isAndroid())throw new Error('Camera captures can only be saved from the Android app.');
+ const type=file.type.toLowerCase();
+ const video=type==='video/mp4';
+ if(!video&&type!=='image/jpeg')throw new Error('Camera captures must be JPEG photos or MP4 videos.');
+ if(file.size<=0)throw new Error('The camera capture is empty.');
+ const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
+ const name=`ClearWater_${stamp}_${crypto.randomUUID()}.${video?'mp4':'jpg'}`;
+ const {uri}=await files.createCapture({name,type:video?'video/mp4':'image/jpeg'});
+ const {id}=await files.beginWrite({uri});let committed=false;
+ try{
+  for(let offset=0;offset<file.size;offset+=256*1024){const bytes=new Uint8Array(await file.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}
+  await files.finishWrite({id,abort:false});committed=true;
+ }finally{if(!committed)await files.finishWrite({id,abort:true}).catch(()=>{});}
+}
 function fileHandle(uri:string,name:string,created=false,size?:number):LocalFileHandle {
  return {name,size,getFile:async()=>{const response=await fetch(Capacitor.convertFileSrc(uri));if(!response.ok)throw new Error('Cannot read source file.');return new File([await response.blob()],name);},async createWritable(){
    if(!created)throw new Error('Existing files cannot be overwritten.');

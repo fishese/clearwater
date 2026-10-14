@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, chooseCameraVideoMimeType, makeCameraRecipe, stopStreamTracks } from '../src/core/camera-capture';
+import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
 import { analyse } from '../src/core/engine';
 
 describe('camera capture helpers', () => {
@@ -52,4 +52,26 @@ describe('camera capture helpers', () => {
     expect(stopB).toHaveBeenCalledOnce();
     expect(() => stopStreamTracks(null)).not.toThrow();
   });
+});
+
+// The sampled live analysis must not erase a user-selected neutral point.
+it('retains manual white balance across scene analysis',()=>{
+ const first=makeCameraRecipe(analyse(new Uint8ClampedArray([40,110,130,255]),1,1));
+ first.manual.neutral=[1.3,.9,.8];
+ const next=makeCameraRecipe(analyse(new Uint8ClampedArray([60,100,120,255]),1,1),.8,first);
+ expect(next.manual.neutral).toEqual([1.3,.9,.8]);
+ expect(next.manual).not.toBe(first.manual);
+});
+
+it('neutralises a useful camera patch without changing the original recipe',()=>{
+ const pixels=new Uint8ClampedArray([90,120,150,255]);
+ const recipe=makeCameraRecipe(analyse(pixels,1,1),0);
+ const picked=pickCameraNeutral(pixels,recipe);
+ expect(picked?.manual.neutral).toEqual([120/90,1,120/150]);
+ expect(recipe.manual.neutral).toEqual([1,1,1]);
+ expect(picked?.auto).toEqual(recipe.auto);
+});
+it('rejects dark, clipped and empty white balance patches',()=>{
+ const recipe=makeCameraRecipe(analyse(new Uint8ClampedArray([80,100,120,255]),1,1),0);
+ for(const pixel of [[0,0,0,255],[255,255,255,255],[80,100,120,0]])expect(pickCameraNeutral(new Uint8ClampedArray(pixel),recipe)).toBeNull();
 });

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Camera as CameraIcon, Circle, FlipHorizontal, Square, X } from 'lucide-react';
-import { makeCameraRecipe, chooseCameraVideoMimeType, CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, stopStreamTracks } from './core/camera-capture';
+import { Camera as CameraIcon, Circle, FlipHorizontal, Square, X, Pipette, RotateCcw, Check } from 'lucide-react';
+import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
 import { analyse } from './core/engine';
 import type { Recipe } from './core/types';
@@ -10,8 +10,10 @@ export interface CameraHandle {
   requestClose(): void;
 }
 
+export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
+
 interface CameraProps {
-  onCapture: (file: File, recipe: Recipe) => void;
+  onCapture: (file: File, recipe: Recipe) => Promise<CameraSaveResult>;
   onClose: () => void;
 }
 
@@ -59,6 +61,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const chunksRef = useRef<Blob[]>([]);
   const recipeRef = useRef<Recipe | null>(null);
   const strengthRef = useRef(80);
+  const whiteBalanceLocked = useRef(false);
+  const savingRef = useRef(false);
   const frozenRecipeRef = useRef<Recipe | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef(0);
@@ -74,6 +78,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [ready, setReady] = useState(false);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState('');
+  const [pickingBalance,setPickingBalance]=useState(false);
+  const [balanceLocked,setBalanceLocked]=useState(false);
+  const [savePending,setSavePending]=useState(false);
+  const [savedCount,setSavedCount]=useState(0);
+  const [saveStatus,setSaveStatus]=useState('');
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [strength, setStrength] = useState(80);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -189,6 +198,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         return;
       }
       const firstRecipe = recipeForFrame(video, strengthRef.current / 100);
+      whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);
       recipeRef.current = firstRecipe;
       setRecipe(firstRecipe);
       preview.render(video, video.videoWidth, video.videoHeight, firstRecipe);
@@ -215,7 +225,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
             const isRecording = recordingRef.current;
             const currentRecipe = isRecording ? frozenRecipeRef.current : recipeRef.current;
             if (currentRecipe) livePreview.render(source, source.videoWidth, source.videoHeight, currentRecipe);
-            if (!isRecording && time - lastAnalysisAt >= 500 && analysisContext) {
+            if (!isRecording && !whiteBalanceLocked.current && time - lastAnalysisAt >= 500 && analysisContext) {
               analysisContext.drawImage(source, 0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
               const pixels = analysisContext.getImageData(0, 0, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
               const analysis = analyse(pixels.data, ANALYSIS_WIDTH, ANALYSIS_HEIGHT);
@@ -291,9 +301,43 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     };
   }, [releaseCamera, stopAudio, stopRecording]);
 
+  const saveCapture = useCallback(async (file:File, frozen:Recipe) => {
+    savingRef.current=true;
+    if(aliveRef.current){setSavePending(true);setSaveStatus('');setError('');}
+    try{
+      const result=await onCapture(file,frozen);
+      if(!aliveRef.current)return;
+      if(result.collection||result.device)setSavedCount(n=>n+1);
+      setSaveStatus(result.device?'Saved on phone.':result.collection?'Saved in collection.':'');
+      if(result.deviceExpected&&!result.device)setError(result.collection?'Saved in collection. Could not save on phone.':'Capture could not be saved. Keep the app open.');
+      else if(!result.collection)setError(result.device?'Saved on phone. Could not save in collection.':'Capture could not be saved. Keep the app open.');
+    }catch{if(aliveRef.current)setError('Capture could not be saved. Keep the app open.');}
+    finally{savingRef.current=false;if(aliveRef.current)setSavePending(false);}
+  },[onCapture]);
+
+  function pickBalance(event:React.PointerEvent<HTMLCanvasElement>){
+    if(!pickingBalance||recordingRef.current||savingRef.current)return;
+    const video=videoRef.current,current=recipeRef.current;
+    if(!video||!current||!video.videoWidth)return;
+    const rect=event.currentTarget.getBoundingClientRect();
+    const x=Math.max(0,Math.min(video.videoWidth-1,(event.clientX-rect.left)/rect.width*video.videoWidth));
+    const y=Math.max(0,Math.min(video.videoHeight-1,(event.clientY-rect.top)/rect.height*video.videoHeight));
+    const patch=document.createElement('canvas');patch.width=9;patch.height=9;
+    const ctx=patch.getContext('2d');if(!ctx)return;
+    const left=Math.max(0,Math.min(video.videoWidth-9,Math.round(x)-4)),top=Math.max(0,Math.min(video.videoHeight-9,Math.round(y)-4));
+    ctx.drawImage(video,left,top,Math.min(9,video.videoWidth),Math.min(9,video.videoHeight),0,0,9,9);
+    const next=pickCameraNeutral(ctx.getImageData(0,0,9,9).data,current);
+    if(!next){setError('Choose a midtone white or grey area.');return;}
+    recipeRef.current=next;setRecipe(next);whiteBalanceLocked.current=true;setBalanceLocked(true);setPickingBalance(false);setError('');
+  }
+  function resetBalance(){
+    whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);
+    if(videoRef.current){const next=recipeForFrame(videoRef.current,strengthRef.current/100);recipeRef.current=next;setRecipe(next);}
+  }
+
   const capturePhoto = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight || recording || photoPendingRef.current) return;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight || recording || photoPendingRef.current || savingRef.current) return;
     photoPendingRef.current = true;
     setPhotoPending(true);
     setError('');
@@ -311,8 +355,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     try {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('Photo capture failed.')), 'image/jpeg', JPEG_QUALITY));
-      if (!aliveRef.current) return;
-      onCapture(new File([blob], `clearwater-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }), frozenRecipe);
+      await saveCapture(new File([blob], `clearwater-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }), frozenRecipe);
     } catch {
       setError('Photo capture failed.');
     } finally {
@@ -321,11 +364,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       photoPendingRef.current = false;
       if (aliveRef.current) setPhotoPending(false);
     }
-  }, [onCapture, recording, strength]);
+  }, [saveCapture, recording, strength]);
 
   const startRecording = useCallback(async () => {
     const stream = cameraStreamRef.current;
-    if (!stream || recordingRef.current || startingRecordingRef.current || photoPendingRef.current || !videoMimeType) return;
+    if (!stream || recordingRef.current || startingRecordingRef.current || photoPendingRef.current || savingRef.current || !videoMimeType) return;
     setError('');
     const selectedMimeType = microphoneEnabled
       ? chooseCameraVideoMimeType(type => MediaRecorder.isTypeSupported(type), true)
@@ -393,7 +436,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           return;
         }
         const extension = 'mp4';
-        onCapture(new File([blob], `clearwater-camera-${Date.now()}.${extension}`, { type: 'video/mp4', lastModified: Date.now() }), frozen);
+        void saveCapture(new File([blob], `clearwater-camera-${Date.now()}.${extension}`, { type: 'video/mp4', lastModified: Date.now() }), frozen);
       };
       recorder.start(250);
       recordingStartedRef.current = performance.now();
@@ -407,13 +450,14 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setError('Could not start recording.');
       setRecording(false);
     } finally { startingRecordingRef.current = false; if (aliveRef.current) setRecordPending(false); }
-  }, [microphoneEnabled, onCapture, recording, stopAudio, stopRecording, strength, videoMimeType]);
+  }, [microphoneEnabled, saveCapture, recording, stopAudio, stopRecording, strength, videoMimeType]);
 
   const stopFromUser = useCallback(() => stopRecording(false), [stopRecording]);
   const flipCamera = useCallback(() => {
     if (recording || starting) return;
     const next = facing === 'environment' ? 'user' : 'environment';
     facingRef.current = next;
+    whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);
     setFacing(next);
     void startCamera(next);
   }, [facing, recording, starting, startCamera]);
@@ -441,7 +485,9 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     </header>
     <div className="camera-stage">
       <video ref={videoRef} className="camera-source" muted playsInline aria-hidden="true"/>
-      <canvas ref={previewCanvasRef} className="camera-preview" aria-label={t('Balanced preview')}/>
+      <canvas ref={previewCanvasRef} className={`camera-preview ${pickingBalance?'picking-balance':''}`} aria-label={t('Balanced preview')} onPointerUp={pickBalance}/>
+      {pickingBalance&&<div className="camera-picker-hint">{t('Tap a white or grey area.')}</div>}
+      {(savePending||saveStatus)&&<div className="camera-save-status" role="status">{!savePending&&<Check size={16}/>} {savePending?t('Saving…'):t(saveStatus)}{savedCount>0&&` · ${savedCount}`}</div>}
       {!ready && <div className="camera-loading" aria-live="polite">{starting ? t('Starting camera…') : t('Camera unavailable.')}</div>}
       {recording && <div className="camera-recording" role="status"><Circle size={11} fill="currentColor"/>{t('Recording')} · {formatElapsed(timeLimit)} / 1:00</div>}
       {ready && videoRef.current && <small className="camera-resolution">{t('Original capture is kept. Export in the editor to save the correction.')} · {t('Stream resolution: {0} × {1}', [videoRef.current.videoWidth, videoRef.current.videoHeight])}</small>}
@@ -449,16 +495,17 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     {error && <div className="camera-error" role="alert">{t(error)}{!ready && !starting && <button className="text-button" type="button" onClick={() => void startCamera(facing)}>{t('Retry camera')}</button>}</div>}
     <div className="camera-options">
       <label>{t('Strength')} <output>{strength}%</output><input type="range" aria-label={t('Strength')} min="0" max="100" value={strength} disabled={!ready || recording || recordPending} onChange={event => applyStrength(Number(event.target.value))}/></label>
+      <div className="camera-white-balance"><button type="button" className={`button secondary ${pickingBalance||balanceLocked?'active':''}`} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>setPickingBalance(v=>!v)}><Pipette size={16}/>{pickingBalance?t('Cancel picker'):t('White balance')}</button><button type="button" className="icon-button" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={resetBalance}><RotateCcw size={18}/></button></div>
       <label className="camera-audio"><input type="checkbox" checked={microphoneEnabled} disabled={recording || starting || recordPending} onChange={event => setMicrophoneEnabled(event.target.checked)}/>{t('Use microphone audio')}</label>
       <small>{t('60 second / 64 MB limit')}{recording && ` · ${Math.round(byteLimitPercent)}%`}</small>
     </div>
     {!videoMimeType && <p className="camera-error" role="status">{t('MP4 recording is unavailable on this device. Photos still work.')}</p>}
     <footer className="camera-actions">
-      <button type="button" className="button secondary" disabled={!ready || recording || starting || recordPending || photoPending} aria-label={t('Flip camera')} onClick={flipCamera}><FlipHorizontal size={17}/>{t('Flip camera')}</button>
-      <button type="button" className="button primary camera-photo" disabled={!ready || recording || starting || recordPending || photoPending} onClick={() => void capturePhoto()}><CameraIcon size={18}/>{t('Take photo')}</button>
+      <button type="button" className="button secondary" disabled={!ready || recording || starting || recordPending || photoPending || savePending} aria-label={t('Flip camera')} onClick={flipCamera}><FlipHorizontal size={17}/>{t('Flip camera')}</button>
+      <button type="button" className="button primary camera-photo" disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void capturePhoto()}><CameraIcon size={18}/>{t('Take photo')}</button>
       {recording
         ? <button type="button" className="button secondary camera-record" onClick={stopFromUser}><Square size={16} fill="currentColor"/>{t('Stop recording')}</button>
-        : <button type="button" className="button secondary camera-record" disabled={!ready || starting || recordPending || photoPending || !videoMimeType || (microphoneEnabled && !audioVideoMimeType)} onClick={() => void startRecording()}><Circle size={16} fill="currentColor"/>{t('Record video')}</button>}
+        : <button type="button" className="button secondary camera-record" disabled={!ready || starting || recordPending || photoPending || savePending || !videoMimeType || (microphoneEnabled && !audioVideoMimeType)} onClick={() => void startRecording()}><Circle size={16} fill="currentColor"/>{t('Record video')}</button>}
     </footer>
   </div>;
 });
