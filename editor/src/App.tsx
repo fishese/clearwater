@@ -81,7 +81,7 @@ export default function App() {
   const lastBackAt=useRef(0),exitPromptTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
-  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
+  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
   const hdrWorkingCopies=useRef(new Map<string,{id:string;file:File}>()),hdrJobId=useRef<string|null>(null),hdrActive=useRef<{generation:number;photoId:string}|null>(null);
   const photoProcessor=useRef<Worker|null>(null),videoProcessor=useRef<Worker|null>(null);
   const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
@@ -260,6 +260,9 @@ export default function App() {
         if(c)thumbnailCanvas.getContext('2d')!.drawImage(c,0,0,thumbnailCanvas.width,thumbnailCanvas.height);
         const thumbnail=c?thumbnailCanvas.toDataURL('image/jpeg',.75):undefined;
         setPhotos(all=>all.map(p=>{if(p.id!==activeRef.current)return p;let next=p.recipe??(data.video?makeRecipe(data.analysis):makePhotoRecipe(data.analysis));return {...p,recipe:next,thumbnail:thumbnail??p.thumbnail};}));
+      } else if(data.type==='neutral-picked'&&data.request===neutralRequest.current) {
+        if(!data.neutral){notify(t("Choose a midtone white or grey area, away from deep shadows and bright highlights."));}
+        else {update(r=>({...r,manual:{...r.manual,neutral:data.neutral}}));notify(t("Neutral point applied. Undo if the selected area was not white or grey."));}
       } else if(data.type==='rendered') {
         if(data.request===latest.current){if(data.analysis)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');}
         data.original?.close();
@@ -391,15 +394,12 @@ export default function App() {
   }
   function cancelExport(){if(saving)return;generation.current++;exportTarget.current=null;worker.current?.postMessage({type:'cancel',gen:generation.current});setExporting(false);notify(t("Export cancelled."));}
   function pickNeutralAt(clientX:number,clientY:number,frame:HTMLDivElement){
-    if(!eyedropper||!canEdit||!editedCanvas.current)return;
-    const c=editedCanvas.current,rect=frame.getBoundingClientRect();
+    if(!eyedropper||!canEdit||!originalCanvas.current||!recipe)return;
+    const c=originalCanvas.current,rect=frame.getBoundingClientRect();
     const x=clamp(Math.floor((clientX-rect.left)/rect.width*c.width),0,c.width-1),y=clamp(Math.floor((clientY-rect.top)/rect.height*c.height),0,c.height-1);
-    const pixel=c.getContext('2d')!.getImageData(Math.max(0,x-1),Math.max(0,y-1),Math.min(3,c.width-x),Math.min(3,c.height-y)).data;
-    const rgb=[0,0,0];for(let i=0;i<pixel.length;i+=4){rgb[0]+=pixel[i];rgb[1]+=pixel[i+1];rgb[2]+=pixel[i+2];}rgb.forEach((_,i)=>rgb[i]/=pixel.length/4);
-    if(Math.min(...rgb)<12||Math.max(...rgb)>245){notify(t("Choose a midtone white or grey area, away from deep shadows and bright highlights."));return;}
-    const target=(rgb[0]+rgb[1]+rgb[2])/3;
-    update(r=>({...r,manual:{...r.manual,neutral:r.manual.neutral.map((v,i)=>clamp(v*target/rgb[i],.25,4)) as [number,number,number]}}));
-    setEyedropper(false);notify(t("Neutral point applied. Undo if the selected area was not white or grey."));
+    const id=++request.current;neutralRequest.current=id;
+    worker.current?.postMessage({type:'sample-neutral',gen:generation.current,request:id,x,y,recipe,time:previewTime});
+    setEyedropper(false);
   }
   function expandedPointerDown(e:ReactPointerEvent<HTMLDivElement>){
     const comparison=!!(e.target as HTMLElement).closest('.comparison-input');

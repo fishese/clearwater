@@ -7,6 +7,7 @@ import {preservePhotoMetadata} from './photo-metadata';
 import {decodePhoto} from './photo-decode';
 import type {PhotoInfo,PhotoResolution,PhotoDevice} from './core/photo-size';
 import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancement';
+import {pickNeutralFromPixels} from './core/white-balance';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
@@ -69,6 +70,20 @@ ctx.onmessage=async({data})=>{
       pixels=c.getImageData(0,0,canvas.width,canvas.height);
       const original=canvas.transferToImageBitmap();
       send({type:'loaded',gen,width:sourceInfo.sourceWidth,height:sourceInfo.sourceHeight,analysis:analyse(pixels.data,pixels.width,pixels.height),original,photo:sourceInfo},[original]);
+    } else if(type==='sample-neutral' && gen===generation && pixels) {
+      const recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
+      if(gen!==generation)return;
+      const followUp=balancedFollowUp(recipe,field);
+      const centerX=Math.max(0,Math.min(pixels.width-1,Math.round(data.x))),centerY=Math.max(0,Math.min(pixels.height-1,Math.round(data.y)));
+      const left=Math.max(0,centerX-1),top=Math.max(0,centerY-1),right=Math.min(pixels.width,centerX+2),bottom=Math.min(pixels.height,centerY+2);
+      const patch=new Uint8ClampedArray((right-left)*(bottom-top)*4),patchBase=field?new Uint8ClampedArray(patch.length):undefined;
+      for(let y=top;y<bottom;y++)for(let x=left;x<right;x++){
+        const from=(y*pixels.width+x)*4,to=((y-top)*(right-left)+x-left)*4;
+        patch.set(pixels.data.subarray(from,from+4),to);
+      }
+      if(field){const sampledBase=transferField(patch,right-left,bottom-top,field,256,top,pixels.height,left,pixels.width);patchBase?.set(sampledBase);}
+      const picked=pickNeutralFromPixels(patch,recipe,patchBase,followUp);
+      send({type:'neutral-picked',gen,request,neutral:picked?.manual.neutral??null});
     } else if(type==='enhance' && gen===generation && pixels) {
       const input=pixels,recipe=data.recipe as Recipe,field=await neural(recipe,gen,request);
       if(gen!==generation||request!==latestPreviewRequest)return;

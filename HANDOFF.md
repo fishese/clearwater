@@ -72,3 +72,5 @@ Settings opens from the gear near the brand (also in About), returns to its logi
 Web Settings offers the signed stable APK at `https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk`. Every stable release must attach this constant-name copy and its SHA-256 sidecar, in addition to any versioned APK, so the link follows GitHub's latest release. This points to stable releases, not experimental debug builds.
 
 Collection entries now show newest additions first, including reloads and shared files. Preview controls suppress text selection and context menus so holding Original compares reliably; pointer cancellation resets the comparison.
+
+White-balance picks now replace prior gains by sampling source pixels before manual white balance, using the active AI correction when applicable. Photo sampling transfers only the selected neural patch; video sampling uses the current preview frame. Repeated red-then-white picks have unit, worker and browser regression coverage.

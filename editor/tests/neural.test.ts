@@ -10,7 +10,9 @@ describe('AI finishing pipeline',()=>{
     const full=transferField(input,2,2,field,2);
     const top=transferField(input.slice(0,8),2,1,field,2,0,2);
     const bottom=transferField(input.slice(8),2,1,field,2,1,2);
+    const corner=transferField(input.slice(12),1,1,field,2,1,2,1,2);
     expect([...top,...bottom]).toEqual([...full]);
+    expect([...corner]).toEqual([...full.slice(12)]);
     expect(full[4]-full[0]).toBe(10);
     expect(full[3]).toBe(255);
   });
