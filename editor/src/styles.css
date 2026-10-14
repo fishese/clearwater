@@ -332,3 +332,14 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 
 @media(min-width:651px){.enhancement-group>summary{padding:0 10px}}
 @media(max-width:650px){.image-label{font-size:8px}.canvas-toolbar .filename{font-size:10px}}
+
+/* Keep image metadata fixed to the preview edge while the image pans underneath. */
+.preview-viewport{position:relative;display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.preview-viewport>.stage{height:0;min-height:0;max-height:none;flex:1}
+.preview-info{position:absolute;left:8px;bottom:6px;z-index:2;max-width:calc(100% - 16px);padding:3px 6px;border-radius:4px;background:#0b171dcc;color:#c5d4d3;font-size:11px;line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.workspace-bottom>div{margin-left:auto}
+@media(max-width:650px){
+ .app-shell:not(.expanded-photo) .preview-viewport{height:36dvh;min-height:210px;max-height:380px;flex:none}
+ .workspace-bottom{flex-wrap:nowrap;min-height:44px;padding:2px 8px}
+ .workspace-bottom>div{margin-left:0}
+}

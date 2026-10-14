@@ -34,6 +34,11 @@ try{
    await page.locator('[data-control-tab=enhancement]').click();
    for(const sub of ['colour','light','clarity','effects']){await page.locator(`[data-control-subtab=${sub}]`).click();await check(width,sub);}
    await page.locator('[data-control-tab=export]').click();await check(width,'export');
+   const preview=await page.locator('.preview-viewport').boundingBox(),info=await page.locator('.preview-info').boundingBox();
+   assert.ok(preview.height<=306&&preview.height>=210,'Normal mobile preview is compact');
+   assert.ok(info.y>=preview.y&&info.y+info.height<=preview.y+preview.height,'Resolution stays inside preview');
+   assert.equal(await page.locator('.workspace-bottom>span').count(),0);
+   assert.ok((await page.locator('.preview-info').innerText()).includes(' MP'));
    assert.equal(await page.locator('.canvas-tools .expand-view-button').count(),0);
    await page.locator('.workspace-bottom .expand-view-button').click();await page.locator('.expanded-zoom-controls .expand-view-button').waitFor();await check(width,'expanded');
    await page.locator('.expanded-zoom-controls .expand-view-button').click();

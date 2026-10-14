@@ -65,6 +65,52 @@ try{
       await checkNav('correction','engine');
       assert.ok(await page.locator('#control-subpanel-engine .analysis-note').isVisible(),`${width}px ${language}: analysis explanation stays visible`);
       assert.ok(await page.locator('.engine-details select').isVisible(),`${width}px ${language}: engine selector stays visible`);
+      if(language==='en'&&width===390){
+        await page.evaluate(()=>{const tabs=document.querySelector('.main-control-tabs');if(tabs)window.scrollTo(0,window.scrollY+tabs.getBoundingClientRect().top-96);});
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const baseline=await page.evaluate(()=>({y:window.scrollY,top:document.querySelector('.main-control-tabs')?.getBoundingClientRect().top??NaN}));
+        const assertTabScrollStable=async label=>{
+          await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+          const current=await page.evaluate(()=>({y:window.scrollY,top:document.querySelector('.main-control-tabs')?.getBoundingClientRect().top??NaN}));
+          assert.ok(Math.abs(current.y-baseline.y)<=1,`390px en ${label}: tab switch preserves window scrollY (${baseline.y} → ${current.y})`);
+          assert.ok(Math.abs(current.top-baseline.top)<=1,`390px en ${label}: main tab bar stays at the same viewport position (${baseline.top} → ${current.top})`);
+        };
+        await page.locator('[data-control-subtab="dive"]').click();await assertTabScrollStable('correction subtab');
+        await page.locator('[data-control-tab="enhancement"]').click();await assertTabScrollStable('enhancement tab');
+        await page.locator('[data-control-subtab="effects"]').click();await assertTabScrollStable('enhancement subtab');
+        await page.locator('[data-control-tab="export"]').click();await assertTabScrollStable('export tab');
+        await page.locator('[data-control-tab="correction"]').click();await assertTabScrollStable('return to correction');
+        await page.locator('[data-control-subtab="engine"]').click();await assertTabScrollStable('return to engine');
+        await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const bottomBefore=await page.evaluate(()=>({y:window.scrollY,max:document.documentElement.scrollHeight-innerHeight}));
+        await page.evaluate(()=>document.querySelector('[data-control-tab="export"]')?.click());
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const bottomExport=await page.evaluate(()=>({y:window.scrollY,max:document.documentElement.scrollHeight-innerHeight}));
+        assert.ok(Math.abs(bottomExport.y-bottomBefore.y)<=1,`390px en bottom: shorter Export preserves window scrollY (${bottomBefore.y} → ${bottomExport.y})`);
+        assert.ok(Math.abs(bottomExport.max-bottomBefore.max)<=1,`390px en bottom: shorter Export preserves document height (${bottomBefore.max} → ${bottomExport.max})`);
+        await page.evaluate(()=>document.querySelector('[data-control-tab="correction"]')?.click());
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const bottomCorrection=await page.evaluate(()=>({y:window.scrollY,max:document.documentElement.scrollHeight-innerHeight}));
+        assert.ok(Math.abs(bottomCorrection.y-bottomBefore.y)<=1,`390px en bottom: longer Correction preserves window scrollY (${bottomBefore.y} → ${bottomCorrection.y})`);
+        assert.ok(Math.abs(bottomCorrection.max-bottomBefore.max)<=1,`390px en bottom: longer Correction preserves document height (${bottomBefore.max} → ${bottomCorrection.max})`);
+
+        await page.setViewportSize({width:390,height:600});
+        await page.evaluate(()=>document.querySelector('[data-control-tab="export"]')?.click());
+        await page.evaluate(()=>window.scrollTo(0,0));
+        await page.getByRole('button',{name:'Expand photo'}).click();
+        await page.locator('.adjustments-toggle').click();
+        await page.locator('.controls').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+        const expandedTop=await page.locator('.controls').evaluate(el=>el.scrollTop);
+        assert.ok(expandedTop>0,`390px en expanded: adjustment sheet is internally scrollable (${expandedTop})`);
+        await page.evaluate(()=>document.querySelector('[data-control-tab="enhancement"]')?.click());
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        const expandedAfter=await page.locator('.controls').evaluate(el=>el.scrollTop);
+        assert.ok(Math.abs(expandedAfter-expandedTop)<=1,`390px en expanded: tab switch preserves controls scrollTop (${expandedTop} → ${expandedAfter})`);
+        await page.evaluate(()=>document.querySelector('[data-control-subtab="colour"]')?.click());
+        await page.evaluate(()=>document.querySelector('[data-control-tab="correction"]')?.click());
+        await page.getByRole('button',{name:'Exit expanded view'}).click();
+      }
       if(language==='en'&&[320,390].includes(width))await page.screenshot({path:path.join(outputDir,`controls-${width}-en-engine.png`),fullPage:true});
       for(const button of await page.locator('.main-control-tabs button:visible,.correction-subtabs.is-visible button:visible').all())assert.ok((await button.boundingBox()).height>=40,`${width}px ${language}: tabs have touch-sized hit areas`);
       await page.locator('[data-control-subtab="dive"]').focus();await page.keyboard.press('Home');await checkNav('correction','engine');
@@ -135,7 +181,7 @@ try{
       assert.equal(await page.locator('#control-panel-correction').evaluate(node=>getComputedStyle(node).display),'contents');
       assert.equal(await page.locator('.light-clarity-group').count(),1,`${width}px ${language}: one combined desktop light/clarity group`);
       assert.equal(await page.locator('.light-clarity-grid input[type=range]').count(),5,`${width}px ${language}: desktop retains five manual sliders`);
-      const autoButton=page.getByRole('button',{name:'Auto enhance'});
+      const autoButton=page.locator('.auto-enhance-button');
       const readyPaint=await autoButton.evaluate(button=>{const style=getComputedStyle(button);return {background:style.backgroundColor,border:style.borderTopColor};});
       assert.deepEqual(readyPaint,{background:'rgba(0, 0, 0, 0)',border:'rgb(142, 203, 180)'},`${width}px ${language}: desktop ready state has a mint outline`);
       await autoButton.evaluate(button=>button.classList.add('is-applied'));await page.waitForTimeout(180);
