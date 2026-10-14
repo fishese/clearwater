@@ -14,6 +14,11 @@ try{
   const png=await page.evaluate(async()=>{const c=new OffscreenCanvas(96,72);c.getContext('2d').fillRect(0,0,96,72);return Array.from(new Uint8Array(await (await c.convertToBlob()).arrayBuffer()));});
   await page.locator('input[type=file][multiple]').setInputFiles({name:'mobile-type.png',mimeType:'image/png',buffer:Buffer.from(png)});
   await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
+  const hold=page.locator('.workspace-bottom button').first();
+  assert.equal(await hold.evaluate(el=>getComputedStyle(el).userSelect),'none','Hold label cannot be text-selected');
+  assert.equal(await hold.evaluate(el=>el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))),false,'Preview suppresses long-press menu');
+  await hold.dispatchEvent('pointerdown',{pointerId:8,pointerType:'touch'});await page.waitForFunction(()=>document.querySelector('.original-canvas')?.style.clipPath==='none');
+  await hold.dispatchEvent('pointercancel',{pointerId:8,pointerType:'touch'});await page.waitForFunction(()=>document.querySelector('.original-canvas')?.style.clipPath!=='none');
   const check=async(width,section)=>{
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${language}/${width}/${section}: page overflow`);
    const bad=await page.evaluate(()=>{
@@ -46,6 +51,9 @@ try{
   }
   await page.setViewportSize({width:390,height:844});await page.locator('[data-control-tab=correction]').click();await page.locator('[data-control-subtab=dive]').click();await page.screenshot({path:fileURLToPath(new URL(`../../analysis/photo-check/mobile-type-${language}.png`,import.meta.url)),fullPage:true});
   for(const width of [901,1280,1920]){await page.setViewportSize({width,height:900});const summary=page.locator('.enhancement-group>summary');const gap=await summary.evaluate(el=>{const node=[...el.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());const range=document.createRange();range.selectNodeContents(node);return range.getBoundingClientRect().left-el.getBoundingClientRect().left;});assert.ok(gap>=9,`${language}/${width}: Effects label needs inset padding`);}
+  await page.locator('input[type=file][multiple]').setInputFiles({name:'newer-photo.png',mimeType:'image/png',buffer:Buffer.from(png)});
+  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
+  assert.equal(await page.locator('.photo-select').first().getAttribute('title'),'newer-photo.png');await page.reload();await page.locator('.photo-select').first().waitFor();assert.equal(await page.locator('.photo-select').first().getAttribute('title'),'newer-photo.png','Newest-first order survives reload');
   assert.deepEqual(errors,[]);await page.close();
  }
  console.log('PASS EN/中/日, mobile typography, unwrapped tabs/radios, footer zoom/expand and no overflow at 320–650px');

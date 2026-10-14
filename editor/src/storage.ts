@@ -1,3 +1,4 @@
+import { newestPhotos } from './core/library-order';
 import type { Recipe } from './core/types';
 export interface StoredPhoto { id:string; file:File; recipe?:Recipe; thumbnail?:string;addedAt?:number;pendingShare?:boolean }
 const DB='clearwater-library';
@@ -22,7 +23,7 @@ function enqueueWrite<T>(run:()=>Promise<T>):Promise<T>{
   writeQueue=next.then(()=>undefined,()=>undefined);
   return next;
 }
-export const listPhotos=async()=>((await transaction('readonly',s=>s.getAll())) as StoredPhoto[]).filter(photo=>photo.pendingShare!==true).sort((a,b)=>(a.addedAt??0)-(b.addedAt??0)||a.file.name.localeCompare(b.file.name));
+export const listPhotos=async()=>newestPhotos(((await transaction('readonly',s=>s.getAll())) as StoredPhoto[]).filter(photo=>photo.pendingShare!==true));
 export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(()=>transaction('readwrite',s=>s.put(photo)));
 export const deletePhoto=(id:string)=>enqueueWrite(()=>transaction('readwrite',s=>s.delete(id)));
 /** Move service-worker share records into the visible collection after intake completes. */
