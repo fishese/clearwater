@@ -95,3 +95,9 @@ Camera quality profiles are in core/camera-quality.ts. Auto resolves by platform
 
 
 Release 1.0.2 review: camera progress state is quantized to visible seconds/percentages while limits remain precise; Android file chunks use batched base64 encoding. Settings radio groups and guide links have improved accessibility/touch targets. See Maintenance for the iOS sideloading feasibility findings; no native iOS implementation exists yet.
+
+## Experimental iOS shell (feature branch only)
+
+`codex/ios-native-camera` contains the milestone-1 Capacitor iOS shell, bundled supplied models, explicit platform guards and a local `ClearWaterExport` share bridge. The shell has no camera: AVFoundation stills/preview and incremental enhanced recording await the first phone acceptance gate in IOS_PLAN.md. iOS video editing remains gated separately from shared web/Android support. System sharing creates independent Files/Photos copies; no Photos asset linking, deletion or replacement is implemented.
+
+Use the plan's final implementation section for build identity, verification and outstanding device tests. Native export stages bounded chunks into transient scoped files and cleans them after sharing/cancellation; imported photo persistence continues using existing IndexedDB. This is not the later native camera manifest/archive design. Android/web capture, recovery and signing/versioning remain on their existing paths. Main and unrelated local edits are preserved.
