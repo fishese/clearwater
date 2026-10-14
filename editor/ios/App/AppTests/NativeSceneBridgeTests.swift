@@ -12,6 +12,7 @@ final class NativeSceneBridgeTests: XCTestCase {
             bridgeController = UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
                 .flatMap(\.windows)
+                .filter { $0.isKeyWindow && !$0.isHidden }
                 .compactMap { $0.rootViewController as? ClearWaterBridgeViewController }
                 .first
             if bridgeController != nil { break }
