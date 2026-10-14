@@ -1,3 +1,4 @@
+import {changeLanguage,readLanguage} from './settings-helpers.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -38,7 +39,7 @@ try{
       window.Worker=class extends NativeWorker{constructor(...args){super(...args);window.__cwWorkerCount++;const send=this.postMessage.bind(this);this.postMessage=(data,...rest)=>{window.__cwWorkerMessages.push(data?.type??'unknown');return send(data,...rest);};}};
     });
     await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
-    await page.locator('.language-select').first().selectOption(language);
+    await changeLanguage(page,language);
     await page.locator('input[type=file][multiple]').setInputFiles({name:'synthetic-dive.png',mimeType:'image/png',buffer:png});
     await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
     const workerBaseline=await page.evaluate(()=>({count:window.__cwWorkerCount,messages:window.__cwWorkerMessages.length}));

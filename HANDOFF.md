@@ -2,7 +2,7 @@
 
 ## Current product
 
-ClearWater is a local-first React/TypeScript/Vite editor with web/PWA and Capacitor Android builds. No server-side image processing or account system. Interface and guide support English, Hong Kong Traditional Chinese (standard written Chinese, not Cantonese) and Japanese. A compact EN / 中 / 日 header selector switches language without restarting processing or changing edits. Browser language supplies the first default; a saved choice overrides it.
+ClearWater is a local-first React/TypeScript/Vite editor with web/PWA and Capacitor Android builds. No server-side image processing or account system. Interface and guide support English, Hong Kong Traditional Chinese (standard written Chinese, not Cantonese) and Japanese. A compact EN / 中 / 日 selector in Settings switches language without restarting processing or changing edits. Browser language supplies the first default; a saved choice overrides it.
 
 Photos: JPEG, PNG, HEIC/HEIF and compatible Android DNG / Apple ProRAW; JPEG/PNG export with supported EXIF/GPS retention enabled by default. RAW develops into 8-bit sRGB. JPEG-XL DNG and HDR photo tone mapping are unsupported.
 
@@ -62,3 +62,11 @@ Mobile controls use slightly larger text (main tabs/selects 13px, most labels 12
 Narrow tab navigation preserves scroll position by retaining the tallest settings region seen for the current photo and viewport width. Keyboard focus uses preventScroll, and expanded adjustments preserve their internal scroll position. This may leave unused settings space after switching to a shorter panel; it prevents the page height from collapsing beneath the reader.
 
 `editor/src/use-stable-tab-scroll.ts` owns the narrow tab height reservation and scroll restoration; layout is remeasured when settings content grows, and reservations reset for a new photo, viewport width or expanded mode. The layered controls browser check covers main/subtab switching, document-bottom scroll and expanded internal scroll.
+
+## Settings and installed-PWA offline models
+
+Settings opens from the gear near the brand (also in About), returns to its logical parent with Back/Escape, and holds language plus web offline preferences. `src/offline-models.ts` stores preferences in `clearwater-offline-settings`; installed/Home Screen detection enables automatic downloads by default, selecting WWE-UIE and Shallow-UWnet. FUnIE-GAN is unchecked initially. Selected models plus shared WASM dependencies total about 19 MB by default, 47 MB with all models. Android bundles all supplied models and skips the web download controls. Custom-model files and per-photo engine choices retain their existing persistence rules.
+
+`build-sw.mjs` generates optional-asset SHA-256 digests. The worker stores verified ONNX/WASM responses in a stable cache scoped to the app base path, migrates matching legacy cached files, reuses unchanged assets after UI updates and prunes outdated hashes. Required app install remains small and independent. Downloads run sequentially, preserve finished files on interruption and retry missing files on foreground/connectivity events; a partial file is restarted. Deselecting removes that model cache only; on-demand editor use can fetch/cache it again. Automatic download can be disabled; manual download and readiness remain in Settings. Custom weights, user photos and third-party files are excluded from this model cache.
+
+Web Settings offers the signed stable APK at `https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk`. Every stable release must attach this constant-name copy and its SHA-256 sidecar, in addition to any versioned APK, so the link follows GitHub's latest release. This points to stable releases, not experimental debug builds.
