@@ -1,3 +1,5 @@
+import type { AIEngine } from './bundled-models';
+
 export type Scene = 'auto' | 'underwater' | 'surface';
 export type Water = 'auto' | 'blue' | 'green';
 export type Filter = 'auto' | 'yes' | 'no';
@@ -21,7 +23,7 @@ export interface Adjustments {
   neutral: [number, number, number];
 }
 export interface Recipe {
-  version: 1; engine: 'balanced' | 'baseline' | 'shallow' | 'funie' | 'wwe' | 'wave'; strength: number;
+  version: 1; engine: 'balanced' | 'baseline' | AIEngine; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
   customModel?: CustomModel;
   enhancement?: PhotoEnhancement;

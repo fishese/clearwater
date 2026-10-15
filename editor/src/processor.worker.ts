@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import {aiStatusLabel,isAIEngine} from './core/bundled-models';
 import { analyse, renderPixels, suggest } from './core/engine';
 import {DEFAULT_MANUAL,type Recipe,CustomModel,Suggestion} from './core/types';
 import { transferField } from './core/neural-field';
@@ -20,12 +21,12 @@ let followUpSuggestions=new Map<string,Suggestion>();
 let customModel:CustomModel|undefined;
 let customTask:Promise<unknown>=Promise.resolve();
 async function neural(recipe:Recipe,gen:number,request:number):Promise<Float32Array|undefined> {
-  if(recipe.engine!=='shallow'&&recipe.engine!=='funie'&&recipe.engine!=='wwe'&&recipe.engine!=='wave')return;
+  if(!isAIEngine(recipe.engine))return;
   if(recipe.engine==='wave')await customTask;
   const name=recipe.engine,cache=fields,bitmap=source!;
   if(name==='wave'&&(!customModel||(recipe.customModel&&(recipe.customModel.sha256!==customModel.sha256||recipe.customModel.inputRange!==customModel.inputRange||recipe.customModel.outputRange!==customModel.outputRange))))throw new Error('Load the matching custom ONNX file and range settings for this recipe.');
   if(!cache.has(name)) {
-    send({type:'model-status',gen,request,message:`Loading and running ${{shallow:'Shallow-UWnet',funie:'FUnIE-GAN',wwe:'WWE-UIE',wave:'custom ONNX model'}[name]}…`});
+    send({type:'model-status',gen,request,message:`Loading and running ${aiStatusLabel(name)}…`});
     const snapshot=new OffscreenCanvas(256,256),c=snapshot.getContext('2d')!;
     c.imageSmoothingQuality='high';c.drawImage(bitmap,0,0,256,256);
     const promise=import('./models').then(m=>m.inferField(name,snapshot));
@@ -139,7 +140,9 @@ ctx.onmessage=async({data})=>{
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
-      const rendered=await canvas.convertToBlob({type:data.format==='png'?'image/png':'image/jpeg',quality:.95});
+      const blobOptions:{type:string;quality?:number}={type:data.format==='png'?'image/png':'image/jpeg'};
+      if(data.format!=='png')blobOptions.quality=data.jpegQuality===0.99?0.99:0.95;
+      const rendered=await canvas.convertToBlob(blobOptions);
       const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
       send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});

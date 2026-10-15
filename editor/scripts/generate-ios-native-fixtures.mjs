@@ -13,7 +13,7 @@ const compile = (file, replacements = []) => {
 };
 const stripImports = (file) => compile(file).replace(/^import .*?;\s*$/gm, '');
 const shared = await import(`data:text/javascript;base64,${Buffer.from([
-  stripImports('src/core/types.ts'), stripImports('src/core/engine.ts'), stripImports('src/core/white-balance.ts'), stripImports('src/core/camera-capture.ts'),
+  stripImports('src/core/bundled-models.ts'), stripImports('src/core/types.ts'), stripImports('src/core/engine.ts'), stripImports('src/core/white-balance.ts'), stripImports('src/core/camera-capture.ts'),
 ].join('\n')).toString('base64')}`);
 const engine = shared, wb = shared, types = shared;
 

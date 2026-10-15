@@ -18,13 +18,14 @@ class FakeImageData {
  constructor(public data:Uint8ClampedArray,public width:number,public height:number){}
 }
 class FakeCanvas {
+ static lastBlobOptions:{type?:string;quality?:number}|undefined;
  constructor(public width:number,public height:number){}
  getContext(){return {
   drawImage:vi.fn(),clearRect:vi.fn(),putImageData:vi.fn(),
   getImageData:()=>{const data=new Uint8ClampedArray(this.width*this.height*4);for(let i=0;i<data.length;i+=4){data[i]=40;data[i+1]=80;data[i+2]=120;data[i+3]=255;}return {data,width:this.width,height:this.height};},
  };}
  transferToImageBitmap(){return {width:this.width,height:this.height,close:vi.fn()};}
- convertToBlob(){return Promise.resolve(new Blob());}
+ convertToBlob(options?:{type?:string;quality?:number}){FakeCanvas.lastBlobOptions=options;return Promise.resolve(new Blob());}
 }
 
 describe('photo processor request sequencing',()=>{
@@ -59,6 +60,20 @@ describe('photo processor request sequencing',()=>{
   const second=handler({data:{type:'enhance',gen:1,request:21,recipe}});
   await Promise.all([first,second]);
   expect(messages.filter(message=>message.type==='error').map(message=>message.request)).toEqual([21]);
+ });
+
+ it('uses the requested JPEG quality while keeping the default at 0.95',async()=>{
+  const messages:Record<string,unknown>[]=[];
+  const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
+  vi.stubGlobal('self',scope);vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
+  await import('../src/processor.worker');
+  const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
+  await handler({data:{type:'load',gen:1,blob:new Blob()}});
+  const recipe=makeRecipe(analyse(new Uint8ClampedArray([40,80,120,255]),1,1));
+  await handler({data:{type:'export',gen:1,request:1,recipe,format:'jpg',jpegQuality:.99,keepMetadata:false}});
+  expect(FakeCanvas.lastBlobOptions).toEqual({type:'image/jpeg',quality:.99});
+  await handler({data:{type:'export',gen:1,request:2,recipe,format:'jpg',keepMetadata:false}});
+  expect(FakeCanvas.lastBlobOptions).toEqual({type:'image/jpeg',quality:.95});
  });
 
  it('reuses cached AI inference when Balanced after AI strength or dive hints change',async()=>{

@@ -1,4 +1,5 @@
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {basename, join, resolve} from 'node:path';
@@ -25,7 +26,17 @@ function checkApp(app){
  const build=run('xcrun',['vtool','-show-build',executable]);if(!/^\s*platform IOS\s*$/m.test(build))fail(`app executable is not built for physical iOS: ${build}`);
  const web=join(app,'public'),html=join(web,'index.html');if(!existsSync(html))fail('missing bundled public/index.html');
  if(!/\b(?:src|href)="\/assets\//.test(readFileSync(html,'utf8')))fail('index.html does not use root-relative asset paths');
- for(const model of ['shallow','funie','wwe'])if(!existsSync(join(web,'models',`${model}.onnx`)))fail(`missing bundled ${model}.onnx model`);
+ const modelDir=join(web,'models'),manifestFile=join(modelDir,'manifest.json');
+ if(!existsSync(manifestFile))fail('missing bundled model manifest');
+ const modelManifest=JSON.parse(readFileSync(manifestFile,'utf8'));
+ if(!Object.keys(modelManifest).length)fail('empty bundled model manifest');
+ for(const [id,metadata] of Object.entries(modelManifest)){
+  const file=join(modelDir,id+'.onnx');
+  if(!existsSync(file))fail('missing bundled '+id+' model');
+  const bytes=readFileSync(file);
+  if(bytes.length!==metadata.bytes||createHash('sha256').update(bytes).digest('hex')!==metadata.sha256)fail('bundled '+id+' model does not match the shipping manifest');
+ }
+ for(const file of readdirSync(modelDir))if(file.endsWith('.onnx')&&!Object.hasOwn(modelManifest,file.slice(0,-5)))fail('unlisted bundled model '+file);
  const webFiles=allFiles(web);
  for(const asset of ['ort-wasm-simd-threaded.wasm','ort-wasm-simd-threaded.mjs','libraw.wasm']){
   const dot=asset.lastIndexOf('.'),stem=asset.slice(0,dot),ext=asset.slice(dot);

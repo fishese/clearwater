@@ -30,7 +30,9 @@ function valueFor(value:unknown,type:string):unknown {
  }
  if(type==='Undefined'){
   if(typeof value==='number'&&Number.isInteger(value)&&value>=0&&value<=255)return binary([value]);
-  if(typeof value==='string'&&value.length<=8192)return value;
+  // Undefined EXIF tags are bytes, not text. Keep piexifjs' binary-string
+  // representation byte-for-byte and reject decoded Unicode strings.
+  if(typeof value==='string'&&value.length<=8192&&Array.from(value).every(c=>c.charCodeAt(0)<=255))return value;
   if((Array.isArray(value)||ArrayBuffer.isView(value))&&(value as ArrayLike<number>).length<=8192)return binary(value as ArrayLike<number>);
   throw new Error('Invalid bytes');
  }
@@ -46,6 +48,32 @@ function valueFor(value:unknown,type:string):unknown {
  return array.length===1?array[0]:array;
 }
 
+async function rawJpegUserComment(source:Blob|Uint8Array):Promise<string|undefined> {
+ try{
+  // exifr exposes Undefined values as strings and can UTF-8-replace bytes in
+  // an EXIF Unicode UserComment. Read this one tag through piexifjs directly,
+  // whose JPEG loader returns the original APP1 bytes as a binary string.
+  const head=source instanceof Blob
+   ?new Uint8Array(await source.slice(0,131072).arrayBuffer())
+   :source.subarray(0,131072);
+  if(head[0]!==255||head[1]!==216)return;
+  let offset=2;
+  while(offset+4<=head.length&&head[offset]===255){
+   while(head[offset]===255)offset++;
+   const marker=head[offset++];
+   if(marker===218||marker===217)break;
+   if(marker===1||(marker>=208&&marker<=215))continue;
+   const size=(head[offset]<<8)|head[offset+1],start=offset+2,end=offset+size;
+   if(size<2||end>head.length)break;
+   if(marker===225&&end-start>=6&&binary(head.subarray(start,start+6))==='Exif\0\0'){
+    const value=piexif.load(binary(head.subarray(start,end))).Exif?.[37510];
+    return typeof value==='string'?value:undefined;
+   }
+   offset=end;
+  }
+ }catch{return;}
+}
+
 export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:number):Promise<{exif?:Uint8Array;warning?:string}> {
  try{
   const options={translateKeys:false,translateValues:false,reviveValues:false,mergeOutput:false,sanitize:false,
@@ -53,10 +81,12 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
    ifd1:false,interop:false,makerNote:false,userComment:true,xmp:false,icc:false,iptc:false,jfif:false,ihdr:false,silentErrors:false};
   const parsed=await parse(source,options);
   if(!parsed)return {};
+  const userComment=await rawJpegUserComment(source);
   const output:Record<string,Directory>={'0th':{},Exif:{},GPS:{}};
   let copied=0,skipped=false;
   for(const [block,target] of [['ifd0','0th'],['exif','Exif'],['gps','GPS']]){
-   for(const [key,value] of Object.entries(parsed[block]??{})){
+   for(const [key,parsedValue] of Object.entries(parsed[block]??{})){
+    const value=block==='exif'&&Number(key)===37510&&userComment!==undefined?userComment:parsedValue;
     const tag=Number(key),info=piexif.TAGS[target][tag];
     if(!info||(target==='0th'&&!ifd0Tags.has(tag))||(target==='Exif'&&excludedExif.has(tag)))continue;
     try{output[target][tag]=valueFor(value,info.type);copied++;}catch{skipped=true;}

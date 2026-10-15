@@ -17,7 +17,7 @@ const testHashes=Object.fromEntries(Object.entries(modelBodies).map(([path,body]
 workerSource=workerSource.replace(/const OPTIONAL_HASHES=\{[^;]+\};/,`const OPTIONAL_HASHES=${JSON.stringify(testHashes)};`);
 const selectedModels=['wwe','shallow'];
 const selectedPaths=optional.filter(path=>path.endsWith('.wasm')||selectedModels.some(model=>path.endsWith('/'+model+'.onnx')));
-const funiePath=optional.find(path=>path.endsWith('/funie.onnx'));
+const fiveaPath=optional.find(path=>path.endsWith('/fivea.onnx'));
 let failingPath=selectedPaths.find(path=>path.endsWith('/wwe.onnx'));
 let failEnabled=true;
 let corruptNext=false;
@@ -84,7 +84,7 @@ try{
     });
   });
 
-  await page.evaluate(path=>fetch(path).then(response=>{if(!response.ok)throw new Error('on-demand model fetch failed');}),funiePath);
+  await page.evaluate(path=>fetch(path).then(response=>{if(!response.ok)throw new Error('on-demand model fetch failed');}),fiveaPath);
   const initial=await callWorker('OFFLINE_MODELS_STATUS',{models:selectedModels});
   assert.deepEqual(initial,{state:'incomplete',cached:0,total:selectedPaths.length},'Selected status must exclude an on-demand unselected model.');
   holdPath=failingPath;
@@ -100,10 +100,10 @@ try{
   const retried=await callWorker('CACHE_OFFLINE_MODELS',{models:selectedModels});
   assert.deepEqual(retried,{state:'ready',cached:selectedPaths.length,total:selectedPaths.length},'Retry should fetch only the missing model.');
   assert.equal(modelHits.get(failingPath),3,'Retries should resume only the one missing asset.');
-  assert.equal(modelHits.get(funiePath),1,'Bulk caching should skip unselected models.');
+  assert.equal(modelHits.get(fiveaPath),1,'Bulk caching should skip unselected models.');
 
   await context.setOffline(true);
-  const offlineResults=await page.evaluate(async paths=>Promise.all(paths.map(async path=>({path,status:(await fetch(path)).status}))),[...selectedPaths,funiePath]);
+  const offlineResults=await page.evaluate(async paths=>Promise.all(paths.map(async path=>({path,status:(await fetch(path)).status}))),[...selectedPaths,fiveaPath]);
   assert.ok(offlineResults.every(result=>result.status===200),'Selected models, shared WASM, and explicitly loaded unselected model should load offline.');
   await page.reload();await page.getByRole('heading').waitFor();
 
@@ -124,9 +124,9 @@ try{
   assert.deepEqual(refreshed,{state:'ready',cached:selectedPaths.length,total:selectedPaths.length},'A changed model should download and validate at its new digest.');
   assert.equal(modelHits.get(failingPath),4,'A changed model should be fetched again after its digest changes.');
 
-  const removed=await callWorker('REMOVE_OFFLINE_MODEL',{model:'funie'});
+  const removed=await callWorker('REMOVE_OFFLINE_MODEL',{model:'fivea'});
   assert.deepEqual(removed,{state:'ready',cached:selectedPaths.length,total:selectedPaths.length},'Removing an unselected model should preserve selected models and shared runtimes.');
-  const removalCheck=await page.evaluate(async path=>{const cache=await caches.open((await caches.keys()).find(name=>name.startsWith('clearwater-models-')));return (await cache.keys()).some(request=>new URL(request.url).pathname===path);},funiePath);
+  const removalCheck=await page.evaluate(async path=>{const cache=await caches.open((await caches.keys()).find(name=>name.startsWith('clearwater-models-')));return (await cache.keys()).some(request=>new URL(request.url).pathname===path);},fiveaPath);
   assert.equal(removalCheck,false,'Deselecting a model should remove its cached model file.');
   await context.close();
   console.log(`PASS optional offline cache protocol (${optional.length} ONNX/WASM assets): selection, on-demand, stop/retry, digest validation, cold offline fetch, UI-only reuse, changed-model redownload, and targeted removal.`);

@@ -1,11 +1,12 @@
+import {BUNDLED_MODEL_IDS,migrateOfflineModelSelection,type BundledModelId} from './core/bundled-models';
 import {getPlatformCapabilities} from './platform/capabilities';
-export type OfflineModel='wwe'|'shallow'|'funie';
+export type OfflineModel=BundledModelId;
 export type OfflineModelState={state:'checking'|'downloading'|'ready'|'incomplete';cached:number;total:number};
 export type OfflineSettings={automatic:boolean;models:OfflineModel[]};
-const key='clearwater-offline-settings',allowed:OfflineModel[]=['wwe','shallow','funie'];
+const key='clearwater-offline-settings',allowed:OfflineModel[]=[...BUNDLED_MODEL_IDS];
 function loadSettings():OfflineSettings{
- try{const saved=JSON.parse(localStorage.getItem(key)??'null');if(saved&&typeof saved.automatic==='boolean'&&Array.isArray(saved.models))return {automatic:saved.automatic,models:allowed.filter(m=>saved.models.includes(m))};}catch{/* Keep session defaults if storage is unavailable. */}
- return {automatic:true,models:['wwe','shallow']};
+ try{const saved=JSON.parse(localStorage.getItem(key)??'null');if(saved&&typeof saved.automatic==='boolean'&&Array.isArray(saved.models))return {automatic:saved.automatic,models:migrateOfflineModelSelection(saved.models)};}catch{/* Keep session defaults if storage is unavailable. */}
+ return {automatic:true,models:[...allowed]};
 }
 let settings=loadSettings(),snapshot:OfflineModelState={state:'checking',cached:0,total:0};
 const listeners=new Set<()=>void>();

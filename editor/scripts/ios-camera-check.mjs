@@ -12,7 +12,7 @@ try {
  await context.addInitScript(({photoId,videoId})=>{
   const listeners=new Map();
   const url=(id,part)=>`file:///mock/ClearWater/${id}/${part}`;
-  const descriptor=(id,kind,name,addedAt)=>({schemaVersion:1,id,kind,name,type:kind==='photo'?'image/jpeg':'video/mp4',sourceUrl:url(id,'source'),thumbnailUrl:url(id,'thumbnail'),width:kind==='photo'?96:640,height:kind==='photo'?64:360,bytes:kind==='photo'?4096:16384,addedAt,recipeVersion:1,recipe:{engine:'balanced',strength:0,manual:{},enhancement:null},visible:true,pending:false,photosSaved:true,...(kind==='video'?{duration:2,fps:30,codec:'h264'}:{})});
+  const descriptor=(id,kind,name,addedAt)=>({schemaVersion:1,id,kind,name,type:kind==='photo'?'image/jpeg':'video/mp4',sourceUrl:url(id,'source'),thumbnailUrl:url(id,'thumbnail'),width:kind==='photo'?96:640,height:kind==='photo'?64:360,bytes:kind==='photo'?4096:16384,addedAt,recipeVersion:1,recipe:{version:1,engine:'balanced',strength:kind==='photo'?.8:0,hints:{scene:'auto',water:'auto',filter:'auto',depth:null},auto:{gains:[1,1,1],redMix:0,haze:0,highlights:0,mode:'gentle',explanation:'Captured Balanced correction'},manual:{warmth:0,tint:0,red:0,exposure:0,highlights:0,shadows:0,contrast:0,haze:0,vibrance:0,neutral:[1,1,1]}},visible:true,pending:false,photosSaved:true,...(kind==='video'?{duration:2,fps:30,codec:'h264'}:{})});
   const video=descriptor(videoId,'video','mock-native-video.mp4',Date.now()-1000);
   let saved;try{saved=JSON.parse(localStorage.getItem('__iosCameraMock')??'null');}catch{}
   const state=saved??{captures:[video],calls:{open:0,acknowledge:[],setVisible:[],delete:[],photosSave:0,share:[],sourceFetches:[],thumbnailFetches:[]},openResolve:null};
@@ -87,6 +87,7 @@ try {
  assert.deepEqual(state.calls.sourceFetches,[photoId],'opening the newly captured photo should read its source');
  assert.equal(state.calls.thumbnailFetches.includes(photoId),true,'native still should load through its thumbnail file URI');
  assert.deepEqual(errors,[],'native still capture should not produce page errors');
+ assert.equal(await page.getByLabel('Correction engine',{exact:true}).inputValue(),'balanced','captured still keeps its native Balanced recipe');
 
  // Unsupported WebCodecs must leave an existing native video shareable as its thumbnail.
  await page.locator('.photo-select[title="mock-native-video.mp4"]').click();

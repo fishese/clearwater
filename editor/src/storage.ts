@@ -1,3 +1,4 @@
+import { migrateRetiredEngine } from './core/engine';
 import type { Recipe } from './core/types';
 import { newestPhotos } from './core/library-order';
 import type { IOSCaptureDescriptor } from './platform/ios-camera';
@@ -9,6 +10,9 @@ export interface StoredPhoto {
   cameraCapture?:CameraCapture; sourceUri?:string; nativeCapture?:NativeCaptureSource; previewFile?:File;
 }
 type PhotoMetadata=Omit<StoredPhoto,'file'|'previewFile'|'nativeCapture'>;
+function withCurrentEngines<T extends {recipe?:Recipe}>(photo:T):T {
+  return photo.recipe?{...photo,recipe:migrateRetiredEngine(photo.recipe as Recipe & {engine:string}) as Recipe}:photo;
+}
 const DB='clearwater-library';
 const PHOTOS='photos';
 const CAMERA_ORIGINALS='camera-originals';
@@ -65,8 +69,8 @@ export const listPhotos=async()=>{
     if(row.pendingShare===true)continue;
     const original=row.cameraCapture?archived.get(row.id):undefined;
     if(row.cameraCapture&&!original)continue;
-    if(original)joined.push({...original,...row,file:namedCameraFile(original,row)});
-    else if(hasFile((row as PhotoMetadata&{file?:unknown}).file))joined.push(row as StoredPhoto);
+    if(original)joined.push(withCurrentEngines({...original,...row,file:namedCameraFile(original,row)}));
+    else if(hasFile((row as PhotoMetadata&{file?:unknown}).file))joined.push(withCurrentEngines(row as StoredPhoto));
   }
   return newestPhotos(joined);
 };
@@ -112,7 +116,7 @@ export async function listCameraOriginals():Promise<StoredPhoto[]> {
   const metadata=new Map(photos.filter(p=>validCameraCapture(p.cameraCapture)).map(p=>[p.id,p]));
   return newestPhotos(originals.filter(p=>hasFile(p.file)&&validCameraCapture(p.cameraCapture)).map(original=>{
     const current=metadata.get(original.id);
-    return {...original,...current,file:namedCameraFile(original,current)};
+    return withCurrentEngines({...original,...current,file:namedCameraFile(original,current)});
   }));
 };
 /** Move service-worker share records into the visible collection after intake completes. */

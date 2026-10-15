@@ -1,6 +1,6 @@
 # iOS native camera and sideloading plan
 
-Status: shell preview/export accepted by user; native camera/recording implementation in progress, 14 October 2026, on codex/ios-native-camera. Android/web baseline: release 1.0.2, main d9a0a06. Shell build and device acceptance are tracked at the end of this plan; native camera milestones are pending.
+Status: native camera/recording implemented and 17 hosted native tests pass. Current main 233331d merged; final current-model IPA packaging and physical-phone acceptance pending, 15 October 2026. Work remains isolated on codex/ios-native-camera.
 
 ## Outcome and scope
 
@@ -186,3 +186,13 @@ Install the unsigned physical-device IPA over the existing app with the same loc
 Outstanding phone tests: actual photo size/quality/EXIF, preview colour/framerate, front mirroring/loupe, hardware WB, microphone routing/audio sync, interruptions/thermal/memory/disk-full behavior, Photos permission/retry/cancel, long 3/5-minute limits and update retention. Cold-offline inference for every supplied model remains unreported. A successful package/simulator does not establish these hardware results.
 
 Native CI checkpoint: commit 3206b42 produced an unsigned physical-device IPA in run 38729680857 and passed compiled-plugin/Metal/offline/privacy checks. Hosted tests actually executed Metal: CPU/GPU reference parity, five manifest/recovery cases, AAC timeline, startup bridge, limits/cancel/profile/empty-writer checks passed. Two writer tests failed (7 assertions total): inferred final sample length after a timestamp gap, and compressed-reader marker buffers counted as images. These are fixed by explicitly ending the writer session and checking decoded image samples; that earlier IPA is not the final delivery. A synthetic portrait test was added after correcting whole-frame analysis sampling. Final verification is pending at commit ee22678, run 38731452603 (17 native tests). Do not mark the camera phone gate complete from the earlier package.
+
+### Verified native suite and current-main integration
+
+Run 38731452603 at ee22678b449f8341f22db25f855086ce4fa1a52f succeeded: 17 hosted XCTest cases, 0 failures and no skips. Metal CPU/GPU reference parity, whole-portrait statistics, replacement WB, manifest recovery, production corrected H.264 decode/timestamps, optional AAC sync, duration/byte guards, cancellation/empty clips, sizing/neutral editor recipe, and active WKWebView camera/export registration all passed. Native result artifact: 11971047643. This is simulator verification, not sensor/microphone hardware performance.
+
+While capture work ran, committed main advanced to 233331d with current model migration and export quality/metadata fixes. That exact snapshot is merged into the feature branch, preserving the main checkout and its unrelated changes. Android native/signing/version files match this main snapshot; no new Android version or signing values were authored here. Bundled models now follow main: WWE-UIE, Five A+ and Shallow-UWnet (2,017,128 bytes total), replacing the retired FUnIE-GAN. The native package validator checks each shipping model's size/hash and rejects unlisted ONNX files. Shared engine parity fixtures regenerate byte-identically, so Balanced native math is unchanged.
+
+Post-merge validation: 142 tests in 25 files, production build, native-camera mock with valid Balanced recipes and all-language Settings, iOS shell export mock, web camera GPU parity/MP4/audio/lifecycle/permissions, Android linked gallery/save/delete/trash, archive migration/recovery, Settings offline inference, About, mobile readability and generated JPEG/PNG metadata round trips all pass. The valid native-video recipe fixture caught a stale-ready render request that could leave collection clearing disabled; unloaded/unsupported native sources now suppress that request. Native Swift/project/test/fixture files are byte-identical to the successful ee22678 suite.
+
+Final packaging may therefore skip repeating the unchanged native suite while rerunning shared tests, iOS sync, device compilation and manifest checks. The previously accepted EXIF warning is not a current phone result: main's metadata fixes are included, and actual iOS metadata exports still need retesting. No merge into main, stable publication, Apple credentials or signing changes are involved.

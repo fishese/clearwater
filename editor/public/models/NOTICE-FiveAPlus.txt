@@ -1,0 +1,5 @@
+Five A+ Network (FAPlusNet, alpha-0.1 checkpoint)
+Paper: arXiv:2305.08824 (BMVC 2023). Code: https://github.com/Owen718/FiveAPlus-Network
+Upstream has no licence file. Use in ClearWater (including this ONNX conversion) was permitted by author Tian Ye
+for non-commercial use, on condition of crediting the paper and linking the repository. Commercial use requires
+contacting Prof. Erkang Chen.
