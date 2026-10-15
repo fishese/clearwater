@@ -312,7 +312,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             if state == "recording" { stopRecordingWithError(text("Recording stopped because the camera is under heavy load.", "Recording stopped because the camera is under heavy load.")) }
             else if state == "ready" { statusLabel.text = text("Camera load is high; let the device cool before recording.", "Camera load is high; let the device cool before recording.") }
         case .nominal, .fair: break
-        @unknown default: break
+        default: break
         }
     }
     private func sessionRuntimeError(_ notification: Notification) {

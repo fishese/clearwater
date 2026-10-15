@@ -1,5 +1,6 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
+import {changeLanguage} from './settings-helpers.mjs';
 
 // Browser integration with a mocked Capacitor iOS camera bridge. This exercises
 // the shared editor/bridge flow; it does not run Swift or validate camera hardware.
@@ -34,7 +35,7 @@ try {
     if(plugin==='ClearWaterExport')throw new Error(`Unexpected export bridge call ${method}`);
     if(plugin!=='ClearWaterCamera')throw new Error(`Unexpected plugin ${plugin}`);
     switch(method){
-     case 'open':state.calls.open++;return await new Promise(resolve=>{state.openResolve=resolve;});
+     case 'open':if(options.schemaVersion!==1||options.settings.quality!=='high'||!options.strings['Close camera'])throw new Error('Invalid native camera launch options');state.calls.open++;return await new Promise(resolve=>{state.openResolve=resolve;});
      case 'listCaptures':{const captures=state.captures.map(item=>({...item}));if(state.holdNextList){state.holdNextList=false;return await new Promise(resolve=>{state.releaseList=()=>resolve({captures});});}return {captures};}
      case 'drainCaptures':return {captures:state.captures.filter(item=>item.pending).map(item=>({...item}))};
      case 'getCapture':{const item=state.captures.find(value=>value.id===options.id);if(!item)throw new Error('Missing mock capture');return {capture:{...item}};}
@@ -62,6 +63,18 @@ try {
  await page.goto(process.env.CHECK_URL||'http://127.0.0.1:4186/');
  await page.waitForFunction(()=>window.iosCamera.state.calls.open===0);
  assert.equal(await page.locator('.camera-launch:enabled').count(),1,'iOS native-camera plugin should enable the camera action');
+ for(const language of ['zh-HK','ja','en']){
+  await changeLanguage(page,language);
+  await page.locator('.settings-launch:visible').first().click();
+  assert.equal(await page.locator('.camera-quality-options').count(),1);
+  assert.equal(await page.locator('.offline-model-choices').count(),0);
+  for(const width of [320,390,650]){
+   await page.setViewportSize({width,height:844});
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'native Settings overflow: '+language+' at '+width);
+  }
+  await page.locator('.settings-close').click();
+ }
+ await page.setViewportSize({width:390,height:844});
  await page.locator('.camera-launch').click();
  await page.waitForFunction(()=>window.iosCamera.state.calls.open===1);
  await page.evaluate(()=>window.iosCamera.takePhoto());
@@ -122,5 +135,5 @@ try {
  assert.equal(state.calls.acknowledge.includes('d48d7fdf-ff4a-4d33-bb5f-bec57def2804'),true);
  assert.equal(state.calls.sourceFetches.includes('c37c6ece-ee3f-4c22-aa4e-adb46cef1703'),false,'capture mode should not activate earlier stills while the native view is open');
  assert.deepEqual(errors,[]);
- console.log('PASS mocked iOS native-camera bridge: pending photo capture, file-URI thumbnail/source reads, native video share without WebCodecs/full fetch, clear/recovery preserving originals and Photos copies, capture/Close during a slow native inventory read');
+ console.log('PASS mocked iOS native-camera bridge: three-locale Settings, Auto/High launch, pending photo capture, file-URI thumbnail/source reads, native video share without WebCodecs/full fetch, clear/recovery preserving originals and Photos copies, capture/Close during a slow native inventory read');
 } finally {await browser.close();}
