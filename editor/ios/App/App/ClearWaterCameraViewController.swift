@@ -143,7 +143,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         guard let device = MTLCreateSystemDefaultDevice() else { throw ClearWaterProcessorError.metalUnavailable }
         guard let commandQueue = device.makeCommandQueue() else { throw ClearWaterProcessorError.metalUnavailable }
         renderCommandQueue = commandQueue
-        ciContext = CIContext(mtlDevice: device, options: [.cacheIntermediates: false])
+        ciContext = CIContext(mtlDevice: device, options: [.workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, .outputColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!, .cacheIntermediates: false])
         metalView = MTKView(frame: .zero, device: device)
         super.init(nibName: nil, bundle: nil)
     }
@@ -469,6 +469,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         guard let data = analysisPixels(source),
               let analysis = try? NativeBalancedMath.analyse(rgba: data, width: 64, height: 48) else { return }
         recipeLock.lock()
+        guard !pickedNeutral else { recipeLock.unlock(); return }
         let previous = currentRecipe
         currentRecipe = NativeBalancedMath.makeCameraRecipe(analysis: analysis, strength: previous.strength, previous: previous)
         recipeLock.unlock()
@@ -509,14 +510,16 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
 
     @objc private func photoTapped() {
         guard state == "ready", photoCaptureAvailable, !captureInFlight else { return }
+        let frozenRecipe = snapshotRecipe()
         captureInFlight = true; photoButton.isEnabled = false; setState("capturing")
-        let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg]); settings.photoQualityPrioritization = .quality
-        if #available(iOS 16.0, *) { settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions }
-        recipeLock.lock(); photoRecipes[settings.uniqueID] = currentRecipe; recipeLock.unlock()
-        sessionQueue.async { [weak self] in
-            guard let self else { return }
-            guard !self.closeRequested, !self.backgrounded else { DispatchQueue.main.async { self.photoFailed(CameraError.unavailable) }; return }
+        sessionQueue.async {
             self.orientationLocked = true
+            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            settings.photoQualityPrioritization = .quality
+            settings.maxPhotoDimensions = self.photoOutput.maxPhotoDimensions
+            self.recipeLock.lock()
+            self.photoRecipes[settings.uniqueID] = frozenRecipe
+            self.recipeLock.unlock()
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
     }
@@ -628,8 +631,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             let withAudio = self.audioEnabled && self.audioInput != nil
             self.session.commitConfiguration()
             self.mediaQueue.async {
+                var stagedCaptureID: UUID?
                 do {
                     let id = ClearWaterCaptureStore.shared.newCaptureID()
+                    stagedCaptureID = id
                     let url = try ClearWaterCaptureStore.shared.makeVideoOutputURL(id: id)
                     let writer = try ClearWaterMovieWriter(outputURL: url, sourceSize: sourceSize, profile: profile, audioEnabled: withAudio,
                         recipe: frozenRecipe, processor: self.processor, maximumDuration: Double(self.options.minutes * 60), maximumBytes: self.videoByteLimit)
@@ -641,7 +646,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                         }
                         return
                     }
-                    self.movieWriter = writer; self.captureID = id; self.videoURL = url; self.writerAcceptingFrames = true
+                    self.movieWriter = writer; self.writerIncludesAudio = withAudio; self.captureID = id; self.videoURL = url; self.writerAcceptingFrames = true
                     DispatchQueue.main.async {
                         self.setState("recording"); self.recordButton.setImage(UIImage(systemName: "stop.circle.fill"), for: .normal)
                         self.recordingStartedAt = ProcessInfo.processInfo.systemUptime
@@ -652,6 +657,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                         self.delegate?.cameraViewController(self, recordingState: "recording")
                     }
                 } catch {
+                    if let stagedCaptureID { ClearWaterCaptureStore.shared.discardStagedCapture(id: stagedCaptureID) }
                     DispatchQueue.main.async {
                         self.delegate?.cameraViewController(self, didFail: self.text("Recording could not start.", "Recording could not start."), captureID: nil)
                         self.setState("ready")
@@ -662,8 +668,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
     }
     private func appendAudio(_ sample: CMSampleBuffer) {
-        guard writerAcceptingFrames, let movieWriter else { return }
-        do { _ = try movieWriter.appendAudio(sample) }
+        guard writerAcceptingFrames, writerIncludesAudio, let movieWriter else { return }
+        do {
+            if case .limitReached = try movieWriter.appendAudio(sample) {
+                DispatchQueue.main.async { self.stopRecording(reason: nil) }
+            }
+        }
         catch { DispatchQueue.main.async { self.stopRecordingWithError(self.text("Audio could not be encoded.", "Audio could not be encoded.")) } }
     }
     private func stopRecording(reason: String?) {
@@ -691,7 +701,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             switch result {
             case .failure(let error):
                 self.failStagedVideo(error, id: id, url: url)
-                self.clearWriter()
+                self.mediaQueue.async { self.clearWriter() }
             case .success(let metadata):
                 self.mediaQueue.async {
                     let asset = AVURLAsset(url: url), generator = AVAssetImageGenerator(asset: asset)
@@ -731,7 +741,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         DispatchQueue.main.async { self.delegate?.cameraViewController(self, didFail: self.text("Video could not be saved.", "Video could not be saved."), captureID: id); self.delegate?.cameraViewController(self, recordingState: "ready"); self.setState("ready"); self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
     }
     private func clearWriter() {
-        movieWriter = nil; writerAcceptingFrames = false; captureID = nil; videoURL = nil; clipRecipe = nil
+        movieWriter = nil; writerAcceptingFrames = false; writerIncludesAudio = false; captureID = nil; videoURL = nil
+        recipeLock.lock(); clipRecipe = nil; recipeLock.unlock()
         DispatchQueue.main.async { self.recordingStartedAt = nil; self.elapsedTimer?.invalidate(); self.elapsedTimer = nil }
         unlockCaptureOrientation()
     }
@@ -776,6 +787,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     @objc private func flipTapped() {
         guard state == "ready" else { return }
+        setState("starting")
         releaseHardwareWhiteBalance()
         sessionQueue.async { [weak self] in
             guard let self else { return }; self.session.stopRunning(); self.session.beginConfiguration()
@@ -860,8 +872,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func applyNeutral(_ patch: Data) {
         do {
-            recipeLock.lock(); let updated = try NativeBalancedMath.pickNeutral(patchRGBA: patch, recipe: currentRecipe); currentRecipe = updated; recipeLock.unlock()
-            pickedNeutral = true
+            recipeLock.lock(); let updated = try NativeBalancedMath.pickNeutral(patchRGBA: patch, recipe: currentRecipe); currentRecipe = updated; pickedNeutral = true; recipeLock.unlock()
             statusLabel.text = text("Software white balance applied", "Software white balance applied")
             lockHardwareWhiteBalance { [weak self] locked in
                 guard let self, self.pickedNeutral else { return }
