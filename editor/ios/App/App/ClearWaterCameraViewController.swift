@@ -56,6 +56,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private let audioOutput = AVCaptureAudioDataOutput()
     private var cameraInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
+    private var pressureObservation: NSKeyValueObservation?
     private var observers: [NSObjectProtocol] = []
     // cameraPosition and cameraInput are owned by sessionQueue.
     private var cameraPosition: AVCaptureDevice.Position = .back
@@ -83,10 +84,13 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     private var configured = false
+    private var runtimeRecoveryAttempts = 0
     private var captureInFlight = false
     private var currentRecipe: NativeBalancedRecipe
     private var clipRecipe: NativeBalancedRecipe?
     private var photoRecipes: [Int64: NativeBalancedRecipe] = [:]
+    private var photoCaptureAvailable = false
+    private var pendingRecordingMessage: String?
     private var latestRendered: CIImage?
     private var latestSource: CIImage?
     // Preview buffers are reused with a hard allocation threshold; resolution changes
@@ -203,6 +207,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         observers.append(n.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterForeground() })
         observers.append(n.addObserver(forName: .AVCaptureSessionWasInterrupted, object: session, queue: .main) { [weak self] _ in self?.interrupted() })
         observers.append(n.addObserver(forName: .AVCaptureSessionInterruptionEnded, object: session, queue: .main) { [weak self] _ in self?.restartIfActive() })
+        observers.append(n.addObserver(forName: .AVCaptureSessionRuntimeError, object: session, queue: .main) { [weak self] note in self?.sessionRuntimeError(note) })
         observers.append(n.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.checkThermalState() })
         observers.append(n.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in self?.processor.purgeIntermediatePools() })
     }
@@ -217,8 +222,20 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func configureAndStart() {
         sessionQueue.async { [weak self] in
             guard let self, !self.backgrounded, !self.closeRequested else { return }
-            do { if !self.configured { try self.configureSession() }; self.session.startRunning(); DispatchQueue.main.async { self.setState("ready") } }
-            catch { DispatchQueue.main.async { self.fail(self.text("The camera could not start.", "The camera could not start.")) } }
+            do {
+                if !self.configured { try self.configureSession() }
+                self.session.startRunning()
+                DispatchQueue.main.async {
+                    guard !self.backgrounded, !self.closeRequested,
+                          !["capturing", "startingRecording", "recording", "finalising"].contains(self.state) else { return }
+                    self.setState("ready")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard !self.backgrounded, !self.closeRequested else { return }
+                    self.fail(self.text("The camera could not start.", "The camera could not start."))
+                }
+            }
         }
     }
     private func configureSession() throws {
@@ -230,7 +247,9 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         guard session.canAddInput(input), session.canAddOutput(photoOutput), session.canAddOutput(videoOutput) else { throw CameraError.unavailable }
         session.addInput(input); cameraInput = input; session.addOutput(photoOutput); session.addOutput(videoOutput)
         try configureDeviceFormat(input.device)
-        configurePhotoDimensions(for: input.device)
+        let hasPhotoCapture = configurePhotoDimensions(for: input.device)
+        DispatchQueue.main.async { self.photoCaptureAvailable = hasPhotoCapture }
+        observeSystemPressure(input.device)
         photoOutput.maxPhotoQualityPrioritization = .quality
         videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
@@ -251,6 +270,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
         if let best = supported.max(by: { a, b in
             let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription), db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+            let aPhoto = supportedPhotoPixelCount(for: a), bPhoto = supportedPhotoPixelCount(for: b)
+            if aPhoto != bPhoto { return aPhoto < bPhoto }
             return Int(da.width) * Int(da.height) < Int(db.width) * Int(db.height)
         }) { device.activeFormat = best }
         guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) else { throw CameraError.unavailable }
@@ -261,14 +282,63 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if device.activeFormat.supportedColorSpaces.contains(.sRGB) { device.activeColorSpace = .sRGB }
         else { throw CameraError.unavailable }
     }
-    private func configurePhotoDimensions(for device: AVCaptureDevice) {
-        if #available(iOS 16.0, *) {
-            let candidates = device.activeFormat.supportedMaxPhotoDimensions.filter { $0.width > 0 && $0.height > 0 }
-            let limit = 12_500_000
-            let inBudget = candidates.filter { Int($0.width) * Int($0.height) <= limit }
-            let chosen = inBudget.max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-                ?? candidates.min { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
-            if let chosen { photoOutput.maxPhotoDimensions = chosen }
+    private func supportedPhotoPixelCount(for format: AVCaptureDevice.Format) -> Int {
+        let limit = 12_500_000
+        return format.supportedMaxPhotoDimensions
+            .map { Int($0.width) * Int($0.height) }
+            .filter { $0 > 0 && $0 <= limit }
+            .max() ?? 0
+    }
+    private func configurePhotoDimensions(for device: AVCaptureDevice) -> Bool {
+        let candidates = device.activeFormat.supportedMaxPhotoDimensions.filter {
+            $0.width > 0 && $0.height > 0 && Int($0.width) * Int($0.height) <= 12_500_000
+        }
+        guard let chosen = candidates.max(by: { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }) else { return false }
+        photoOutput.maxPhotoDimensions = chosen
+        return true
+    }
+    private func observeSystemPressure(_ device: AVCaptureDevice) {
+        pressureObservation?.invalidate()
+        pressureObservation = device.observe(\.systemPressureState, options: [.new]) { [weak self] _, change in
+            guard let level = change.newValue?.level else { return }
+            DispatchQueue.main.async { self?.systemPressureChanged(level) }
+        }
+    }
+    private func systemPressureChanged(_ level: AVCaptureDevice.SystemPressureState.Level) {
+        switch level {
+        case .serious:
+            if state == "ready" { statusLabel.text = text("Camera load is high; recording may be limited.", "Camera load is high; recording may be limited.") }
+        case .critical, .shutdown:
+            if state == "recording" { stopRecordingWithError(text("Recording stopped because the camera is under heavy load.", "Recording stopped because the camera is under heavy load.")) }
+            else if state == "ready" { statusLabel.text = text("Camera load is high; let the device cool before recording.", "Camera load is high; let the device cool before recording.") }
+        case .nominal, .fair: break
+        @unknown default: break
+        }
+    }
+    private func sessionRuntimeError(_ notification: Notification) {
+        let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
+        guard let error else { fail(text("The camera stopped unexpectedly.", "The camera stopped unexpectedly.")); return }
+        if error.code == .mediaServicesWereReset, state == "ready", runtimeRecoveryAttempts < 1, !closeRequested, !backgrounded {
+            runtimeRecoveryAttempts += 1
+            setState("starting")
+            releaseHardwareWhiteBalance()
+            sessionQueue.async { [weak self] in
+                guard let self, !self.backgrounded, !self.closeRequested else { return }
+                self.session.stopRunning()
+                self.session.beginConfiguration()
+                for input in self.session.inputs { self.session.removeInput(input) }
+                for output in self.session.outputs { self.session.removeOutput(output) }
+                self.cameraInput = nil; self.audioInput = nil; self.configured = false
+                self.session.commitConfiguration()
+                do { try self.configureSession(); self.session.startRunning(); DispatchQueue.main.async { guard !self.closeRequested, !self.backgrounded, self.state == "starting" else { return }; self.setState("ready") } }
+                catch { DispatchQueue.main.async { self.fail(self.text("The camera could not restart.", "The camera could not restart.")) } }
+            }
+        } else if state == "recording" {
+            stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted."))
+        } else if ["capturing", "startingRecording", "finalising"].contains(state) {
+            statusLabel.text = text("Camera interrupted.", "Camera interrupted.")
+        } else {
+            fail(text("The camera stopped unexpectedly. Close and reopen the camera.", "The camera stopped unexpectedly. Close and reopen the camera."))
         }
     }
     private func selectCamera() throws -> AVCaptureDevice {
@@ -294,7 +364,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func configureOrientation(angle: CGFloat) {
         guard !orientationLocked else { return }
         for output in [photoOutput, videoOutput] as [AVCaptureOutput] {
-            if let c = output.connection(with: .video), c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+            guard let c = output.connection(with: .video) else { continue }
+            if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+            if c.isVideoMirroringSupported {
+                c.automaticallyAdjustsVideoMirroring = false
+                c.isVideoMirrored = cameraPosition == .front
+            }
         }
     }
 
@@ -433,7 +508,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
 
     @objc private func photoTapped() {
-        guard state == "ready", !captureInFlight else { return }
+        guard state == "ready", photoCaptureAvailable, !captureInFlight else { return }
         captureInFlight = true; photoButton.isEnabled = false; setState("capturing")
         let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg]); settings.photoQualityPrioritization = .quality
         if #available(iOS 16.0, *) { settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions }
@@ -447,6 +522,13 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         autoreleasepool { processPhoto(photo, error: error) }
+    }
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
+        guard let error else { return }
+        recipeLock.lock()
+        let outstanding = photoRecipes.removeValue(forKey: resolvedSettings.uniqueID) != nil
+        recipeLock.unlock()
+        if outstanding { photoFailed(error) }
     }
     private func processPhoto(_ photo: AVCapturePhoto, error: Error?) {
         recipeLock.lock(); let recipe = photoRecipes.removeValue(forKey: photo.resolvedSettings.uniqueID) ?? currentRecipe; recipeLock.unlock()
@@ -524,11 +606,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if state == "recording" { stopRecording(reason: nil); return }
         guard state == "ready" else { return }
         if audioEnabled && AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
-            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in DispatchQueue.main.async { guard let self else { return }; self.audioEnabled = granted; self.startRecording() } }
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in DispatchQueue.main.async { guard let self else { return }; self.setMicrophoneEnabled(granted); self.startRecording() } }
         } else { startRecording() }
     }
     private func startRecording() {
         guard state == "ready", !closeRequested, !backgrounded else { return }
+        if audioEnabled && AVCaptureDevice.authorizationStatus(for: .audio) != .authorized { setMicrophoneEnabled(false) }
         setState("startingRecording")
         recipeLock.lock(); let frozenRecipe = currentRecipe; clipRecipe = frozenRecipe; recipeLock.unlock()
         let profile: ClearWaterMovieWriter.QualityProfile = options.quality == "high" ? .high : .standard
@@ -585,6 +668,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func stopRecording(reason: String?) {
         guard state == "recording" else { return }
+        pendingRecordingMessage = reason
         setState("finalising"); mediaQueue.async { [weak self] in
             guard let self else { return }
             self.writerAcceptingFrames = false
@@ -627,6 +711,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                                 self.delegate?.cameraViewController(self, didComplete: descriptor)
                                 self.delegate?.cameraViewController(self, recordingState: "ready")
                                 self.setState("ready"); self.endBackgroundTask()
+                                if let message = self.pendingRecordingMessage { self.statusLabel.text = message }
+                                self.pendingRecordingMessage = nil
                                 if self.closeRequested { self.finishClose() }
                             }
                         } catch { self.failStagedVideo(error, id: id, url: url) }
@@ -698,8 +784,11 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 self.cameraPosition = self.cameraPosition == .back ? .front : .back
                 let input = try AVCaptureDeviceInput(device: self.selectCamera())
                 guard self.session.canAddInput(input) else { throw CameraError.unavailable }
-                self.session.addInput(input); self.cameraInput = input; try self.configureDeviceFormat(input.device); self.configurePhotoDimensions(for: input.device); self.session.commitConfiguration(); self.requestOrientationUpdate(); self.session.startRunning()
-                DispatchQueue.main.async { self.setState("ready") }
+                self.session.addInput(input); self.cameraInput = input; try self.configureDeviceFormat(input.device)
+                let hasPhotoCapture = self.configurePhotoDimensions(for: input.device)
+                self.observeSystemPressure(input.device)
+                self.session.commitConfiguration(); self.requestOrientationUpdate(); self.session.startRunning()
+                DispatchQueue.main.async { self.photoCaptureAvailable = hasPhotoCapture; self.setState("ready") }
             } catch { self.session.commitConfiguration(); DispatchQueue.main.async { self.fail(self.text("The selected camera is unavailable.", "The selected camera is unavailable.")) } }
         }
     }
@@ -710,7 +799,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in DispatchQueue.main.async { self?.setMicrophoneEnabled(granted) } }
         } else { setMicrophoneEnabled(enable) }
     }
-    private func setMicrophoneEnabled(_ enabled: Bool) {
+    private func setMicrophoneEnabled(_ requested: Bool) {
+        let enabled = requested && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         audioEnabled = enabled; micButton.setImage(UIImage(systemName: enabled ? "mic.fill" : "mic.slash.fill"), for: .normal)
         sessionQueue.async { [weak self] in
             guard let self else { return }; self.session.beginConfiguration()
@@ -828,8 +918,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         UIApplication.shared.endBackgroundTask(backgroundTask); backgroundTask = .invalid
     }
     private func interrupted() {
-        if state == "recording" { stopRecording(reason: nil) }
-        setState("error"); statusLabel.text = text("Camera interrupted.", "Camera interrupted.")
+        let message = text("Camera interrupted.", "Camera interrupted.")
+        if state == "recording" { stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted.")); return }
+        if state == "capturing" || state == "startingRecording" || state == "finalising" { statusLabel.text = message; return }
+        setState("error"); statusLabel.text = message
     }
     private func restartIfActive() {
         guard !backgrounded, !closeRequested else { return }; releaseHardwareWhiteBalance(); requestCamera()
@@ -841,7 +933,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         state = value
         if value != "recording" { elapsedTimer?.invalidate(); elapsedTimer = nil; recordingStartedAt = nil; if value != "finalising" { durationLabel.text = "" } }
         switch value {
-        case "ready": statusLabel.text = pickedNeutral ? (hardwareWhiteBalanceLocked ? text("White balance locked", "White balance locked") : text("Software white balance applied", "Software white balance applied")) : ""; durationLabel.text = ""
+        case "ready": statusLabel.text = !photoCaptureAvailable ? text("Still capture is unavailable on this camera.", "Still capture is unavailable on this camera.") : (pickedNeutral ? (hardwareWhiteBalanceLocked ? text("White balance locked", "White balance locked") : text("Software white balance applied", "Software white balance applied")) : ""); durationLabel.text = ""
         case "starting": statusLabel.text = text("Starting camera", "Starting camera")
         case "capturing": statusLabel.text = text("Saving photo", "Saving photo")
         case "startingRecording": statusLabel.text = text("Starting recording", "Starting recording")
@@ -849,7 +941,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         case "finalising": statusLabel.text = text("Finishing video", "Finishing video")
         default: break
         }
-        photoButton.isEnabled = value == "ready" && !captureInFlight
+        photoButton.isEnabled = value == "ready" && photoCaptureAvailable && !captureInFlight
         recordButton.isEnabled = value == "ready" || value == "recording"
         pickerButton.isEnabled = value == "ready"; strengthSlider.isEnabled = value == "ready"; resetButton.isEnabled = value == "ready"
         if value != "recording" && value != "finalising" { recordButton.setImage(UIImage(systemName: "record.circle"), for: .normal); recordButton.accessibilityLabel = text("Start recording", "Start recording") }
@@ -857,8 +949,3 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func fail(_ message: String) { setState("error"); statusLabel.text = message; delegate?.cameraViewController(self, didFail: message, captureID: nil) }
     private enum CameraError: Error { case unavailable, processing, writer }
 }
-
-
-
-
-
