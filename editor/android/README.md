@@ -1,6 +1,6 @@
 # Android app
 
-Capacitor 8 app, package `com.fishese.clearwater`, Android 7.0/API 24 or newer. The editor and all three supplied ONNX models (WWE-UIE, Shallow-UWnet and FUnIE-GAN) are packaged locally, with no hosted website dependency.
+Capacitor 8 app, package `com.fishese.clearwater`, Android 7.0/API 24 or newer. The editor and the supplied ONNX models (WWE-UIE, Five A+ and Shallow-UWnet) are packaged locally, with no hosted website dependency.
 
 Native features:
 

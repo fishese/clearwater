@@ -1,6 +1,10 @@
 """Convert the authors' checkpoints using restricted torch loading; verify ONNX parity.
 Run from project root with .model-tools/Scripts/python.exe model-tools/export_models.py.
 Upstream model sources belong in model-tools/upstream (see public/models/README.md).
+
+The committed bundles under editor/public/models are later optimised exports.
+This script still checks full-precision ONNX against PyTorch below 1e-4.
+It does not reproduce the int8 files or their looser parity_tolerance values.
 """
 from pathlib import Path
 import sys, hashlib, json

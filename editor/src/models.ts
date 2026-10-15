@@ -1,10 +1,11 @@
 import * as ort from 'onnxruntime-web/wasm';
 import wasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import wasmModuleUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
+import {aiStatusLabel, BUNDLED_MODELS, type BundledModelId} from './core/bundled-models';
 import {validateImageTensor,validateImageOutput} from './core/model-contract';
 import type {CustomModel} from './core/types';
 
-export type ModelName='shallow'|'funie'|'wwe'|'wave';
+export type ModelName=BundledModelId|'wave';
 ort.env.wasm.wasmPaths={wasm:wasmUrl,mjs:wasmModuleUrl};
 ort.env.wasm.numThreads=1;
 ort.env.wasm.proxy=false;
@@ -26,7 +27,7 @@ async function session(name:ModelName) {
   if(!sessions.has(name)) {
     const pending=(async()=>{
       const response=await fetch(`${import.meta.env.BASE_URL}models/${name}.onnx`);
-      if(!response.ok)throw new Error(`Could not load ${{shallow:'Shallow-UWnet',funie:'FUnIE-GAN',wwe:'WWE-UIE',wave:'custom ONNX model'}[name]}. Check the model files and retry.`);
+      if(!response.ok)throw new Error(`Could not load ${aiStatusLabel(name)}. Check the model files and retry.`);
       return ort.InferenceSession.create(await response.arrayBuffer(),{executionProviders:['wasm'],graphOptimizationLevel:'all'});
     })();
     sessions.set(name,pending);
@@ -51,12 +52,14 @@ export async function inferField(name:ModelName,source:OffscreenCanvas):Promise<
   const canvas=new OffscreenCanvas(size,size),c=canvas.getContext('2d',{willReadFrequently:true})!;
   c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(source,0,0,size,size);
   const pixels=c.getImageData(0,0,size,size).data,input=new Float32Array(count*3);
-  const signedInput=name==='funie'||(name==='wave'&&custom?.inputRange==='signed');
-  const signedOutput=name==='funie'||(name==='wave'&&custom?.outputRange==='signed');
+  const bundled=name==='wave'?undefined:BUNDLED_MODELS[name];
+  const signedInput=name==='wave'?custom?.inputRange==='signed':bundled?.inputRange==='signed';
+  const signedOutput=name==='wave'?custom?.outputRange==='signed':bundled?.outputRange==='signed';
   for(let i=0;i<count;i++)for(let ch=0;ch<3;ch++) {
     const v=pixels[i*4+ch]/255;
     input[ch*count+i]=signedInput?v*2-1:v;
   }
+  // Bundled files have one image input and one image output. Names differ between models.
   const result=await net.run({[net.inputNames[0]]:new ort.Tensor('float32',input,[1,3,size,size])});
   try {
   const tensor=result[net.outputNames[0]],output=tensor.data as Float32Array;

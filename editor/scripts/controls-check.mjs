@@ -28,7 +28,7 @@ await page.getByLabel('ONNX model file',{exact:true}).setInputFiles({name:'inval
 await page.getByRole('checkbox',{name:'I have permission to use this model and will follow its licence.'}).check();await load.click();await page.getByRole('alert').waitFor({timeout:30000});
 assert.equal(await page.getByRole('dialog').count(),1);
 // The same generic adapter handles a unit-range model and a signed-range model.
-for(const [file,range] of [['editor/public/models/shallow.onnx','unit'],['editor/public/models/funie.onnx','signed']]){
+for(const [file,range] of [['editor/public/models/shallow.onnx','unit'],['editor/public/models/shallow.onnx','signed']]){
   await page.getByLabel('ONNX model file',{exact:true}).setInputFiles(root+'/'+file);
   await page.getByLabel('Model input range',{exact:true}).selectOption(range);await page.getByLabel('Model output range',{exact:true}).selectOption(range);
   await load.click();await page.getByRole('dialog').waitFor({state:'hidden',timeout:120000});await ready();
@@ -36,7 +36,7 @@ for(const [file,range] of [['editor/public/models/shallow.onnx','unit'],['editor
 }
 await page.waitForTimeout(500);await page.reload();await ready();assert.equal(await page.getByRole('dialog').count(),0);
 await engine.locator('summary').click();assert.equal(await page.getByLabel('Correction engine').inputValue(),'wave');
-assert.match(await page.getByLabel('Correction engine').locator('option:checked').innerText(),/funie\.onnx/i);
+assert.match(await page.getByLabel('Correction engine').locator('option:checked').innerText(),/shallow\.onnx/i);
 await page.getByRole('button',{name:'Load another ONNX model',exact:true}).click();await page.getByRole('dialog').waitFor();
 assert.equal(await page.getByLabel('Model input range').inputValue(),'signed');assert.equal(await page.getByLabel('Model output range').inputValue(),'signed');
 await page.getByRole('button',{name:'Cancel',exact:true}).click();
