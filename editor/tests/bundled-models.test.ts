@@ -3,14 +3,14 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {describe,expect,it} from 'vitest';
 import * as ort from 'onnxruntime-web/wasm';
-import {BUNDLED_MODEL_IDS,BUNDLED_MODELS} from '../src/core/bundled-models';
+import {BUNDLED_MODEL_IDS,BUNDLED_MODELS,migrateOfflineModelSelection} from '../src/core/bundled-models';
 
 const modelsDir=fileURLToPath(new URL('../public/models/',import.meta.url));
 ort.env.wasm.numThreads=1;
 ort.env.wasm.proxy=false;
 ort.env.wasm.wasmPaths={
-  wasm:fileURLToPath(new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',import.meta.url)),
-  mjs:fileURLToPath(new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',import.meta.url)),
+  wasm:new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm',import.meta.url).href,
+  mjs:new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs',import.meta.url).href,
 };
 
 type TensorSpec={name:string;shape:number[];dtype:string;range:'unit'|'signed'};
@@ -25,6 +25,11 @@ describe('bundled ONNX models',()=>{
   it('lists exactly the bundled engines',()=>{
     expect(Object.keys(manifest).sort()).toEqual([...BUNDLED_MODEL_IDS].sort());
     expect(manifest).not.toHaveProperty('funie');
+  });
+
+  it('maps the retired offline selection to Five A+',()=>{
+    expect(migrateOfflineModelSelection(['wwe','shallow','funie'])).toEqual(['wwe','fivea','shallow']);
+    expect(migrateOfflineModelSelection(['funie'])).toEqual(['fivea']);
   });
 
   for(const id of BUNDLED_MODEL_IDS) it(`${id} matches the manifest and runs in onnxruntime-web`,async()=>{

@@ -7,6 +7,12 @@ export type BundledModelId = typeof BUNDLED_MODEL_IDS[number];
 export const AI_ENGINES = ['wwe', 'fivea', 'shallow', 'wave'] as const;
 export type AIEngine = typeof AI_ENGINES[number];
 
+/** Preserve offline selections when the retired model slot becomes Five A+. */
+export function migrateOfflineModelSelection(models: readonly unknown[]): BundledModelId[] {
+  const selected = new Set(models.map(model => model === 'funie' ? 'fivea' : model));
+  return BUNDLED_MODEL_IDS.filter(model => selected.has(model));
+}
+
 export const BUNDLED_MODELS: Record<BundledModelId, {
   label: string;
   inputRange: 'unit' | 'signed';
