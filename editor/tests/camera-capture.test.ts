@@ -66,6 +66,15 @@ describe('camera capture helpers', () => {
     expect(next.auto.gains[0]).not.toBe(makeCameraRecipe(analyse(teal, 8, 4)).auto.gains[0]);
   });
 
+  it('applies camera depth and red-filter hints while preserving them across live analysis', () => {
+    const pixels = new Uint8ClampedArray([35, 100, 180, 255]);
+    const hints = { scene: 'underwater' as const, water: 'blue' as const, filter: 'yes' as const, depth: 18 };
+    const first = makeCameraRecipe(analyse(pixels, 1, 1), 0.8, undefined, hints);
+    const next = makeCameraRecipe(analyse(pixels, 1, 1), 0.7, first);
+    expect(first.hints).toEqual(hints);
+    expect(next.hints).toEqual(hints);
+  });
+
   it('stops every track and tolerates track stop failures', () => {
     const stopA = vi.fn();
     const stopB = vi.fn(() => { throw new Error('already ended'); });

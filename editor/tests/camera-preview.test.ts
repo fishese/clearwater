@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createCameraPreview, getCameraPreviewSize } from '../src/core/camera-preview';
+import { cameraColourMatrixForWebGl, createCameraPreview, getCameraPreviewSize } from '../src/core/camera-preview';
 import { cameraQualityProfile } from '../src/core/camera-quality';
 
 describe('camera preview', () => {
@@ -26,6 +26,22 @@ describe('camera preview', () => {
     expect(getCameraPreviewSize(1920, 1080, high)).toEqual([1920, 1080]);
     expect(getCameraPreviewSize(640, 480, high)).toEqual([640, 480]);
     expect(getCameraPreviewSize(3840, 2160)).toEqual([1280, 720]);
+  });
+
+  it('keeps portrait camera frames within the orientation-aware long and short edge limits', () => {
+    expect(getCameraPreviewSize(608, 1080)).toEqual([608, 1080]);
+    expect(getCameraPreviewSize(1080, 1920, cameraQualityProfile('high', true))).toEqual([1080, 1920]);
+    expect(getCameraPreviewSize(2160, 3840)).toEqual([720, 1280]);
+  });
+
+  it('maps row-wise RGB affine coefficients to the shader matrix without transposing channels', () => {
+    const shaderMatrix = cameraColourMatrixForWebGl([1, 2, 3, .1, 4, 5, 6, .2, 7, 8, 9, .3]);
+    expect(Array.from(shaderMatrix.slice(0, 12))).toEqual([1, 4, 7, 0, 2, 5, 8, 0, 3, 6, 9, 0]);
+    expect(shaderMatrix[12]).toBeCloseTo(.1);
+    expect(shaderMatrix[13]).toBeCloseTo(.2);
+    expect(shaderMatrix[14]).toBeCloseTo(.3);
+    expect(shaderMatrix[15]).toBe(1);
+    expect(() => cameraColourMatrixForWebGl([1, 2])).toThrow('Invalid camera colour matrix.');
   });
 
   it('reports the supported message when WebGL is unavailable', () => {

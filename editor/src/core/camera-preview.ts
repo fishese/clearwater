@@ -9,8 +9,25 @@ export function getCameraPreviewSize(
   height: number,
   limits: Pick<CameraQualityProfile, 'maxWidth' | 'maxHeight'> = DEFAULT_PREVIEW_LIMITS,
 ): [number, number] {
-  const scale = Math.min(1, limits.maxWidth / width, limits.maxHeight / height);
+  // CameraX and some mobile browsers report portrait buffers in sensor
+  // orientation. Apply the same long/short edge budget after orientation so
+  // a 608 × 1080 frame is not squeezed into a landscape 1280 × 720 box.
+  const portrait = height > width;
+  const maxWidth = portrait ? limits.maxHeight : limits.maxWidth;
+  const maxHeight = portrait ? limits.maxWidth : limits.maxHeight;
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
   return [Math.max(1, Math.round(width * scale)), Math.max(1, Math.round(height * scale))];
+}
+
+/** Convert row-wise RGB affine coefficients to WebGL's column-major mat4 form. */
+export function cameraColourMatrixForWebGl(matrix: readonly number[]): Float32Array {
+  if (matrix.length !== 12 || !matrix.every(Number.isFinite)) throw new Error('Invalid camera colour matrix.');
+  return new Float32Array([
+    matrix[0], matrix[4], matrix[8], 0,
+    matrix[1], matrix[5], matrix[9], 0,
+    matrix[2], matrix[6], matrix[10], 0,
+    matrix[3], matrix[7], matrix[11], 1,
+  ]);
 }
 
 const VERTEX_SHADER = `
@@ -24,6 +41,8 @@ const FRAGMENT_SHADER = `
 precision mediump float;
 uniform sampler2D u_image;
 uniform vec3 u_autoGains;
+uniform mat4 u_cameraColour;
+uniform float u_hasCameraColour;
 uniform vec3 u_manualGains;
 uniform float u_redMix;
 uniform float u_strength;
@@ -41,7 +60,12 @@ void main() {
   vec3 original = texture2D(u_image, v_uv).rgb;
   float peak = max(original.r, max(original.g, original.b));
   float red = clamp(original.r * u_autoGains.r + u_redMix * max(0.0, original.g - 0.3 * original.b) * (1.0 - 0.45 * smoothstep(0.65, 1.0, peak)), 0.0, 1.0);
-  vec3 restored = clamp(vec3(red, original.g * u_autoGains.g, original.b * u_autoGains.b), 0.0, 1.0);
+  vec3 balanced = vec3(red, original.g * u_autoGains.g, original.b * u_autoGains.b);
+  // Five A+ is sampled off-thread and fitted to a global affine RGB transform.
+  // Keeping this transform in the live shader avoids transferring full frames
+  // across the worker boundary and keeps still capture and video preview alike.
+  vec3 aiColour = (u_cameraColour * vec4(original, 1.0)).rgb;
+  vec3 restored = clamp(mix(balanced, aiColour, u_hasCameraColour), 0.0, 1.0);
   vec3 blended = vec3(
     srgbChannel(linearChannel(original.r) * (1.0 - u_strength) + linearChannel(restored.r) * u_strength),
     srgbChannel(linearChannel(original.g) * (1.0 - u_strength) + linearChannel(restored.g) * u_strength),
@@ -131,7 +155,7 @@ export function createCameraPreview(
   gl.enableVertexAttribArray(uv);
   gl.vertexAttribPointer(uv, 2, gl.FLOAT, false, 16, 8);
   const uniforms = Object.fromEntries([
-    'u_image', 'u_autoGains', 'u_manualGains', 'u_redMix', 'u_strength', 'u_haze',
+    'u_image', 'u_autoGains', 'u_cameraColour', 'u_hasCameraColour', 'u_manualGains', 'u_redMix', 'u_strength', 'u_haze',
     'u_highlights', 'u_exposure', 'u_shadows', 'u_contrast', 'u_vibrance',
   ].map(name => [name, gl.getUniformLocation(program, name)]));
   const uploadCanvas = document.createElement('canvas');
@@ -181,6 +205,18 @@ export function createCameraPreview(
       const set1f = (name: string, value: number) => gl.uniform1f(uniforms[name], value);
       gl.uniform1i(uniforms.u_image, 0);
       gl.uniform3fv(uniforms.u_autoGains, auto.gains);
+      const cameraColour = recipe.cameraColour?.matrix;
+      if (cameraColour?.length === 12) {
+        // GLSL matrices are column-major; mat4's last row/column below supplies
+        // the affine offset while retaining a simple vec4 multiply.
+        gl.uniformMatrix4fv(uniforms.u_cameraColour, false, cameraColourMatrixForWebGl(cameraColour));
+        set1f('u_hasCameraColour', 1);
+      } else {
+        gl.uniformMatrix4fv(uniforms.u_cameraColour, false, new Float32Array([
+          1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+        ]));
+        set1f('u_hasCameraColour', 0);
+      }
       gl.uniform3fv(uniforms.u_manualGains, manualGains);
       set1f('u_redMix', auto.redMix);
       set1f('u_strength', strength);

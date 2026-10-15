@@ -10,7 +10,7 @@ await context.addInitScript(()=>{
   window.showDirectoryPicker=async()=>{window.pickerCount++;if(window.pickerMode==='cancel')throw new DOMException('Cancelled','AbortError');const folder=window.folderMode;return {name:folder,async getFileHandle(name,options){if(options?.create)return handle(folder,name);if(folder+'/'+name in window.savedFiles)return handle(folder,name);throw new DOMException('Missing','NotFoundError');}};};
 });
 const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:5173');
+await page.goto(process.env.CHECK_URL||'http://127.0.0.1:4176/');
 const files=['IMG_7386-green tint.JPG','IMG_E7433-too bright.JPG'];
 await page.getByLabel('Choose photos',{exact:true}).setInputFiles(files.map(f=>root+'/Sample photos/'+f));
 const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,{timeout:120000});await ready();
@@ -23,7 +23,9 @@ assert.equal(await page.getByRole('button',{name:'Next photo',exact:true}).isDis
 await page.getByRole('button',{name:'Previous photo',exact:true}).click();await ready();
 assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).inputValue(),'1');
 await page.reload();await ready();assert.equal(await page.getByRole('slider',{name:'Warmth',exact:true}).inputValue(),'1');
-await page.getByRole('button',{name:'Choose output folder',exact:true}).click();
+await page.evaluate(()=>window.pickerMode='cancel');await page.getByRole('button',{name:'Export photo',exact:true}).click();await ready();
+assert.equal(await page.evaluate(()=>window.savedFiles['output/IMG_7386-green tint.jpg']),undefined,'cancelling output selection does not render or save');
+await page.evaluate(()=>window.pickerMode='ok');
 for(const suffix of ['',' (1)']){
   await page.getByRole('button',{name:'Export photo',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.modal-shade'),{timeout:120000});await ready();
   assert.ok(await page.evaluate(name=>window.savedFiles[name]>0,`output/IMG_7386-green tint${suffix}.jpg`));
@@ -34,17 +36,11 @@ await page.getByLabel('Export filename',{exact:true}).fill('my-photo.jpg');await
 assert.ok(await page.evaluate(()=>window.savedFiles['output/my-photo.jpg']>0));
 await page.getByRole('button',{name:/^Save as/,exact:true}).click();await page.getByLabel('Export filename',{exact:true}).fill('my-photo.jpg');await page.getByRole('button',{name:'Save copy',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.modal-shade'),{timeout:120000});await ready();
 assert.ok(await page.evaluate(()=>window.savedFiles['output/my-photo (1).jpg']>0));
-await page.getByRole('button',{name:'Use source folder',exact:true}).click();await page.evaluate(()=>window.folderMode='source');
-for(const suffix of ['',' (1)']){
- await page.getByRole('button',{name:'Export photo',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.modal-shade'),{timeout:120000});await ready();
- assert.ok(await page.evaluate(name=>window.savedFiles[name]>0,`source/IMG_7386-green tint-restore${suffix}.jpg`));
-}
 const pickerCount=await page.evaluate(()=>window.pickerCount);
 await page.getByRole('button',{name:'Next photo',exact:true}).click();await ready();await page.getByRole('button',{name:'Export photo',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.modal-shade'),{timeout:120000});await ready();
-assert.equal(await page.evaluate(()=>window.pickerCount),pickerCount);assert.ok(await page.evaluate(()=>window.savedFiles['source/IMG_E7433-too bright-restore.jpg']>0));
-await page.evaluate(()=>window.pickerMode='cancel');await page.getByRole('button',{name:'Change source folder',exact:true}).click();await ready();
-await page.evaluate(()=>window.pickerMode='fail');const fallback=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'Export photo',exact:true}).click();assert.ok((await fallback).suggestedFilename().includes('-restore'));await ready();
+assert.equal(await page.evaluate(()=>window.pickerCount),pickerCount);assert.ok(await page.evaluate(()=>window.savedFiles['output/IMG_E7433-too bright.jpg']>0));
+await page.evaluate(()=>window.pickerMode='fail');const fallback=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'Export photo',exact:true}).click();assert.equal((await fallback).suggestedFilename(),'IMG_E7433-too bright.jpg');await ready();
 await page.evaluate(()=>window.pickerMode='ok');const downloaded=page.waitForEvent('download',{timeout:120000});await page.getByRole('button',{name:'Download instead',exact:true}).click();assert.equal((await downloaded).suggestedFilename(),'IMG_E7433-too bright-restore.jpg');await ready();
 await page.screenshot({path:root+'/analysis/browser-check/browsing-desktop.png'});
 await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:root+'/analysis/browser-check/browsing-mobile.png',fullPage:true});
-assert.deepEqual(errors,[]);console.log('PASS multi-import, navigation, edit persistence, folder collisions, Save As, cancel, write failure fallback, downloads, mobile. Native dialogs still need manual testing; folder numbering covers output, source and Save As.');await browser.close();
+assert.deepEqual(errors,[]);console.log('PASS multi-import, navigation, edit persistence, output-only folder collisions, Save As, cancel, write failure fallback, downloads, mobile. Native dialogs still need manual testing.');await browser.close();

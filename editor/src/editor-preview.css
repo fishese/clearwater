@@ -1,0 +1,28 @@
+/* Local to the editor workspace so camera and modal layouts keep their own spacing. */
+.editor-preview .workspace{padding-top:3px;padding-bottom:3px}
+.editor-preview .editor-note{padding-top:12px;padding-bottom:16px}
+.editor-preview .compact-controls .range-field:not(.vertical-range)>span{margin-bottom:3px}
+.editor-preview .compact-controls .range-field:not(.vertical-range) input{height:44px}
+.editor-preview .video-timeline{padding:5px 9px}
+.editor-preview .video-timeline-controls{display:flex;align-items:center;gap:9px}
+.editor-preview .video-timeline-controls>button{width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px solid #34494b;border-radius:5px;color:#acd6c3;background:#18282c}
+.editor-preview .video-timeline-controls>button:hover:not(:disabled){background:#263b3e}
+.editor-preview .video-timeline-controls>label{flex:1;min-width:0;gap:3px}
+.editor-preview .video-timeline-controls input{height:28px;touch-action:pan-x}
+.editor-preview .comparison-input{top:50%;bottom:auto;height:44px;transform:translateY(-50%);inset-inline:0;z-index:2}
+.editor-preview .divider-line,.editor-preview .divider-line>span{pointer-events:none}
+.editor-preview .stage.pan-enabled{display:flex;align-items:flex-start;justify-content:flex-start}
+.editor-preview .stage.pan-enabled .image-frame{touch-action:none;cursor:grab}
+.editor-preview .stage.pan-enabled .image-frame:active{cursor:grabbing}
+.editor-preview.expanded-photo .stage.pan-enabled .image-frame{cursor:grab}
+.editor-preview .preview-info{margin-top:3px}
+.editor-preview .export-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.editor-preview .export-actions .button{min-height:40px}
+.editor-preview .export-options{align-items:stretch;flex-wrap:wrap}
+.editor-preview .export-options>label,.editor-preview .export-options>.video-export-options{flex:1 0 100%;min-width:0;margin-bottom:0}
+.editor-preview .export-options>.export-actions{flex:1 0 100%}
+.editor-preview .preset-actions{display:flex;gap:9px;flex-wrap:wrap}
+.editor-preview .save-destination{margin-top:12px}
+@media(max-width:650px){
+  .editor-preview .video-timeline-controls>button{width:44px;height:44px}
+}

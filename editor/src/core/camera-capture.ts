@@ -1,7 +1,7 @@
 import { makeRecipe } from './engine';
 import { pickNeutralFromPixels } from './white-balance';
 import type { CameraRecordingBudget } from './camera-settings';
-import type { Analysis, Recipe, Suggestion } from './types';
+import { DEFAULT_HINTS, type Analysis, type Hints, type Recipe, type Suggestion } from './types';
 
 export const CAMERA_VIDEO_MIME_TYPES = [
   'video/mp4;codecs=avc1.42E01E',
@@ -43,8 +43,8 @@ export function cameraRecordingTracks(
 }
 
 /** Gradually follow changing scene analysis to avoid visible balance jumps. */
-export function makeCameraRecipe(analysis: Analysis, strength = 0.8, previous?: Recipe): Recipe {
-  const next = makeRecipe(analysis);
+export function makeCameraRecipe(analysis: Analysis, strength = 0.8, previous?: Recipe, hints?: Hints): Recipe {
+  const next = makeRecipe(analysis, hints ?? previous?.hints ?? { ...DEFAULT_HINTS });
   next.strength = Math.max(0, Math.min(1, strength));
   if (!previous) return next;
   next.manual = structuredClone(previous.manual);

@@ -5,14 +5,16 @@ Capacitor 8 app, package `com.fishese.clearwater`, Android 7.0/API 24 or newer. 
 Native features:
 
 - Android gallery/document selection through Open files, including multiple files.
-- Open folder lists JPEG, PNG, HEIC/HEIF, DNG, MP4 and MOV files directly inside a selected folder, sorted by filename with natural numbering. Next/Previous opens each file on demand. Subfolders and files over 512 MiB are excluded; photo resolution checks still apply when opening a file. The selected folder is automatically available for source-folder exports. Folder browsing lasts for the current session; opened files and edits remain in the local library.
+- Open folder lists JPEG, PNG, HEIC/HEIF, DNG, MP4 and MOV files directly inside a selected folder, sorted by filename with natural numbering. Next/Previous opens each file on demand. Subfolders and files over 512 MiB are excluded; photo resolution checks still apply when opening a file. Folder browsing lasts for the current session; opened files and edits remain in the local library.
 - Receive single/multiple images and videos from other apps through Android Share.
-- Select source/output folders with Android's Storage Access Framework; save copies without overwriting existing files. Large exports cross the bridge in 256 KB chunks.
+- Select output folders with Android's Storage Access Framework; save copies without overwriting existing files. Large exports cross the bridge in 256 KB chunks.
 - Same photo navigation, expanded view, manual adjustments and AI engines as the web editor.
-- Local camera capture with a Balanced live preview, optional microphone audio and configurable 1, 3 or 5 minute recording limits. Android saves linked camera captures to the gallery and keeps untouched photo originals or the enhanced video source plus edit settings in app storage; Settings can restore the collection after it is cleared. See About & guide for capture limits and retention details.
+- Native CameraX still/video capture with a Balanced GPU preview, optional sampled Five A+ colour assist, actual lens/zoom controls, red-filter/depth hints, microphone audio and configurable 1, 3 or 5 minute recording limits. Android saves linked camera captures to the gallery and keeps untouched photo originals or the enhanced video source plus edit settings in app storage; Settings can restore the collection after it is cleared. See About & guide for capture limits and retention details.
 - On Android 10+ devices with compatible decoding and OpenGL support, supported HDR and iPhone Dolby Vision clips are converted to an SDR working copy before editing. The source stays unchanged; the editor preview and exports are SDR. Web builds still require an SDR copy.
 
-Android photo providers do not automatically grant access to a photo's parent folder. Choose its source folder once when saving, or select an output folder. Folder selections are retained for the current editor session. Source folders must contain the original named photo.
+Export chooses an output folder once and reuses it for the current session; it does not require access to the original photo's parent folder. The chosen destination keeps the original filename stem, adding a number if needed. Save as chooses a separate destination, and Share opens Android's chooser.
+
+Android launcher long-press shortcuts offer Edit and Camera. External actions can use `clearwater://edit` or `clearwater://camera`. Still capture uses negotiated ImageCapture resolution independently of preview size; native Standard/High video targets HD/FHD. CameraX 1.6.2 and its Media3 effect adapter (1.0.0-alpha04) share correction with preview and recording. A native camera build needs physical-phone checks for effect parity, orientation and lens compatibility before release.
 
 ## Build
 
