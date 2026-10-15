@@ -1,12 +1,14 @@
 import type { Recipe } from './core/types';
 import { newestPhotos } from './core/library-order';
+import type { IOSCaptureDescriptor } from './platform/ios-camera';
 
 export interface CameraCapture { uri?:string; name?:string; renderedSha256?:string; enhancedVideo?:boolean }
+export interface NativeCaptureSource { descriptor:IOSCaptureDescriptor; loaded:boolean }
 export interface StoredPhoto {
   id:string; file:File; recipe?:Recipe; thumbnail?:string; addedAt?:number; pendingShare?:boolean;
-  cameraCapture?:CameraCapture; sourceUri?:string;
+  cameraCapture?:CameraCapture; sourceUri?:string; nativeCapture?:NativeCaptureSource; previewFile?:File;
 }
-type PhotoMetadata=Omit<StoredPhoto,'file'>;
+type PhotoMetadata=Omit<StoredPhoto,'file'|'previewFile'|'nativeCapture'>;
 const DB='clearwater-library';
 const PHOTOS='photos';
 const CAMERA_ORIGINALS='camera-originals';
@@ -69,6 +71,9 @@ export const listPhotos=async()=>{
   return newestPhotos(joined);
 };
 export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
+  // iOS camera sources belong to the native manifest. Persisting a hydrated File
+  // here would create a second full-size private copy in IndexedDB.
+  if(photo.nativeCapture)return;
   const {id,file,recipe,thumbnail,addedAt,pendingShare,cameraCapture,sourceUri}=photo;
   photo={id,file,recipe,thumbnail,addedAt,pendingShare,cameraCapture,sourceUri};
   const db=await openDB();

@@ -16,13 +16,13 @@ export type PlatformCapabilities={
 };
 
 /** Derive app behavior from explicit platform facts rather than assuming every non-Android host is a browser. */
-export function platformCapabilities(platform:AppPlatform,nativeShell=platform==='ios'||platform==='android',nativeMediaSave=false):PlatformCapabilities{
+export function platformCapabilities(platform:AppPlatform,nativeShell=platform==='ios'||platform==='android',nativeMediaSave=false,nativeCamera=false):PlatformCapabilities{
  const android=platform==='android',ios=platform==='ios',web=platform==='web';
  return {
   platform,nativeShell,
   // The Android and browser camera is implemented with getUserMedia. The iOS shell
   // must wait for the separate AVFoundation plugin instead of opening that path.
-  nativeCamera:false,
+  nativeCamera:ios&&nativeCamera,
   webStreamCamera:!ios,
   nativeMediaSave:ios&&nativeMediaSave,
   androidLinkedCapture:android,
@@ -42,7 +42,8 @@ function currentPlatform():AppPlatform{
 export function getPlatformCapabilities():PlatformCapabilities{
  const platform=currentPlatform();
  const nativeMediaSave=platform==='ios'&&Capacitor.isPluginAvailable('ClearWaterExport');
+ const nativeCamera=platform==='ios'&&Capacitor.isPluginAvailable('ClearWaterCamera');
  const videoEditing=typeof VideoDecoder!=='undefined'&&typeof OffscreenCanvas!=='undefined';
  const videoExport=videoEditing&&typeof VideoEncoder!=='undefined'&&(platform!=='ios'||nativeMediaSave);
- return {...platformCapabilities(platform,Capacitor.isNativePlatform(),nativeMediaSave),videoEditing,videoExport};
+ return {...platformCapabilities(platform,Capacitor.isNativePlatform(),nativeMediaSave,nativeCamera),videoEditing,videoExport};
 }
