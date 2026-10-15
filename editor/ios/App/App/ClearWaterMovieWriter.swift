@@ -194,6 +194,15 @@ final class ClearWaterMovieWriter {
                 self.complete(.failure(WriterError.zeroFrames))
             case .writing:
                 guard self.frameCount > 0, self.didStartSession else { self.fail(WriterError.zeroFrames); self.complete(.failure(WriterError.zeroFrames)); return }
+                // The pixel-buffer adaptor infers an open-ended last sample from
+                // preceding timestamps. Explicitly end at one frame after the last
+                // accepted image so a dropped-frame gap cannot extend the clip.
+                if let last = self.lastVideoPTS, let first = self.firstVideoPTS {
+                    let frameEnd = CMTimeAdd(last, CMTime(value: 1, timescale: Int32(self.profile.fps)))
+                    let limitEnd = CMTimeAdd(first, CMTime(seconds: self.maximumDuration, preferredTimescale: 60_000))
+                    let end = CMTimeCompare(frameEnd, limitEnd) < 0 ? frameEnd : limitEnd
+                    self.writer.endSession(atSourceTime: end)
+                }
                 self.state = .finishing; self.videoInput.markAsFinished(); self.audioInput?.markAsFinished()
                 self.writer.finishWriting { self.queue.async { self.finishWritingCompleted() } }
             }

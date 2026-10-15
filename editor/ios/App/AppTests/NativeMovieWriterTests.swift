@@ -72,10 +72,11 @@ final class NativeMovieWriterTests: XCTestCase {
         let track = try XCTUnwrap(asset.tracks(withMediaType: .video).first)
         XCTAssertEqual(track.naturalSize.width, 1280); XCTAssertEqual(track.naturalSize.height, 720)
         let reader = try AVAssetReader(asset: asset)
-        let trackOutput = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
+        let trackOutput = AVAssetReaderTrackOutput(track: track, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
         XCTAssertTrue(reader.canAdd(trackOutput)); reader.add(trackOutput); XCTAssertTrue(reader.startReading())
         var times: [Double] = []
         while let sample = trackOutput.copyNextSampleBuffer() {
+            guard CMSampleBufferGetImageBuffer(sample) != nil else { continue }
             times.append(CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample)))
         }
         let presentationTimes = times.sorted()
@@ -183,6 +184,7 @@ final class NativeMovieWriterTests: XCTestCase {
         XCTAssertEqual(metadata.stopReason, "duration-limit")
         XCTAssertEqual(metadata.frameCount, 2)
         XCTAssertLessThan(metadata.duration, 0.15)
+        XCTAssertEqual(metadata.duration, 0.1 + 1.0/30.0, accuracy: 0.004)
     }
 
     func testCancelIsIdempotentAndRemovesStagedMovie() throws {
