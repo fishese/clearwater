@@ -68,6 +68,21 @@ final class NativeBalancedParityTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testCameraAnalysisIncludesTheWholePortraitFrame() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal is unavailable on this test device") }
+        let camera = try ClearWaterCameraViewController(options: ClearWaterCameraOptions(locale: "en", strings: [:], settings: [:]))
+        let red = CIImage(color: CIColor(red: 1, green: 0, blue: 0))
+            .cropped(to: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let blue = CIImage(color: CIColor(red: 0, green: 0, blue: 1))
+            .cropped(to: CGRect(x: 0, y: 100, width: 100, height: 300))
+        let pixels = try XCTUnwrap(camera.analysisPixels(blue.composited(over: red)))
+        let analysis = try NativeBalancedMath.analyse(rgba: pixels, width: 64, height: 48)
+        XCTAssertEqual(analysis.mean[0], 255 * 0.25, accuracy: 2)
+        XCTAssertEqual(analysis.mean[1], 0, accuracy: 1)
+        XCTAssertEqual(analysis.mean[2], 255 * 0.75, accuracy: 2)
+    }
+
     func testMetalRenderMatchesTypeScriptWithinThreeBytes() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal is unavailable on this test device") }
         let processor = try ClearWaterBalancedProcessor()

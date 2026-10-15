@@ -474,10 +474,14 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         currentRecipe = NativeBalancedMath.makeCameraRecipe(analysis: analysis, strength: previous.strength, previous: previous)
         recipeLock.unlock()
     }
-    private func analysisPixels(_ source: CIImage) -> Data? {
+    func analysisPixels(_ source: CIImage) -> Data? {
         let width = 64, height = 48, bounds = CGRect(x: 0, y: 0, width: 64, height: 48)
-        let scale = max(bounds.width / source.extent.width, bounds.height / source.extent.height)
-        let scaled = source.transformed(by: CGAffineTransform(scaleX: scale, y: scale)).cropped(to: bounds)
+        let extent = source.extent
+        guard extent.width > 0, extent.height > 0 else { return nil }
+        // Statistics cover the whole source frame, as in the shared camera path.
+        let scaled = source.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: bounds.width / extent.width, y: bounds.height / extent.height))
+            .cropped(to: bounds)
         guard let cg = ciContext.createCGImage(scaled, from: bounds) else { return nil }
         let data = NSMutableData(length: width * height * 4)!
         guard let context = CGContext(data: data.mutableBytes, width: width, height: height, bitsPerComponent: 8,
