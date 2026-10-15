@@ -27,9 +27,9 @@ try{
  await page.getByLabel('Video correction',{exact:true}).selectOption('sampled');await page.getByLabel('AI sample interval',{exact:true}).selectOption('2');await page.waitForTimeout(100);await ready();
  await page.getByRole('button',{name:'Download instead',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Cancel export',exact:true}).click();await ready();assert.equal(await page.getByRole('dialog').count(),0);console.log('PASS cancellation during sampled analysis');
  if(process.env.CHECK_OFFLINE==='1')await context.setOffline(false);
- await choose('funie');await exportVideo('sampled-funie.mp4');
- // Use the distributed FUnIE weights to check the generic adapter and independent ranges.
- await engine.selectOption('wave');await page.getByLabel('ONNX model file',{exact:true}).setInputFiles(resolve(root,'editor/public/models/funie.onnx'));
+ await choose('fivea');await exportVideo('sampled-fivea.mp4');
+ // A bundled unit-range file, loaded with signed ranges, checks the generic adapter.
+ await engine.selectOption('wave');await page.getByLabel('ONNX model file',{exact:true}).setInputFiles(resolve(root,'editor/public/models/shallow.onnx'));
  await page.getByLabel('Model input range',{exact:true}).selectOption('signed');await page.getByLabel('Model output range',{exact:true}).selectOption('signed');
  await page.getByRole('checkbox',{name:/I have permission/}).check();await page.getByRole('button',{name:'Load model',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden',timeout:120000});await page.waitForTimeout(100);await ready();
  await exportVideo('sampled-custom.mp4');

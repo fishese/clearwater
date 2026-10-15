@@ -25,7 +25,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 107 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 113 tests.
 
 ## Languages
 
@@ -58,7 +58,7 @@ Debug builds use the standard Android test keystore. Release builds load only th
 
 ## Dependencies, licences and data
 
-Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet/FUnIE-GAN carry MIT notices; WWE-UIE carries Apache-2.0 notices and pinned checkpoint/export hashes. Android HDR conversion uses unmodified Media3 1.11.1 (Apache-2.0). Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
+Use package-lock.json/npm ci. Review preprocessing, shape and parity before replacing model weights. Supplied Shallow-UWnet carries an MIT notice; WWE-UIE carries Apache-2.0; Five A+ is non-commercial only (see `editor/public/models/NOTICE-FiveAPlus.txt`). Quantised bundles use the `parity_tolerance` in `editor/public/models/manifest.json` rather than `1e-4`. Android HDR conversion uses unmodified Media3 1.11.1 (Apache-2.0). Custom ONNX contract: RGB float32 NCHW `[1,3,256,256]`, unit/signed ranges. Validated custom weights and ranges are saved on the user's device; they are never bundled or uploaded. Generic loading grants no licence rights. Preserve the previous saved model when validating or saving a replacement fails, and check the saved SHA-256 before reuse. Restoring a model must not switch an unrelated Balanced/AI recipe to the custom engine.
 
 LibRaw bindings pinned at @colorhythm/libraw-wasm 1.1.1 / LibRaw 0.22.1. Keep MIT bindings, chosen CDDL notices, copyright and matching source archives. Mediabunny and HEIC/HEIF decoder (heic-to/libheif) source/licence notices are bundled too. Attribution is in About and public licence/model notes; do not remove source offerings to reduce size.
 
@@ -104,7 +104,7 @@ Run `node scripts/camera-save-check.mjs` for the mocked Android capture bridge: 
 
 ## Offline settings regression checks
 
-`node scripts/offline-models-check.mjs` verifies the actual worker with controlled model payloads: selection, stop/retry, SHA-256 rejection, offline fetch, reuse after UI updates, changed-model downloads and targeted deletion. `node scripts/settings-check.mjs` checks installed-PWA automatic defaults with real bundled assets, optional FUnIE download/removal, manual download with auto disabled, language layouts, parent Back/Escape, saved preferences and cold offline WWE inference. `settings-helpers.mjs` keeps language-navigation setup shared by browser checks. Run browser scripts against production builds; CHECK_URL defaults to port 4176 where supported. Android packages skip web caching and already contain every supplied model.
+`node scripts/offline-models-check.mjs` verifies the actual worker with controlled model payloads: selection, stop/retry, SHA-256 rejection, offline fetch, reuse after UI updates, changed-model downloads and targeted deletion. `node scripts/settings-check.mjs` checks installed-PWA automatic defaults with real bundled assets, removing and restoring Five A+, manual download with auto disabled, language layouts, parent Back/Escape, saved preferences and cold offline WWE inference. `settings-helpers.mjs` keeps language-navigation setup shared by browser checks. Run browser scripts against production builds; CHECK_URL defaults to port 4176 where supported. Android packages skip web caching and already contain every supplied model.
 
 Stable release publishing: verify the signed APK, copy it to `editor/android/build/clearwater-release.apk`, generate `clearwater-release.apk.sha256`, and attach both using `gh release upload <tag> ... --repo fishese/clearwater` alongside the versioned APK. Check the constant `releases/latest/download/clearwater-release.apk` URL returns the expected release. Never point that alias to a debug/experimental APK.
 

@@ -16,7 +16,23 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement.id),'about-title');
  await page.getByRole('link',{name:'Editing controls',exact:true}).click();
  assert.ok(page.url().endsWith('#about-controls'));
- for(const name of ['Shallow-UWnet','FUnIE-GAN','WWE-UIE'])assert.ok(await page.getByRole('heading',{name:new RegExp(name)}).isVisible());
+ for(const name of ['Shallow-UWnet','Five A\\+','WWE-UIE'])assert.ok(await page.getByRole('heading',{name:new RegExp(name)}).isVisible());
+ assert.equal(await page.getByRole('heading',{name:/FUnIE-GAN/}).count(),0);
+ const modelLayout=()=>page.evaluate(()=>{
+  const cards=[...document.querySelectorAll('.about-models .about-card')];
+  const titles=cards.map(card=>card.querySelector('h3').childNodes[0].textContent.trim());
+  const note=document.querySelector('.about-model-note');
+  const maxCardBottom=Math.max(...cards.map(card=>card.getBoundingClientRect().bottom+window.scrollY));
+  return {titles,noteInGrid:!!note.closest('.about-models'),noteTop:note.getBoundingClientRect().top+window.scrollY,maxCardBottom};
+ });
+ for(const [width,height] of [[1280,900],[360,800]]){
+  await page.setViewportSize({width,height});
+  const layout=await modelLayout();
+  assert.deepEqual(layout.titles,['WWE-UIE','Five A+','Shallow-UWnet','Balanced restoration','Original RGB heuristic'],`${width}px model order`);
+  assert.equal(layout.noteInGrid,false,`${width}px usage note must sit outside the model grid`);
+  assert.ok(layout.noteTop>=layout.maxCardBottom-1,`${width}px usage note must be below every model card`);
+ }
+ await page.setViewportSize({width:1280,height:900});
  for(const a of await page.locator('.about-content a').all()){
   const href=await a.getAttribute('href');
   if(href.includes('/models/')||href.includes('/licenses/'))assert.equal((await page.request.get(new URL(href,url).href)).status(),200,href);

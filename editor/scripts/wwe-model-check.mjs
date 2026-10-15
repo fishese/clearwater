@@ -34,7 +34,9 @@ try{
   const expected=new Float32Array(bytes.buffer),maxError=field.reduce((max,value,i)=>Math.max(max,Math.abs(value-expected[i])),0);
   return {length:field.length,maxError,finite:field.every(Number.isFinite)};
  },expectedBase64);
- assert.equal(wasm.length,256*256*3);assert.equal(wasm.finite,true);assert.ok(wasm.maxError<1e-4,`Browser WASM parity error ${wasm.maxError}`);
+ const manifestPath=resolve(root,'editor/public/models/manifest.json'),manifest=JSON.parse(await readFile(manifestPath,'utf8'));
+ const tolerance=manifest.wwe.parity_tolerance;
+ assert.equal(wasm.length,256*256*3);assert.equal(wasm.finite,true);assert.ok(wasm.maxError<=tolerance,`Browser WASM parity error ${wasm.maxError} exceeds ${tolerance}`);
  console.log(`WWE WASM gradient parity max error: ${wasm.maxError}`);
 
  const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:60000});
@@ -67,7 +69,6 @@ try{
  assert.notEqual(await hash(),balanced,'WWE-UIE video analysis should produce a corrected frame.');
  assert.deepEqual(errors,[]);
 
- const manifestPath=resolve(root,'editor/public/models/manifest.json'),manifest=JSON.parse(await readFile(manifestPath,'utf8'));
  manifest.wwe.wasm_gradient_max_abs_parity_error=wasm.maxError;
  await writeFile(manifestPath,JSON.stringify(manifest,null,2)+'\n');
  console.log('WWE video AI preview passed.');

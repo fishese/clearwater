@@ -32,7 +32,16 @@ Licence: LICENSE-AndroidX-Media3.txt
 WWE-UIE: supplied underwater image enhancement model weights converted from the authors' published UIEB best_model.pth checkpoint.
 Copyright the WWE-UIE authors. Source: https://github.com/chingheng0808/WWE-UIE/tree/fd0697558203f9f849800cc13b804116bb3f921c
 The repository and checkpoint are distributed under Apache License 2.0; see LICENSE-WWE-UIE.txt.
-The ONNX conversion provenance, checkpoint/model hashes and PyTorch/ONNX parity are recorded in ../models/manifest.json.
+The ONNX conversion provenance, checkpoint/model hashes and parity tolerances are recorded in ../models/manifest.json.
+
+Five A+ Network (FA+Net, alpha-0.1 checkpoint): supplied non-commercial underwater enhancement weights.
+Paper: arXiv:2305.08824 (BMVC 2023). Code: https://github.com/Owen718/FiveAPlus-Network
+Authors: Jingxia Jiang, Tian Ye, Jinbin Bai, Sixiang Chen, Wenhao Chai, Shi Jun, Yun Liu and Erkang Chen.
+Upstream has no licence file. Tian Ye permitted this non-commercial ClearWater use, including the ONNX conversion,
+on condition of crediting the paper and linking the repository. Commercial use requires permission from Prof. Erkang Chen.
+See ../models/NOTICE-FiveAPlus.txt.
+
+Shallow-UWnet weights include the MIT notice in ../models/LICENSE-Shallow-UWnet.
 
 HEIC/HEIF decoding uses unmodified heic-to 1.6.6 by Hopper Gee (LGPL-3.0-or-later),
 including libheif 1.23.6 by the libheif contributors (LGPL-3.0).

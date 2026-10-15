@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyse, makePhotoRecipe, makeRecipe, parseRecipe, renderPixels, suggest } from '../src/core/engine';
+import { analyse, makePhotoRecipe, makeRecipe, makeVideoRecipe, parseRecipe, renderPixels, suggest } from '../src/core/engine';
 import { DEFAULT_HINTS } from '../src/core/types';
 
 function fixture(r:number,g:number,b:number){return new Uint8ClampedArray(Array.from({length:64},()=>[r,g,b,255]).flat());}
@@ -41,6 +41,21 @@ describe('render and recipe integrity',()=>{
     expect(photo.engine).toBe('wwe');expect(photo.balancedAfterAI).toEqual({strength:.3});
     expect(generic.engine).toBe('balanced');expect(generic.balancedAfterAI).toBeUndefined();
     expect(parseRecipe(JSON.parse(JSON.stringify(generic)))).toEqual(generic);
+  });
+  it('uses Five A+ sampled colour for new videos and keeps the live-camera default classical',()=>{
+    const analysis=stats(30,100,150),video=makeVideoRecipe(analysis),camera=makeRecipe(analysis);
+    expect(video.engine).toBe('fivea');expect(video.videoCorrection).toEqual({mode:'sampled',interval:5,referenceTime:0});
+    expect(video.balancedAfterAI).toBeUndefined();
+    expect(camera.engine).toBe('balanced');
+    expect(parseRecipe(JSON.parse(JSON.stringify(video)))).toEqual(video);
+  });
+  it('opens a retired FUnIE-GAN recipe on WWE-UIE',()=>{
+    const recipe=makeRecipe(stats(30,100,150));
+    const retired={...recipe,engine:'funie',auto:{...recipe.auto,explanation:'FUnIE-GAN runs on the original photo. Its 256 × 256 colour correction is transferred to the original resolution. Dive hints are used by Balanced restoration only; use manual controls to refine AI results.'}};
+    const opened=parseRecipe(retired);
+    expect(opened.engine).toBe('wwe');
+    expect(opened.auto.explanation.startsWith('WWE-UIE')).toBe(true);
+    expect(recipe.engine).toBe('balanced');
   });
   it('strength zero leaves the original intact to rounding tolerance and preserves alpha',()=>{
     const input=new Uint8ClampedArray([1,136,178,255,87,93,111,128,0,0,0,0,255,255,255,255]);

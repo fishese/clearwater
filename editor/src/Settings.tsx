@@ -1,13 +1,15 @@
 import {useEffect,useRef,useSyncExternalStore} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {LanguageSelect,t,useLanguage} from './i18n';
+import {BUNDLED_MODEL_IDS,BUNDLED_MODELS,type BundledModelId} from './core/bundled-models';
 import {getOfflineSettings,subscribeOfflineModels,setAutomaticOfflineModels,setSelectedOfflineModels,type OfflineModel} from './offline-models';
 import OfflineModels from './OfflineModels';
 import {isAndroid} from './native';
 import {cameraQualityProfile} from './core/camera-quality';
 import {cameraRecordingBudget,getCameraSettings,setCameraMinutes,setCameraQuality,subscribeCameraSettings,type CameraQuality,type CameraRecordingMinutes} from './core/camera-settings';
 
-const models:[OfflineModel,string,string][]=[['wwe','WWE-UIE','3.1 MB'],['shallow','Shallow-UWnet','0.9 MB'],['funie','FUnIE-GAN','28.1 MB']];
+const modelSizes:Record<BundledModelId,string>={wwe:'0.9 MB',fivea:'0.9 MB',shallow:'230 KB'};
+const models:[OfflineModel,string,string][]=BUNDLED_MODEL_IDS.map(id=>[id,BUNDLED_MODELS[id].label,modelSizes[id]]);
 export default function Settings({onClose,parentAbout,onRestoreCamera,restoringCamera=false}:{onClose:()=>void;parentAbout:boolean;onRestoreCamera?:()=>void;restoringCamera?:boolean}){
  useLanguage();
  const heading=useRef<HTMLHeadingElement>(null),settings=useSyncExternalStore(subscribeOfflineModels,getOfflineSettings),cameraSettings=useSyncExternalStore(subscribeCameraSettings,getCameraSettings),cameraProfile=cameraQualityProfile(cameraSettings.quality,isAndroid());

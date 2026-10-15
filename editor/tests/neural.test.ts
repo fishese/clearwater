@@ -16,7 +16,7 @@ describe('AI finishing pipeline',()=>{
     expect(full[4]-full[0]).toBe(10);
     expect(full[3]).toBe(255);
   });
-  for(const engine of ['shallow','funie','wave'] as const)it(`${engine}: zero strength, manual refinement and recipe persistence`,()=>{
+  for(const engine of ['shallow','fivea','wave'] as const)it(`${engine}: zero strength, manual refinement and recipe persistence`,()=>{
     const a=analyse(input,2,2),recipe=makeRecipe(a);
     recipe.engine=engine;recipe.auto=suggest(a,recipe.hints,engine);
     const base=transferField(input,2,2,new Float32Array(12).fill(.1),2);

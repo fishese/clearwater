@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import {Input,BlobSource,MP4,QTFF,CanvasSink,Conversion,Output,Mp4OutputFormat,BufferTarget,type InputVideoTrack} from 'mediabunny';
+import {isAIEngine} from './core/bundled-models';
 import {analyse,renderPixels,parseRecipe} from './core/engine';
 import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,MAX_VIDEO_OUTPUT_BYTES,videoBitrate,videoSize,type VideoInfo} from './core/media';
 import {fitColour,colourHistogram,colourAt,applyColour,sampleTimes,bracket,type ColourNode} from './core/video-colour';
@@ -13,7 +14,7 @@ let generation=0,lastRequest=0,pixels:ImageData|undefined,frameTime=-1,start=0,i
 const send=(data:unknown,transfer:Transferable[]=[])=>ctx.postMessage(data,transfer);
 let customModel:CustomModel|undefined,customTask:Promise<unknown>=Promise.resolve(),aiQueue:Promise<unknown>=Promise.resolve();
 const nodes=new Map<string,ColourNode>(),pendingNodes=new Map<string,Promise<ColourNode>>();
-const isAI=(recipe:Recipe)=>['shallow','funie','wwe','wave'].includes(recipe.engine);
+const isAI=(recipe:Recipe)=>isAIEngine(recipe.engine);
 const settings=(recipe:Recipe)=>recipe.videoCorrection??{mode:'sampled' as const,interval:5 as const,referenceTime:0};
 function timesFor(recipe:Recipe,duration:number){const config=settings(recipe);return config.mode==='fixed'?[Math.min(config.referenceTime,Math.max(0,duration-.001))]:sampleTimes(duration,config.interval);}
 async function getNode(recipe:Recipe,time:number,gen:number,request:number):Promise<ColourNode>{

@@ -1,24 +1,68 @@
 {
-  "shallow": {
-    "sha256": "93a7b77d11fb20574b4174b43cbc1134b142760d678b70ba0a7e5e1eabb7130f",
-    "bytes": 882093,
-    "max_abs_parity_error": 1.7881393432617188e-7,
-    "parity_samples": 1,
-    "checkpoint_sha256": "16c090a847e990bfd56a6466fd36f5595cc3a4c514a5ce941caa1a1806441835"
-  },
-  "funie": {
-    "sha256": "802078db2a823f7ad7b756f0b62dbde67dd2ea94be8a9b083e1bbfbdbc96afb9",
-    "bytes": 28090193,
-    "max_abs_parity_error": 0.000009953975677490234,
-    "parity_samples": 1,
-    "checkpoint_sha256": "e4fcb50e03868f1683c244b1c125def30df335ec43d9bb001b8700c03b8f2bd6"
-  },
   "wwe": {
-    "sha256": "4766dd09bfd1b153f74f14b35f23bd80242f2f6bffa58fb0ba09dec167faee35",
-    "bytes": 3063508,
-    "max_abs_parity_error": 0.0000028908252716064453,
-    "parity_samples": 3,
+    "sha256": "508d69f9b2af915a4a6fc9c5990675b15a1f0794e7d32a61468bfc8c9d1bfb50",
+    "bytes": 932006,
+    "max_abs_parity_error": 0.013311713933944702,
+    "parity_tolerance": 0.02,
+    "parity_samples": 33,
+    "parity_reference": "wwe_uie_256.onnx (fp32 ONNX, itself <1e-4 vs PyTorch)",
     "checkpoint_sha256": "36c3e59e556ed69a31e3f83ae7e15b86409eeb951de049ebc2207728c210027d",
-    "wasm_gradient_max_abs_parity_error": 0.000005513429641723633
+    "input": {
+      "name": "input",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "output": {
+      "name": "output",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "notes": "Int8 weight-only, fp32 compute. This is the plain 256 export, not the reflect-pad 16 alternative."
+  },
+  "fivea": {
+    "sha256": "157a81b40235f4130563fa8b196407d40a0966fa95a02dc0fdb39fe0e3b1df48",
+    "bytes": 854937,
+    "max_abs_parity_error": 0.0,
+    "parity_tolerance": 0.0001,
+    "parity_samples": 33,
+    "parity_reference": "fivea_256_slim_reflect.onnx (fp32 ONNX, itself <1e-4 vs PyTorch)",
+    "checkpoint_sha256": "e2dfc7df5fb4df44a1ba7be38744b5a6b34fad48a210c06df164bd610cd6d495",
+    "input": {
+      "name": "input",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "output": {
+      "name": "output",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "notes": "alpha-0.1 edge-fix: reflect padding on the two 3x3 convs plus the (0,0) inverse-DFT-origin pixel replaced by (1,1). fp32. onnxruntime-web reports a fixed [1,3,256,256] output."
+  },
+  "shallow": {
+    "sha256": "4620236a16750eba3387be109ce45b9ccdb0786df12d13835c317bd05718c18b",
+    "bytes": 230185,
+    "max_abs_parity_error": 0.011632740497589111,
+    "parity_tolerance": 0.02,
+    "parity_samples": 33,
+    "parity_reference": "shallow_pad8.onnx (fp32 ONNX, itself <1e-4 vs PyTorch)",
+    "checkpoint_sha256": "16c090a847e990bfd56a6466fd36f5595cc3a4c514a5ce941caa1a1806441835",
+    "input": {
+      "name": "input_256",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "output": {
+      "name": "output_256",
+      "shape": [1, 3, 256, 256],
+      "dtype": "float32",
+      "range": "unit"
+    },
+    "notes": "Reflect pad 8 px inside the graph; int8 weight-only (DequantizeLinear), fp32 compute."
   }
 }
