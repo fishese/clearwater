@@ -1,6 +1,6 @@
 # iOS native camera and sideloading plan
 
-Status: native camera/recording implemented and 17 hosted native tests pass. Current main 233331d merged; final current-model IPA packaging and physical-phone acceptance pending, 15 October 2026. Work remains isolated on codex/ios-native-camera.
+Status: native camera/recording phone build ready, 15 October 2026. Final IPA 17d45e9 / run 38733242340; 142 shared tests and 17 native tests pass. Current main 233331d is merged into codex/ios-native-camera. Physical-phone acceptance remains open.
 
 ## Outcome and scope
 
@@ -196,3 +196,11 @@ While capture work ran, committed main advanced to 233331d with current model mi
 Post-merge validation: 142 tests in 25 files, production build, native-camera mock with valid Balanced recipes and all-language Settings, iOS shell export mock, web camera GPU parity/MP4/audio/lifecycle/permissions, Android linked gallery/save/delete/trash, archive migration/recovery, Settings offline inference, About, mobile readability and generated JPEG/PNG metadata round trips all pass. The valid native-video recipe fixture caught a stale-ready render request that could leave collection clearing disabled; unloaded/unsupported native sources now suppress that request. Native Swift/project/test/fixture files are byte-identical to the successful ee22678 suite.
 
 Final packaging may therefore skip repeating the unchanged native suite while rerunning shared tests, iOS sync, device compilation and manifest checks. The previously accepted EXIF warning is not a current phone result: main's metadata fixes are included, and actual iOS metadata exports still need retesting. No merge into main, stable publication, Apple credentials or signing changes are involved.
+
+### Native camera phone build ready (15 October 2026)
+
+Final IPA: commit 17d45e98b7bdccd315bcc45ce2b4384c13153a4b, successful Actions run 38733242340, Xcode 26.6 (17F113), unsigned arm64 physical-device app for iOS 26. Artifact ID 11971123853. Local ignored delivery file: editor/ios/App/output/native-camera/ClearWater-unsigned.ipa (8,432,809 bytes). SHA-256: bd30bcbe8948e941b9a10459f1d7d9e3913d4efee3e7f2df93b165f8dc099252. Downloaded checksum matches CI; the sibling checksum and ios-build-commit.txt retain provenance.
+
+This final packaging-only run passed 142 shared tests, root-relative build/iOS-only sync, native device compilation, physical-platform/archive checks, compiled plugin/Metal checks, shipping model size/SHA-256 checks, WASM/assets and localized privacy checks. It deliberately skipped repeating the unchanged 17-test native suite already passed at ee22678 in run 38731452603. All native sources, Xcode project and native fixtures are identical to that successful suite. Main 233331d was merged into the feature branch, with no Android configuration differences from that baseline.
+
+Deliver this IPA for the native capture phone gate above. Sign/install locally with Sideloadly over the prior app using the same resulting bundle identity. Initial smoke test: repeated rear/front stills with resolution check; replace a WB pick and Reset; short Standard MP4 without/with microphone; share/play externally; Close/reopen and force quit; clear/restore disposable private captures while Photos copies stay unchanged. Then try 1-minute High and the longer/thermal/interruption cases. No actual sensor, native microphone, Photos-save or phone performance results have been reported yet. Milestones 2–3 implementation and automated verification are complete; hardware acceptance and stabilization remain open. No main merge or stable release was performed.
