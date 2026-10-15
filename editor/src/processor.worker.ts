@@ -140,7 +140,9 @@ ctx.onmessage=async({data})=>{
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
-      const rendered=await canvas.convertToBlob({type:data.format==='png'?'image/png':'image/jpeg',quality:.95});
+      const blobOptions:{type:string;quality?:number}={type:data.format==='png'?'image/png':'image/jpeg'};
+      if(data.format!=='png')blobOptions.quality=data.jpegQuality===0.99?0.99:0.95;
+      const rendered=await canvas.convertToBlob(blobOptions);
       const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
       send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});

@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
-import {Input,BlobSource,MP4,QTFF,CanvasSink,Conversion,Output,Mp4OutputFormat,BufferTarget,type InputVideoTrack} from 'mediabunny';
+import {Input,BlobSource,MP4,QTFF,CanvasSink,Conversion,Output,Mp4OutputFormat,BufferTarget,canEncodeVideo,type InputVideoTrack} from 'mediabunny';
 import {isAIEngine} from './core/bundled-models';
 import {analyse,renderPixels,parseRecipe} from './core/engine';
-import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,MAX_VIDEO_OUTPUT_BYTES,videoBitrate,videoSize,type VideoInfo} from './core/media';
+import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,patchMp4CreationDate,readMp4CreationDate,videoExportPlan,videoMetadataTags,videoSize,type VideoExportMode,type VideoInfo} from './core/media';
 import {fitColour,colourHistogram,colourAt,applyColour,sampleTimes,bracket,type ColourNode} from './core/video-colour';
 import {pickNeutralFromPixels} from './core/white-balance';
 import type {Recipe,CustomModel} from './core/types';
@@ -61,7 +61,8 @@ ctx.onmessage=async({data})=>{
    if(!(await decodeFrame(video.canDecode())))throw new Error(`This device cannot decode ${await video.getCodec()??'this codec'}. iPhone HEVC/MOV support depends on the device. Try an H.264 SDR copy.`);
    const stats=await video.computePacketStats(100),[outputWidth,outputHeight]=videoSize(width,height);
    const first=Math.max(0,await video.getFirstTimestamp());
-   const metadata:VideoInfo={duration:Math.max(.001,duration-first),codec:await video.getCodec()??'unknown',hasAudio:!!(await opened.getPrimaryAudioTrack()),outputWidth,outputHeight,frameRate:Math.min(30,Math.max(1,stats.averagePacketRate||30))};
+   let creationDate:Date|undefined;try{creationDate=await readMp4CreationDate(data.blob);}catch{/* Embedded date parsing is best-effort; video decoding remains available. */}
+   const metadata:VideoInfo={duration:Math.max(.001,duration-first),codec:await video.getCodec()??'unknown',hasAudio:!!(await opened.getPrimaryAudioTrack()),outputWidth,outputHeight,frameRate:Math.min(30,Math.max(1,stats.averagePacketRate||30)),sourceWidth:width,sourceHeight:height,sourceFrameRate:Math.max(1,stats.averagePacketRate||30),...(creationDate?{creationDate}:{})};
    const [previewWidth,previewHeight]=videoSize(width,height,960,540);
    const reader=new CanvasSink(video,{width:previewWidth,height:previewHeight,fit:'fill',poolSize:1});
    const wrapped=await decodeFrame(reader.getCanvas(first));if(!wrapped)throw new Error('Could not decode the first video frame.');
@@ -90,28 +91,33 @@ ctx.onmessage=async({data})=>{
    send({type:'rendered',gen,request,bitmap:edited,original,analysis:analyse(image.data,image.width,image.height)},[edited,original]);
   }else if(type==='export'&&gen===generation&&input&&track&&info){
    if(conversion?.state==='executing')throw new Error('A video export is already running.');
-   const recipe:Recipe=ensureRecipe(data.recipe),target=new BufferTarget();
+   const recipe:Recipe=ensureRecipe(data.recipe),mode:VideoExportMode=data.exportMode==='source'?'source':'compatible',exportPlan=videoExportPlan({...info,hasAudio:info.hasAudio&&data.keepAudio!==false},mode),target=new BufferTarget();
+   if(!exportPlan.supported)throw new Error(exportPlan.reason??'This video is too large to export with the selected quality.');
+   if(!(await canEncodeVideo('avc',{width:exportPlan.width,height:exportPlan.height,bitrate:exportPlan.bitrate,frameRate:exportPlan.frameRate??info.sourceFrameRate??info.frameRate})))throw new Error(`This device cannot encode H.264 at the requested resolution, frame rate and quality. Choose compatible quality or use a device that supports this export.`);
    const times=timesFor(recipe,info.duration),plan:ColourNode[]=[];
    if(isAI(recipe)){for(let i=0;i<times.length;i++){plan.push(await getNode(recipe,times[i],gen,request));if(gen!==generation)return;send({type:'progress',gen,request,progress:Math.round((i+1)/times.length*20)});}}
    if(gen!==generation)return;
-   target.on('write',({end})=>{if(end>MAX_VIDEO_OUTPUT_BYTES)throw new Error('The output exceeded the 256 MB export limit. Turn off Keep audio or use a shorter clip.');});
+   target.on('write',({end})=>{if(end>exportPlan.maxOutputBytes)throw new Error(mode==='source'?'Source-quality output exceeded its 512 MB limit. Choose Compact or a shorter clip.':'Compact output exceeded its 256 MB limit. Choose a shorter clip.');});
    const output=new Output({format:new Mp4OutputFormat({fastStart:false}),target});let lastActivity=Date.now();
-   const canvas=new OffscreenCanvas(info.outputWidth,info.outputHeight),c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
-   const current=await Conversion.init({input,output,tracks:'primary',tags:{},showWarnings:false,
-    video:{codec:'avc',width:info.outputWidth,height:info.outputHeight,fit:'fill',frameRate:info.frameRate,bitrate:videoBitrate(info.duration),allowTransformationMetadata:false,forceTranscode:true,
+   const sourceTags=data.keepMetadata===true?await input.getMetadataTags():undefined;
+   const tags=videoMetadataTags(sourceTags??{},data.keepMetadata===true);
+   const canvas=new OffscreenCanvas(exportPlan.width,exportPlan.height),c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
+   let current:Conversion;
+   try{current=await Conversion.init({input,output,tracks:'primary',tags,showWarnings:false,
+    video:{codec:'avc',width:exportPlan.width,height:exportPlan.height,fit:'fill',...(exportPlan.frameRate===undefined?{}:{frameRate:exportPlan.frameRate}),bitrate:exportPlan.bitrate,allowTransformationMetadata:false,forceTranscode:true,
      process(sample){if(gen!==generation)throw new Error('Export cancelled.');lastActivity=Date.now();sample.draw(c,0,0,canvas.width,canvas.height);const image=c.getImageData(0,0,canvas.width,canvas.height);let base:Uint8ClampedArray|undefined;
       if(plan.length){const time=Math.max(0,sample.timestamp-start),[a,b]=bracket(times,time),left=plan[times.indexOf(a)],right=plan[times.indexOf(b)];base=applyColour(image.data,colourAt(left,right,time,image.data));}
       c.putImageData(new ImageData(renderPixels(image.data,recipe,base),image.width,image.height),0,0);return canvas;}},
     audio:data.keepAudio===false?{discard:true}:{codec:'aac'}
-   });
-   if(gen!==generation){await current.cancel();return;}
-   if(!current.isValid||!current.utilizedTracks.some(t=>t.isVideoTrack())){await current.cancel();throw new Error('H.264 video encoding is unavailable on this device. Try the Android app or a recent Chrome/Edge browser.');}
-   if(data.keepAudio!==false&&info.hasAudio&&!current.utilizedTracks.some(t=>t.isAudioTrack())){await current.cancel();throw new Error('This audio format cannot be preserved here. Turn off Keep audio to export a silent video.');}
+   });}catch(error){canvas.width=canvas.height=1;throw error;}
+   if(gen!==generation){await current.cancel();canvas.width=canvas.height=1;return;}
+   if(!current.isValid||!current.utilizedTracks.some(t=>t.isVideoTrack())){await current.cancel();canvas.width=canvas.height=1;throw new Error('H.264 video encoding is unavailable on this device. Try the Android app or a recent Chrome/Edge browser.');}
+   if(data.keepAudio!==false&&info.hasAudio&&!current.utilizedTracks.some(t=>t.isAudioTrack())){await current.cancel();canvas.width=canvas.height=1;throw new Error('This audio format cannot be preserved here. Turn off Keep audio to export a silent video.');}
    conversion=current;
    current.onProgress=progress=>{lastActivity=Date.now();if(gen===generation)send({type:'progress',gen,request,progress:Math.min(95,Math.round(plan.length?20+progress*75:progress*95))});};
    let watchdog:ReturnType<typeof setInterval>|undefined;
    const stalled=new Promise<never>((_,reject)=>{watchdog=setInterval(()=>{if(Date.now()-lastActivity>60000)reject(new Error('Video processing stopped responding. Try an H.264 SDR copy or a shorter clip.'));},5000);});
-   try{await Promise.race([current.execute(),stalled]);if(gen!==generation)return;if(!target.buffer)throw new Error('Video export produced no output.');send({type:'exported',gen,request,blob:new Blob([target.buffer],{type:'video/mp4'})});}
+   try{await Promise.race([current.execute(),stalled]);if(gen!==generation)return;if(!target.buffer)throw new Error('Video export produced no output.');let metadataWarning:string|undefined;if(data.keepMetadata===true&&info.creationDate&&!patchMp4CreationDate(target.buffer,info.creationDate))metadataWarning='The video was exported, but its source creation date could not be preserved.';send({type:'exported',gen,request,blob:new Blob([target.buffer],{type:'video/mp4'}),...(metadataWarning?{metadataWarning}:{})});}
    catch(error){await current.cancel().catch(()=>{});throw error;}
    finally{clearInterval(watchdog);if(conversion===current)conversion=undefined;canvas.width=canvas.height=1;}
   }

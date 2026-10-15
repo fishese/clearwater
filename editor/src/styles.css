@@ -381,3 +381,5 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 .camera-quality-options{display:flex;flex-wrap:wrap;gap:8px}.camera-quality-choice{display:flex;align-items:center;gap:8px;min-height:42px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:14px}.camera-quality-choice input{width:18px;height:18px;margin:0;accent-color:var(--jade)}.settings-page .camera-quality-caption{margin:8px 0 16px}.settings-page .camera-duration-heading{font-size:14px;margin:14px 0 8px;color:#d4e2e2}
 .about-index a{display:inline-flex;align-items:center;min-height:40px;padding:4px 2px}
 .settings-install a:not(.button){display:inline-flex;align-items:center;min-height:44px}
+
+.video-export-options{min-width:0}.video-export-options .video-quality-choice{display:grid;gap:6px;min-width:0}.video-quality-choice select{width:100%;min-width:0;max-width:100%}

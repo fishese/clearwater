@@ -5,8 +5,8 @@ import {crc32,readPhotoExif,preservePhotoMetadata} from '../src/photo-metadata';
 const bytes=(s:string)=>Uint8Array.from(s,c=>c.charCodeAt(0));
 const binary=(a:Uint8Array)=>Array.from(a,n=>String.fromCharCode(n)).join('');
 function jpeg(exif?:string){const n=(exif?.length??0)+2;return bytes('\xff\xd8'+(exif?'\xff\xe1'+String.fromCharCode(n>>>8,n&255)+exif:'')+'\xff\xd9');}
-const fixture=()=>jpeg(piexif.dump({'0th':{271:'Test Camera',272:'DiveCam',274:6,315:'Test Author',33432:'Test Copyright'},
- Exif:{36867:'2026:10:01 12:34:56',36868:'2026:10:01 12:34:56',36881:'+08:00',37521:'123',33434:[1,125],33437:[28,10],37380:[-1,3],37500:'private maker note',37510:'ASCII\0\0\0Dive comment',41728:'\x03',40962:64,40963:32},
+const fixture=(userComment='ASCII\0\0\0Dive comment')=>jpeg(piexif.dump({'0th':{271:'Test Camera',272:'DiveCam',274:6,315:'Test Author',33432:'Test Copyright'},
+ Exif:{36867:'2026:10:01 12:34:56',36868:'2026:10:01 12:34:56',36881:'+08:00',37521:'123',33434:[1,125],33437:[28,10],37380:[-1,3],37500:'private maker note',37510:userComment,41728:'\x03',40962:64,40963:32},
  GPS:{0:[2,3,0,0],1:'S',2:[[33,1],[12,1],[123456,10000]],3:'W',4:[[151,1],[9,1],[365432,10000]],5:1,6:[123,10],7:[[12,1],[34,1],[56,1]],29:'2026:10:01'}}));
 // Node does not provide the worker FileReader API used by exifr's Blob reader.
 class Reader {
@@ -28,6 +28,13 @@ describe('photo EXIF preservation',()=>{
   expect(output.ImageWidth).toBe(32);expect(output.ImageHeight).toBe(64);expect(output.ExifImageWidth).toBe(32);expect(output.ExifImageHeight).toBe(64);expect(output.ColorSpace).toBe(1);
   expect(piexif.load(binary(result.exif!)).Exif[37500]).toBeUndefined();expect(piexif.load(binary(result.exif!))['1st']).toEqual({});
   expect(piexif.load(binary(result.exif!)).Exif[37510]).toBe('ASCII\0\0\0Dive comment');
+ });
+ it('preserves the original bytes of a Unicode EXIF UserComment',async()=>{
+  // UNICODE marker followed by UTF-16BE bytes, including a surrogate pair.
+  const comment=String.fromCharCode(85,78,73,67,79,68,69,0,0x6f,0x5b,0xd8,0x3d,0xde,0x37);
+  const result=await readPhotoExif(fixture(comment),32,64);
+  expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
+  expect(piexif.load(binary(result.exif!)).Exif[37510]).toBe(comment);
  });
  it('extracts EXIF from an HEIF item container and writes it to a JPEG export',async()=>{
   const join=(...parts:Uint8Array[])=>new Uint8Array(Buffer.concat(parts));

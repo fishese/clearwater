@@ -96,7 +96,7 @@ Open MP4 or MOV from the file picker, Android folder browser, or Android share m
 
 - SDR H.264 and HEVC input work when the browser/device has the matching WebCodecs decoder. MOV is a container; it does not guarantee codec support. iPhone rotation is baked into the exported pixels.
 - Compatible Android 10+ devices can tone-map supported HDR/PQ/HLG and iPhone Dolby Vision clips to an SDR working copy using Media3. The original is retained; preview and export are SDR. The web version and unsupported devices still require an SDR copy.
-- Input: up to 10 minutes, 512 MB and 34 megapixels per frame. Output: H.264 MP4, up to 1080p (portrait or landscape) and 30 fps, maximum 256 MB. Bitrate is reduced for longer clips, reserving room for audio and encoder variation. Originals are preserved.
+- Input: up to 10 minutes, 512 MB and 34 megapixels per frame. Output: H.264 MP4 in 8-bit SDR. Compact defaults to up to 1080p (portrait or landscape) and 30 fps / 256 MiB, with reduced bitrate for long clips. Optional Source preserves display dimensions and frame timestamps when supported, targets up to 36 Mbps and caps output at 512 MiB; oversized estimates are refused rather than reducing quality. Originals are preserved.
 - Primary audio is retained as compatible AAC or converted when supported. Unsupported audio prompts the user to turn off Keep audio; it is never silently dropped. Additional audio tracks, subtitles and descriptive/GPS metadata are not exported.
 - Balanced, RGB, WWE-UIE, Five A+, Shallow-UWnet and compatible custom ONNX engines are supported. New videos start on Five A+. Balanced after AI is photo-only and cannot be applied to video recipes. AI video uses sampled global colour fitting, described below; it does not run a spatial correction map over moving subjects. Long exports can take time; keep the app open. Export and sample analysis can be cancelled.
 - All decoding/correction/encoding runs locally. Large clips are stored in the local library, and encoded output is buffered in memory. These limits do not guarantee every phone can process the largest clip.
@@ -125,7 +125,7 @@ The small, unframed update icon beside the ClearWater brand explicitly checks fo
 
 A previously cached version may not contain the icon. Open `update.html` under the app's hosted base URL (for Pages: https://fishese.github.io/clearwater/update.html) and select Update and open. This independent recovery page activates the current web worker without clearing IndexedDB. The test `node scripts/update-check.mjs` starts a local server with an old cached app, verifies recovery, explicit activation, edit preservation, compact mobile layout and offline failure.
 
-The Export section shows a processing-time notice for videos at least two minutes long or 100 MB, including approximate sampled-AI analysis count where applicable. Existing hard limits remain 10 minutes / 512 MB input and 256 MB output. Start/end trimming before import remains future work; it must precede duration rejection and processing, while larger input files also need a separate storage/import strategy on Android.
+The Export section shows a processing-time notice for videos at least two minutes long or 100 MB, including approximate sampled-AI analysis count where applicable. Input limits remain 10 minutes / 512 MiB; output is capped at 256 MiB in Compact and 512 MiB in Source. Start/end trimming before import remains future work; it must precede duration rejection and processing, while larger input files also need a separate storage/import strategy on Android.
 
 ## Photo metadata
 
@@ -182,3 +182,6 @@ New Android camera JPEGs appear enhanced in Pictures/ClearWater, using the selec
 Clear collection preserves linked camera originals/edits. Restore camera collection in Settings recovers their entries without duplicating gallery images. Confirmed deletion of a linked capture removes its gallery image and private original; ordinary imports still remove only the app copy. On Android 11+, gallery trash hides entries while keeping recovery data. Confirmed permanent deletion cleans up originals and settings; inaccessible providers or missing permissions retain data. Source checks work only where a usable Android URI is known. Back up originals before uninstalling/clearing app data.
 
 The collection shows newest additions first. Preview text and controls suppress long-press selection without changing compare, zoom or picker gestures.
+
+
+Export quality: JPEG High requests .95, Maximum .99; PNG is lossless for the rendered 8-bit sRGB result. UserComment bytes in JPEG EXIF are retained where readable. Optional video metadata preserves supported title/description/comment/date fields and source MP4 creation headers; it is not a complete metadata copy. Source export does not recover detail/range already lost during HDR working-copy conversion.
