@@ -90,7 +90,7 @@ final class NativeMovieWriterTests: XCTestCase {
             let context = CGContext(data: raw.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
                 space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
             context.interpolationQuality = .none
-            context.draw(decoded, in: CGRect(x: -decoded.width/2, y: -decoded.height/2, width: decoded.width, height: decoded.height))
+            context.draw(decoded, in: CGRect(x: -CGFloat(decoded.width)/2, y: -CGFloat(decoded.height)/2, width: CGFloat(decoded.width), height: CGFloat(decoded.height)))
         }
         XCTAssertGreaterThan(Int(pixel[0]), 65, "The encoded frame must include the native Balanced red gain, not the raw source color.")
     }
@@ -147,7 +147,7 @@ final class NativeMovieWriterTests: XCTestCase {
         let asset = AVURLAsset(url: output)
         let video = try XCTUnwrap(asset.tracks(withMediaType: .video).first)
         let audio = try XCTUnwrap(asset.tracks(withMediaType: .audio).first)
-        let description = try XCTUnwrap(audio.formatDescriptions.first as? CMFormatDescription)
+        let description = try XCTUnwrap(audio.formatDescriptions.first) as! CMFormatDescription
         XCTAssertEqual(CMFormatDescriptionGetMediaSubType(description), kAudioFormatMPEG4AAC)
         XCTAssertGreaterThan(CMTimeGetSeconds(audio.timeRange.duration), 0.5)
         XCTAssertLessThan(abs(CMTimeGetSeconds(audio.timeRange.start) - CMTimeGetSeconds(video.timeRange.start)), 0.05)

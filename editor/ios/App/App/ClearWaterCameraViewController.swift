@@ -93,6 +93,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     // on camera flip drop the prior pool rather than retaining full-frame IOSurfaces.
     private var previewPool: CVPixelBufferPool?
     private var previewPoolSize: CGSize?
+    private var previewFailureReported = false
     private var pendingOrientationAngle: CGFloat?
     private var orientationLocked = false
     private var pickerArmed = false
@@ -308,7 +309,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
             .transformed(by: CGAffineTransform(translationX: -offsetX, y: -offsetY))
         let crop = scaled.cropped(to: bounds)
-        ciContext.render(crop, to: drawable.texture, commandBuffer: command, bounds: bounds, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        guard let sRGB = CGColorSpace(name: CGColorSpace.sRGB) else { return }
+        ciContext.render(crop, to: drawable.texture, commandBuffer: command, bounds: bounds, colorSpace: sRGB)
         command.present(drawable); command.commit()
     }
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
@@ -323,16 +325,19 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let recording = movieWriter != nil && writerAcceptingFrames
         if !recording { updateAnalysisIfDue(source) }
         let recipe = snapshotRecipe(forClip: recording)
+        frameLock.lock(); latestSource = source; frameLock.unlock()
         let size = previewSize(width: CVPixelBufferGetWidth(sourceBuffer), height: CVPixelBufferGetHeight(sourceBuffer))
-        guard let pool = previewBufferPool(size: size) else {
-            DispatchQueue.main.async { self.fail(self.text("Live restoration is unavailable.", "Live restoration is unavailable.")) }
-            return
+        if let pool = previewBufferPool(size: size) {
+            switch renderPreview(source, recipe: recipe, size: size, pool: pool) {
+            case .frame(let processed):
+                frameLock.lock(); latestRendered = CIImage(cvPixelBuffer: processed); frameLock.unlock()
+            case .backpressure: break // Keep the current drawable and latest source; retry on the next frame.
+            case .failure:
+                reportPreviewFailure()
+            }
+        } else {
+            reportPreviewFailure()
         }
-        guard let processed = render(source, recipe: recipe, size: size, pool: pool) else {
-            DispatchQueue.main.async { self.fail(self.text("Live restoration is unavailable.", "Live restoration is unavailable.")) }
-            return
-        }
-        frameLock.lock(); latestSource = source; latestRendered = CIImage(cvPixelBuffer: processed); frameLock.unlock()
         if recording, let movieWriter {
             do {
                 switch try movieWriter.appendVideo(source, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) {
@@ -340,6 +345,29 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 case .limitReached: DispatchQueue.main.async { self.stopRecording(reason: nil) }
                 }
             } catch { DispatchQueue.main.async { self.stopRecordingWithError(self.text("The video could not be encoded.", "The video could not be encoded.")) } }
+        }
+    }
+    private enum PreviewRenderResult { case frame(CVPixelBuffer), backpressure, failure }
+    private func renderPreview(_ source: CIImage, recipe: NativeBalancedRecipe, size: CGSize, pool: CVPixelBufferPool) -> PreviewRenderResult {
+        var destination: CVPixelBuffer?
+        let attributes = [kCVPixelBufferPoolAllocationThresholdKey as String: 3] as CFDictionary
+        let status = CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(kCFAllocatorDefault, pool, attributes, &destination)
+        if status == kCVReturnWouldExceedAllocationThreshold { return .backpressure }
+        guard status == kCVReturnSuccess, let destination else { return .failure }
+        let w = CGFloat(Int(size.width)), h = CGFloat(Int(size.height))
+        let scale = max(w / source.extent.width, h / source.extent.height)
+        let fitted = source.transformed(by: CGAffineTransform(translationX: -source.extent.minX, y: -source.extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            .cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+        do { try processor.render(source: fitted, into: destination, recipe: recipe); return .frame(destination) }
+        catch { return .failure }
+    }
+    private func reportPreviewFailure() {
+        guard !previewFailureReported else { return }
+        previewFailureReported = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.fail(self.text("Live restoration is unavailable.", "Live restoration is unavailable."))
         }
     }
     private func previewSize(width: Int, height: Int) -> CGSize {
@@ -410,7 +438,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg]); settings.photoQualityPrioritization = .quality
         if #available(iOS 16.0, *) { settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions }
         recipeLock.lock(); photoRecipes[settings.uniqueID] = currentRecipe; recipeLock.unlock()
-        photoOutput.capturePhoto(with: settings, delegate: self)
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            guard !self.closeRequested, !self.backgrounded else { DispatchQueue.main.async { self.photoFailed(CameraError.unavailable) }; return }
+            self.orientationLocked = true
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
+        }
     }
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         autoreleasepool { processPhoto(photo, error: error) }
@@ -428,6 +461,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     guard let self else { return }; self.captureInFlight = false; self.setState("ready")
                     self.savedPhotoCount += 1; self.updateCounters()
                     self.delegate?.cameraViewController(self, didComplete: descriptor)
+                    self.unlockCaptureOrientation()
                     if self.closeRequested { self.finishClose(); return }
                     if self.options.saveEnhancedPhotos {
                         self.delegate?.cameraViewController(self, saveCaptureToPhotos: id) { saved, warning in
@@ -483,6 +517,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func photoFailed(_ error: Error) {
         processor.purgeIntermediatePools()
+        unlockCaptureOrientation()
         DispatchQueue.main.async { self.captureInFlight = false; self.setState("ready"); self.delegate?.cameraViewController(self, didFail: self.text("Photo could not be saved.", "Photo could not be saved."), captureID: nil); if self.closeRequested { self.finishClose() } }
     }
     @objc private func recordTapped() {
@@ -519,7 +554,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     if self.closeRequested || self.backgrounded {
                         writer.cancel {
                             ClearWaterCaptureStore.shared.discardStagedCapture(id: id)
-                            DispatchQueue.main.async { self.setState("ready"); self.unlockRecordingOrientation(); if self.closeRequested { self.finishClose() } }
+                            DispatchQueue.main.async { self.setState("ready"); self.unlockCaptureOrientation(); if self.closeRequested { self.finishClose() } }
                         }
                         return
                     }
@@ -537,7 +572,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     DispatchQueue.main.async {
                         self.delegate?.cameraViewController(self, didFail: self.text("Recording could not start.", "Recording could not start."), captureID: nil)
                         self.setState("ready")
-                        self.unlockRecordingOrientation()
+                        self.unlockCaptureOrientation()
                     }
                 }
             }
@@ -612,9 +647,9 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func clearWriter() {
         movieWriter = nil; writerAcceptingFrames = false; captureID = nil; videoURL = nil; clipRecipe = nil
         DispatchQueue.main.async { self.recordingStartedAt = nil; self.elapsedTimer?.invalidate(); self.elapsedTimer = nil }
-        unlockRecordingOrientation()
+        unlockCaptureOrientation()
     }
-    private func unlockRecordingOrientation() {
+    private func unlockCaptureOrientation() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.orientationLocked = false
@@ -775,29 +810,13 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if state == "recording" {
             backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ClearWaterFinalizeMovie") { [weak self] in
                 guard let self else { return }
-                self.mediaQueue.async {
-                    let id = self.captureID, url = self.videoURL
-                    self.movieWriter?.cancel {
-                        if let id { try? ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }
-                        if let url { try? FileManager.default.removeItem(at: url) }
-                        self.clearWriter()
-                        DispatchQueue.main.async { self.setState("ready"); self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
-                    }
-                }
+                self.mediaQueue.async { self.movieWriter?.cancel { DispatchQueue.main.async { self.endBackgroundTask() } } }
             }
             stopRecording(reason: nil)
         } else if state == "finalising" {
             backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ClearWaterFinalizeMovie") { [weak self] in
                 guard let self else { return }
-                self.mediaQueue.async {
-                    let id = self.captureID, url = self.videoURL
-                    self.movieWriter?.cancel {
-                        if let id { try? ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }
-                        if let url { try? FileManager.default.removeItem(at: url) }
-                        self.clearWriter()
-                        DispatchQueue.main.async { self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
-                    }
-                }
+                self.mediaQueue.async { self.movieWriter?.cancel { DispatchQueue.main.async { self.endBackgroundTask() } } }
             }
         }
         sessionQueue.async { [weak self] in self?.session.stopRunning() }

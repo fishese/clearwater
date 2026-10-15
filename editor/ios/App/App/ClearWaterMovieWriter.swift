@@ -140,9 +140,11 @@ final class ClearWaterMovieWriter {
             let scale = max(CGFloat(width) / source.extent.width, CGFloat(height) / source.extent.height)
             let scaled = source.transformed(by: CGAffineTransform(translationX: -source.extent.origin.x, y: -source.extent.origin.y))
                 .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-            let crop = CGRect(x: (scaled.extent.width-CGFloat(width))/2,
-                              y: (scaled.extent.height-CGFloat(height))/2,
-                              width: width, height: height)
+            let cropWidth = CGFloat(width)
+            let cropHeight = CGFloat(height)
+            let cropX = (scaled.extent.width - cropWidth) / CGFloat(2)
+            let cropY = (scaled.extent.height - cropHeight) / CGFloat(2)
+            let crop = CGRect(x: cropX, y: cropY, width: cropWidth, height: cropHeight)
             do { try processor.render(source: scaled.cropped(to: crop), into: destination, recipe: recipe) }
             catch { fail(error); throw error }
             guard adaptor.append(destination, withPresentationTime: pts) else {
@@ -258,7 +260,7 @@ final class ClearWaterMovieWriter {
             let width = Int(abs(transformed.width)), height = Int(abs(transformed.height))
             let duration = CMTimeGetSeconds(asset.duration)
             guard width > 0, height > 0, duration.isFinite, duration > 0, duration <= maximumDuration + 1.0/Double(profile.fps) else { throw WriterError.invalidOutput }
-            let subtype = (track.formatDescriptions.first as? CMFormatDescription).map { CMFormatDescriptionGetMediaSubType($0) }
+            let subtype = track.formatDescriptions.first.map { CMFormatDescriptionGetMediaSubType($0 as! CMFormatDescription) }
             let codec = subtype == kCMVideoCodecType_H264 ? "h264" : "unknown"
             guard codec == "h264" else { throw WriterError.invalidOutput }
             let result = Metadata(width: width, height: height, duration: duration, bytes: bytes,
