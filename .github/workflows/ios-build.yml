@@ -82,7 +82,7 @@ jobs:
             ClearWater-unsigned.ipa.sha256
             ios-build-commit.txt
   native-export-regression:
-    name: Test native iOS export startup
+    name: Test native iOS capture, storage and export
     if: inputs.run_native_tests
     runs-on: macos-26
     timeout-minutes: 30
@@ -103,7 +103,12 @@ jobs:
       - name: Build assets and sync iOS
         working-directory: editor
         run: npm run ios:sync
-      - name: Test active iOS scene and export bridge
+      - name: Verify shared-engine native fixtures
+        working-directory: editor
+        run: |
+          node scripts/generate-ios-native-fixtures.mjs
+          git diff --exit-code -- ios/App/AppTests/balanced-parity-fixtures.json
+      - name: Test native scene, camera math, capture storage and writer
         timeout-minutes: 20
         working-directory: editor
         run: |

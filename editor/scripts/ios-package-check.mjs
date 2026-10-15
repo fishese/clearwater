@@ -17,6 +17,10 @@ function checkApp(app){
  if(info.MinimumOSVersion!=='26.0')fail(`deployment target must be 26.0, got ${info.MinimumOSVersion}`);
  for(const key of ['NSCameraUsageDescription','NSMicrophoneUsageDescription','NSPhotoLibraryAddUsageDescription'])if(!info[key])fail(`missing ${key} in Info.plist`);
  const executable=join(app,info.CFBundleExecutable);if(!existsSync(executable))fail(`missing app executable ${executable}`);
+ const binary=readFileSync(executable);
+ for(const plugin of ['ClearWaterExportPlugin','ClearWaterCameraPlugin'])if(!binary.includes(Buffer.from(plugin)))fail(`native ${plugin} is missing from the compiled app`);
+ const metalLibrary=join(app,'default.metallib');
+ if(!existsSync(metalLibrary)||statSync(metalLibrary).size===0)fail('missing compiled Balanced Metal library');
  const archs=run('lipo',['-archs',executable]).split(/\s+/);if(!archs.includes('arm64'))fail(`app executable lacks arm64 (${archs.join(', ')})`);
  const build=run('xcrun',['vtool','-show-build',executable]);if(!/^\s*platform IOS\s*$/m.test(build))fail(`app executable is not built for physical iOS: ${build}`);
  const web=join(app,'public'),html=join(web,'index.html');if(!existsSync(html))fail('missing bundled public/index.html');
@@ -32,7 +36,7 @@ function checkApp(app){
   const localized=JSON.parse(run('plutil',['-convert','json','-o','-',strings]));
   for(const key of ['NSCameraUsageDescription','NSMicrophoneUsageDescription','NSPhotoLibraryAddUsageDescription'])if(!localized[key])fail(`${locale} localization is missing ${key}`);
  }
- console.log(`Validated unsigned arm64 app shell: ${app}`);
+ console.log(`Validated unsigned arm64 native camera app: ${app}`);
 }
 
 const app=arg('--app'),ipa=arg('--ipa');

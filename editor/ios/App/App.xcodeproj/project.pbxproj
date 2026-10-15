@@ -21,7 +21,17 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
-/* End PBXBuildFile section */
+		C10000010000000000000001 /* ClearWaterCameraPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000001 /* ClearWaterCameraPlugin.swift */; };
+		C10000010000000000000002 /* ClearWaterCameraViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000002 /* ClearWaterCameraViewController.swift */; };
+		C10000010000000000000003 /* ClearWaterCaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000003 /* ClearWaterCaptureStore.swift */; };
+		C10000010000000000000004 /* NativeBalancedMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000004 /* NativeBalancedMath.swift */; };
+		C10000010000000000000005 /* ClearWaterBalancedProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000005 /* ClearWaterBalancedProcessor.swift */; };
+		C10000010000000000000006 /* ClearWaterBalanced.metal in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000006 /* ClearWaterBalanced.metal */; };
+		C10000010000000000000007 /* NativeBalancedParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000007 /* NativeBalancedParityTests.swift */; };
+		C10000010000000000000008 /* balanced-parity-fixtures.json in Resources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000008 /* balanced-parity-fixtures.json */; };/* End PBXBuildFile section */
+		C10000010000000000000009 /* ClearWaterMovieWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000009 /* ClearWaterMovieWriter.swift */; };
+		C10000010000000000000010 /* NativeMovieWriterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000010 /* NativeMovieWriterTests.swift */; };
+		C10000010000000000000011 /* NativeCaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000020000000000000011 /* NativeCaptureStoreTests.swift */; };
 
 /* Begin PBXFileReference section */
 		B10000020000000000000001 /* NativeSceneBridgeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSceneBridgeTests.swift; sourceTree = "<group>"; };
@@ -43,7 +53,17 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
-/* End PBXFileReference section */
+		C10000020000000000000001 /* ClearWaterCameraPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterCameraPlugin.swift; sourceTree = "<group>"; };
+		C10000020000000000000002 /* ClearWaterCameraViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterCameraViewController.swift; sourceTree = "<group>"; };
+		C10000020000000000000003 /* ClearWaterCaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterCaptureStore.swift; sourceTree = "<group>"; };
+		C10000020000000000000004 /* NativeBalancedMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBalancedMath.swift; sourceTree = "<group>"; };
+		C10000020000000000000005 /* ClearWaterBalancedProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterBalancedProcessor.swift; sourceTree = "<group>"; };
+		C10000020000000000000006 /* ClearWaterBalanced.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ClearWaterBalanced.metal; sourceTree = "<group>"; };
+		C10000020000000000000007 /* NativeBalancedParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeBalancedParityTests.swift; sourceTree = "<group>"; };
+		C10000020000000000000008 /* balanced-parity-fixtures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = balanced-parity-fixtures.json; sourceTree = "<group>"; };/* End PBXFileReference section */
+		C10000020000000000000009 /* ClearWaterMovieWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterMovieWriter.swift; sourceTree = "<group>"; };
+		C10000020000000000000010 /* NativeMovieWriterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMovieWriterTests.swift; sourceTree = "<group>"; };
+		C10000020000000000000011 /* NativeCaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCaptureStoreTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXVariantGroup section */
 		A10000030000000000000001 /* InfoPlist.strings */ = {
@@ -101,6 +121,10 @@
 			isa = PBXGroup;
 			children = (
 				B10000020000000000000001 /* NativeSceneBridgeTests.swift */,
+				C10000020000000000000007 /* NativeBalancedParityTests.swift */,
+				C10000020000000000000008 /* balanced-parity-fixtures.json */,
+				C10000020000000000000010 /* NativeMovieWriterTests.swift */,
+				C10000020000000000000011 /* NativeCaptureStoreTests.swift */,
 			);
 			path = AppTests;
 			sourceTree = "<group>";
@@ -111,6 +135,13 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				A10000020000000000000001 /* ClearWaterBridgeViewController.swift */,
 				A10000020000000000000002 /* ClearWaterExportPlugin.swift */,
+				C10000020000000000000001 /* ClearWaterCameraPlugin.swift */,
+				C10000020000000000000002 /* ClearWaterCameraViewController.swift */,
+				C10000020000000000000003 /* ClearWaterCaptureStore.swift */,
+				C10000020000000000000004 /* NativeBalancedMath.swift */,
+				C10000020000000000000005 /* ClearWaterBalancedProcessor.swift */,
+				C10000020000000000000006 /* ClearWaterBalanced.metal */,
+				C10000020000000000000009 /* ClearWaterMovieWriter.swift */,
 				A10000030000000000000001 /* InfoPlist.strings */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -245,7 +276,9 @@
 		B10000050000000000000002 /* AppTests Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				C10000010000000000000008 /* balanced-parity-fixtures.json in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -257,6 +290,13 @@
 			files = (
 				A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */,
 				A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */,
+				C10000010000000000000001 /* ClearWaterCameraPlugin.swift in Sources */,
+				C10000010000000000000002 /* ClearWaterCameraViewController.swift in Sources */,
+				C10000010000000000000003 /* ClearWaterCaptureStore.swift in Sources */,
+				C10000010000000000000004 /* NativeBalancedMath.swift in Sources */,
+				C10000010000000000000005 /* ClearWaterBalancedProcessor.swift in Sources */,
+				C10000010000000000000006 /* ClearWaterBalanced.metal in Sources */,
+				C10000010000000000000009 /* ClearWaterMovieWriter.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);
@@ -267,6 +307,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000010000000000000001 /* NativeSceneBridgeTests.swift in Sources */,
+				C10000010000000000000007 /* NativeBalancedParityTests.swift in Sources */,
+				C10000010000000000000010 /* NativeMovieWriterTests.swift in Sources */,
+				C10000010000000000000011 /* NativeCaptureStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -542,3 +585,5 @@
 	};
 	rootObject = 504EC2FC1FED79650016851F /* Project object */;
 }
+
+

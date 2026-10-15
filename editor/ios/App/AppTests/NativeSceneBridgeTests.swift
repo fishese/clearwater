@@ -5,7 +5,7 @@ import WebKit
 
 final class NativeSceneBridgeTests: XCTestCase {
     @MainActor
-    func testConnectedSceneRegistersAndUsesExportPlugin() async throws {
+    func testConnectedSceneRegistersAndUsesExportAndCameraPlugins() async throws {
         let deadline = Date().addingTimeInterval(30)
         var bridgeController: ClearWaterBridgeViewController?
         while Date() < deadline {
@@ -37,6 +37,14 @@ final class NativeSceneBridgeTests: XCTestCase {
         void (async () => {
           try {
             const bridge = window.Capacitor;
+            if (!bridge.isPluginAvailable('ClearWaterCamera')) throw new Error('Native camera plugin was not registered');
+            const inventory = await bridge.nativePromise('ClearWaterCamera', 'listCaptures', {});
+            if (!Array.isArray(inventory.captures)) throw new Error('Invalid native capture inventory');
+            for (const capture of inventory.captures) {
+              if (capture.schemaVersion !== 1 || capture.recipeVersion !== 1) throw new Error('Unsupported capture schema');
+            }
+            const pending = await bridge.nativePromise('ClearWaterCamera', 'drainCaptures', {});
+            if (!Array.isArray(pending.captures)) throw new Error('Invalid pending capture inventory');
             const {id} = await bridge.nativePromise('ClearWaterExport', 'beginExport', {
               name: 'clearwater-bridge-test.json', type: 'application/json', size: 4
             });

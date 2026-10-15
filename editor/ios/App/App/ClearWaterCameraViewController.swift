@@ -1,0 +1,845 @@
+import AVFoundation
+import CoreImage
+import CoreVideo
+import ImageIO
+import MetalKit
+import UIKit
+
+struct ClearWaterCameraOptions {
+    let locale: String
+    let strings: [String: String]
+    let strength: Double
+    let quality: String
+    let minutes: Int
+    let microphoneEnabled: Bool
+    let saveEnhancedPhotos: Bool
+    init(locale: String, strings: [String: String], settings: [String: Any]) {
+        self.locale = ["en", "zh-HK", "ja"].contains(locale) ? locale : "en"
+        self.strings = strings
+        strength = min(100, max(0, (settings["strength"] as? NSNumber)?.doubleValue ?? 80)) / 100
+        let quality = settings["quality"] as? String ?? "standard"
+        self.quality = quality == "standard" ? "standard" : "high"
+        let minutes = (settings["minutes"] as? NSNumber)?.intValue ?? 1
+        self.minutes = [1, 3, 5].contains(minutes) ? minutes : 1
+        microphoneEnabled = settings["microphoneEnabled"] as? Bool ?? false
+        saveEnhancedPhotos = settings["saveEnhancedPhotos"] as? Bool ?? false
+    }
+    func text(_ key: String, _ fallback: String) -> String { strings[key] ?? fallback }
+}
+
+protocol ClearWaterCameraViewControllerDelegate: AnyObject {
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didComplete descriptor: [String: Any])
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didFail message: String, captureID: UUID?)
+    func cameraViewController(_ controller: ClearWaterCameraViewController, recordingState: String)
+    func cameraViewControllerDidClose(_ controller: ClearWaterCameraViewController)
+    func cameraViewController(_ controller: ClearWaterCameraViewController, saveCaptureToPhotos id: UUID, completion: @escaping (Bool, String?) -> Void)
+}
+
+/// Camera/session callbacks and encoding use bounded serial queues. Late capture frames are dropped.
+final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
+    AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate,
+    AVCaptureAudioDataOutputSampleBufferDelegate {
+    weak var delegate: ClearWaterCameraViewControllerDelegate?
+    private let options: ClearWaterCameraOptions
+    private let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "clearwater.camera.session")
+    private let mediaQueue = DispatchQueue(label: "clearwater.camera.media")
+    private let storageQueue = DispatchQueue(label: "clearwater.camera.storage", qos: .userInitiated)
+    private let frameLock = NSLock()
+    private let recipeLock = NSLock()
+    private let ciContext: CIContext
+    private let renderCommandQueue: MTLCommandQueue
+    private let metalView: MTKView
+    private let processor: ClearWaterBalancedProcessor
+    private let photoOutput = AVCapturePhotoOutput()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let audioOutput = AVCaptureAudioDataOutput()
+    private var cameraInput: AVCaptureDeviceInput?
+    private var audioInput: AVCaptureDeviceInput?
+    private var observers: [NSObjectProtocol] = []
+    // cameraPosition and cameraInput are owned by sessionQueue.
+    private var cameraPosition: AVCaptureDevice.Position = .back
+    private var hardwareWhiteBalanceLocked = false
+    private let lifecycleLock = NSLock()
+    private var closeFlag = false
+    private var backgroundFlag = false
+    private var audioEnabledFlag = false
+    private var pickedNeutralFlag = false
+    private var closeRequested: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return closeFlag }
+        set { lifecycleLock.lock(); closeFlag = newValue; lifecycleLock.unlock() }
+    }
+    private var backgrounded: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return backgroundFlag }
+        set { lifecycleLock.lock(); backgroundFlag = newValue; lifecycleLock.unlock() }
+    }
+    private var audioEnabled: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return audioEnabledFlag }
+        set { lifecycleLock.lock(); audioEnabledFlag = newValue; lifecycleLock.unlock() }
+    }
+    private var pickedNeutral: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return pickedNeutralFlag }
+        set { lifecycleLock.lock(); pickedNeutralFlag = newValue; lifecycleLock.unlock() }
+    }
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var configured = false
+    private var captureInFlight = false
+    private var currentRecipe: NativeBalancedRecipe
+    private var clipRecipe: NativeBalancedRecipe?
+    private var photoRecipes: [Int64: NativeBalancedRecipe] = [:]
+    private var latestRendered: CIImage?
+    private var latestSource: CIImage?
+    // Preview buffers are reused with a hard allocation threshold; resolution changes
+    // on camera flip drop the prior pool rather than retaining full-frame IOSurfaces.
+    private var previewPool: CVPixelBufferPool?
+    private var previewPoolSize: CGSize?
+    private var pendingOrientationAngle: CGFloat?
+    private var orientationLocked = false
+    private var pickerArmed = false
+    private var loupeView: UIImageView?
+    private var pendingNeutralPatch: Data?
+    private var state = "starting"
+    private var photoButton: UIButton!
+    private var recordButton: UIButton!
+    private var pickerButton: UIButton!
+    private var strengthSlider: UISlider!
+    private var statusLabel: UILabel!
+    private var durationLabel: UILabel!
+    private var countersLabel: UILabel!
+    private var resetButton: UIButton!
+    private var elapsedTimer: Timer?
+    private var recordingStartedAt: TimeInterval?
+    private var savedPhotoCount = 0
+    private var savedVideoCount = 0
+    private var micButton: UIButton!
+    // Writer state is confined to mediaQueue.
+    private var movieWriter: ClearWaterMovieWriter?
+    private var writerAcceptingFrames = false
+    private var writerIncludesAudio = false
+    private var recordingStartPTS: CMTime?
+    private var acceptedVideoFrames = 0
+    private var videoURL: URL?
+    private var captureID: UUID?
+    private var lastAnalysisTime = 0.0
+    private var videoByteLimit: Int64 {
+        let standard: [Int64] = [64, 192, 320]
+        let high: [Int64] = [128, 384, 500]
+        let index = options.minutes == 1 ? 0 : options.minutes == 3 ? 1 : 2
+        return (options.quality == "high" ? high[index] : standard[index]) * 1024 * 1024
+    }
+
+    init(options: ClearWaterCameraOptions) throws {
+        self.options = options
+        audioEnabledFlag = options.microphoneEnabled
+        processor = try ClearWaterBalancedProcessor()
+        var initialRecipe = NativeBalancedMath.defaultCameraRecipe()
+        initialRecipe.strength = options.strength
+        currentRecipe = initialRecipe
+        guard let device = MTLCreateSystemDefaultDevice() else { throw ClearWaterProcessorError.metalUnavailable }
+        guard let commandQueue = device.makeCommandQueue() else { throw ClearWaterProcessorError.metalUnavailable }
+        renderCommandQueue = commandQueue
+        ciContext = CIContext(mtlDevice: device, options: [.cacheIntermediates: false])
+        metalView = MTKView(frame: .zero, device: device)
+        super.init(nibName: nil, bundle: nil)
+    }
+    required init?(coder: NSCoder) { nil }
+    override var prefersStatusBarHidden: Bool { true }
+    private func text(_ key: String, _ fallback: String) -> String { options.text(key, fallback) }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        setupUI()
+        metalView.translatesAutoresizingMaskIntoConstraints = false
+        metalView.framebufferOnly = false
+        metalView.colorPixelFormat = .bgra8Unorm
+        metalView.isPaused = false
+        metalView.enableSetNeedsDisplay = false
+        metalView.preferredFramesPerSecond = 30
+        metalView.delegate = self
+        view.insertSubview(metalView, at: 0)
+        NSLayoutConstraint.activate([metalView.leadingAnchor.constraint(equalTo: view.leadingAnchor), metalView.trailingAnchor.constraint(equalTo: view.trailingAnchor), metalView.topAnchor.constraint(equalTo: view.topAnchor), metalView.bottomAnchor.constraint(equalTo: view.bottomAnchor)])
+        installObservers()
+        setState("starting")
+        requestCamera()
+    }
+    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); updateOrientation() }
+    deinit { observers.forEach(NotificationCenter.default.removeObserver); elapsedTimer?.invalidate() }
+
+    private func setupUI() {
+        let top = UIStackView(); top.axis = .horizontal; top.alignment = .center; top.distribution = .equalSpacing; top.translatesAutoresizingMaskIntoConstraints = false
+        let close = button("xmark", text("Close camera", "Close camera"), 60, #selector(closeTapped))
+        pickerButton = button("eyedropper", text("Pick white balance", "Pick white balance"), 60, #selector(pickerTapped))
+        micButton = button(audioEnabled ? "mic.fill" : "mic.slash.fill", text("Microphone", "Microphone"), 60, #selector(microphoneTapped))
+        let flip = button("arrow.triangle.2.circlepath.camera", text("Flip camera", "Flip camera"), 60, #selector(flipTapped))
+        [close, pickerButton, micButton, flip].forEach(top.addArrangedSubview)
+        view.addSubview(top)
+        let strength = UIStackView(); strength.axis = .vertical; strength.spacing = 4; strength.translatesAutoresizingMaskIntoConstraints = false
+        let title = UILabel(); title.text = text("Restoration strength", "Restoration strength"); title.textColor = .white; title.font = .systemFont(ofSize: 14, weight: .medium)
+        strengthSlider = UISlider(); strengthSlider.minimumValue = 0; strengthSlider.maximumValue = 100; strengthSlider.value = Float(options.strength * 100); strengthSlider.accessibilityLabel = title.text; strengthSlider.addTarget(self, action: #selector(strengthChanged), for: .valueChanged)
+        strength.addArrangedSubview(title); strength.addArrangedSubview(strengthSlider); view.addSubview(strength)
+        let bottom = UIStackView(); bottom.axis = .horizontal; bottom.alignment = .center; bottom.distribution = .equalSpacing; bottom.translatesAutoresizingMaskIntoConstraints = false
+        resetButton = button("arrow.counterclockwise", text("Reset white balance", "Reset white balance"), 64, #selector(resetTapped))
+        photoButton = button("circle.inset.filled", text("Take photo", "Take photo"), 88, #selector(photoTapped))
+        recordButton = button("record.circle", text("Start recording", "Start recording"), 68, #selector(recordTapped))
+        [resetButton, photoButton, recordButton].forEach(bottom.addArrangedSubview); view.addSubview(bottom)
+        statusLabel = UILabel(); statusLabel.textColor = .white; statusLabel.textAlignment = .center; statusLabel.font = .systemFont(ofSize: 14, weight: .semibold); statusLabel.numberOfLines = 2; statusLabel.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(statusLabel)
+        durationLabel = UILabel(); durationLabel.textColor = .white; durationLabel.textAlignment = .center; durationLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .semibold); durationLabel.translatesAutoresizingMaskIntoConstraints = false; view.addSubview(durationLabel)
+        countersLabel = UILabel(); countersLabel.textColor = .white; countersLabel.textAlignment = .center; countersLabel.font = .systemFont(ofSize: 13, weight: .medium); countersLabel.translatesAutoresizingMaskIntoConstraints = false; countersLabel.numberOfLines = 1; view.addSubview(countersLabel)
+        let safe = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([top.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 8), top.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -8), top.topAnchor.constraint(equalTo: safe.topAnchor, constant: 8), strength.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 28), strength.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -28), strength.bottomAnchor.constraint(equalTo: bottom.topAnchor, constant: -26), bottom.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 24), bottom.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -24), bottom.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -18), statusLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor), statusLabel.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 18), countersLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor), countersLabel.bottomAnchor.constraint(equalTo: durationLabel.topAnchor, constant: -5), durationLabel.centerXAnchor.constraint(equalTo: safe.centerXAnchor), durationLabel.bottomAnchor.constraint(equalTo: strength.topAnchor, constant: -6)])
+        updateCounters()
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(previewDragged(_:)))
+        pan.cancelsTouchesInView = false
+        metalView.addGestureRecognizer(pan)
+    }
+    private func button(_ symbol: String, _ label: String, _ size: CGFloat, _ action: Selector) -> UIButton {
+        let b = UIButton(type: .system); b.tintColor = .white; b.backgroundColor = UIColor.black.withAlphaComponent(0.52); b.layer.cornerRadius = size / 2; b.layer.borderWidth = 1; b.layer.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor; b.setImage(UIImage(systemName: symbol), for: .normal); b.accessibilityLabel = label; b.translatesAutoresizingMaskIntoConstraints = false; NSLayoutConstraint.activate([b.widthAnchor.constraint(equalToConstant: size), b.heightAnchor.constraint(equalToConstant: size)]); b.addTarget(self, action: action, for: .touchUpInside); return b
+    }
+    private func installObservers() {
+        let n = NotificationCenter.default
+        observers.append(n.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterBackground() })
+        observers.append(n.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterForeground() })
+        observers.append(n.addObserver(forName: .AVCaptureSessionWasInterrupted, object: session, queue: .main) { [weak self] _ in self?.interrupted() })
+        observers.append(n.addObserver(forName: .AVCaptureSessionInterruptionEnded, object: session, queue: .main) { [weak self] _ in self?.restartIfActive() })
+        observers.append(n.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.checkThermalState() })
+        observers.append(n.addObserver(forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main) { [weak self] _ in self?.processor.purgeIntermediatePools() })
+    }
+    private func requestCamera() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: configureAndStart()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] ok in DispatchQueue.main.async { guard let self else { return }; ok ? self.configureAndStart() : self.fail(self.text("Camera permission is required.", "Camera permission is required.")) } }
+        default: fail(text("Enable camera access in Settings.", "Enable camera access in Settings."))
+        }
+    }
+    private func configureAndStart() {
+        sessionQueue.async { [weak self] in
+            guard let self, !self.backgrounded, !self.closeRequested else { return }
+            do { if !self.configured { try self.configureSession() }; self.session.startRunning(); DispatchQueue.main.async { self.setState("ready") } }
+            catch { DispatchQueue.main.async { self.fail(self.text("The camera could not start.", "The camera could not start.")) } }
+        }
+    }
+    private func configureSession() throws {
+        session.beginConfiguration()
+        session.sessionPreset = .inputPriority
+        session.automaticallyConfiguresCaptureDeviceForWideColor = false
+        defer { session.commitConfiguration() }
+        let input = try AVCaptureDeviceInput(device: selectCamera())
+        guard session.canAddInput(input), session.canAddOutput(photoOutput), session.canAddOutput(videoOutput) else { throw CameraError.unavailable }
+        session.addInput(input); cameraInput = input; session.addOutput(photoOutput); session.addOutput(videoOutput)
+        try configureDeviceFormat(input.device)
+        configurePhotoDimensions(for: input.device)
+        photoOutput.maxPhotoQualityPrioritization = .quality
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        videoOutput.setSampleBufferDelegate(self, queue: mediaQueue)
+        if audioEnabled { try addAudioIfGranted() }
+        configured = true
+        requestOrientationUpdate()
+    }
+    private func configureDeviceFormat(_ device: AVCaptureDevice) throws {
+        try device.lockForConfiguration()
+        defer { device.unlockForConfiguration() }
+        let supported = device.formats.filter { format in
+            let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let pixels = Int(dimensions.width) * Int(dimensions.height)
+            return dimensions.width > 0 && dimensions.height > 0 && pixels <= 1920 * 1080 &&
+                format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) &&
+                format.supportedColorSpaces.contains(.sRGB)
+        }
+        if let best = supported.max(by: { a, b in
+            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription), db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
+            return Int(da.width) * Int(da.height) < Int(db.width) * Int(db.height)
+        }) { device.activeFormat = best }
+        guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) else { throw CameraError.unavailable }
+        device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
+        device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+        device.automaticallyAdjustsVideoHDREnabled = false
+        if device.activeFormat.isVideoHDRSupported { device.isVideoHDREnabled = false }
+        if device.activeFormat.supportedColorSpaces.contains(.sRGB) { device.activeColorSpace = .sRGB }
+        else { throw CameraError.unavailable }
+    }
+    private func configurePhotoDimensions(for device: AVCaptureDevice) {
+        if #available(iOS 16.0, *) {
+            let candidates = device.activeFormat.supportedMaxPhotoDimensions.filter { $0.width > 0 && $0.height > 0 }
+            let limit = 12_500_000
+            let inBudget = candidates.filter { Int($0.width) * Int($0.height) <= limit }
+            let chosen = inBudget.max { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+                ?? candidates.min { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }
+            if let chosen { photoOutput.maxPhotoDimensions = chosen }
+        }
+    }
+    private func selectCamera() throws -> AVCaptureDevice {
+        let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: cameraPosition)
+        guard let camera = discovery.devices.first else { throw CameraError.unavailable }
+        return camera
+    }
+    private func addAudioIfGranted() throws {
+        guard audioInput == nil, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+              let device = AVCaptureDevice.default(for: .audio) else { return }
+        let input = try AVCaptureDeviceInput(device: device)
+        guard session.canAddInput(input), session.canAddOutput(audioOutput) else { return }
+        session.addInput(input); session.addOutput(audioOutput); audioInput = input
+        audioOutput.setSampleBufferDelegate(self, queue: mediaQueue)
+    }
+    private func updateOrientation() { requestOrientationUpdate() }
+    private func requestOrientationUpdate() {
+        guard Thread.isMainThread else { DispatchQueue.main.async { [weak self] in self?.requestOrientationUpdate() }; return }
+        let interface = view.window?.windowScene?.interfaceOrientation ?? .portrait
+        let angle: CGFloat = interface == .landscapeLeft ? 180 : interface == .landscapeRight ? 0 : interface == .portraitUpsideDown ? 270 : 90
+        sessionQueue.async { [weak self] in self?.configureOrientation(angle: angle) }
+    }
+    private func configureOrientation(angle: CGFloat) {
+        guard !orientationLocked else { return }
+        for output in [photoOutput, videoOutput] as [AVCaptureOutput] {
+            if let c = output.connection(with: .video), c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        }
+    }
+
+    func draw(in view: MTKView) {
+        frameLock.lock(); let image = latestRendered; frameLock.unlock()
+        guard let image, let drawable = view.currentDrawable, let command = renderCommandQueue.makeCommandBuffer() else { return }
+        let bounds = CGRect(x: 0, y: 0, width: drawable.texture.width, height: drawable.texture.height)
+        let scale = max(bounds.width / image.extent.width, bounds.height / image.extent.height)
+        let scaledSize = CGSize(width: image.extent.width * scale, height: image.extent.height * scale)
+        let offsetX = (scaledSize.width - bounds.width) / 2, offsetY = (scaledSize.height - bounds.height) / 2
+        let scaled = image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+            .transformed(by: CGAffineTransform(translationX: -offsetX, y: -offsetY))
+        let crop = scaled.cropped(to: bounds)
+        ciContext.render(crop, to: drawable.texture, commandBuffer: command, bounds: bounds, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        command.present(drawable); command.commit()
+    }
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        autoreleasepool { processCaptureOutput(output, sampleBuffer: sampleBuffer) }
+    }
+    private func processCaptureOutput(_ output: AVCaptureOutput, sampleBuffer: CMSampleBuffer) {
+        if output === audioOutput { appendAudio(sampleBuffer); return }
+        guard output === videoOutput, let sourceBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let source = CIImage(cvPixelBuffer: sourceBuffer)
+        let recording = movieWriter != nil && writerAcceptingFrames
+        if !recording { updateAnalysisIfDue(source) }
+        let recipe = snapshotRecipe(forClip: recording)
+        let size = previewSize(width: CVPixelBufferGetWidth(sourceBuffer), height: CVPixelBufferGetHeight(sourceBuffer))
+        guard let pool = previewBufferPool(size: size) else {
+            DispatchQueue.main.async { self.fail(self.text("Live restoration is unavailable.", "Live restoration is unavailable.")) }
+            return
+        }
+        guard let processed = render(source, recipe: recipe, size: size, pool: pool) else {
+            DispatchQueue.main.async { self.fail(self.text("Live restoration is unavailable.", "Live restoration is unavailable.")) }
+            return
+        }
+        frameLock.lock(); latestSource = source; latestRendered = CIImage(cvPixelBuffer: processed); frameLock.unlock()
+        if recording, let movieWriter {
+            do {
+                switch try movieWriter.appendVideo(source, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) {
+                case .appended, .droppedBackpressure: break
+                case .limitReached: DispatchQueue.main.async { self.stopRecording(reason: nil) }
+                }
+            } catch { DispatchQueue.main.async { self.stopRecordingWithError(self.text("The video could not be encoded.", "The video could not be encoded.")) } }
+        }
+    }
+    private func previewSize(width: Int, height: Int) -> CGSize {
+        let longSide = CGFloat(max(width, height)), shortSide = CGFloat(min(width, height))
+        let scale = min(1, min(1280 / longSide, 720 / shortSide))
+        return CGSize(width: max(2, floor(CGFloat(width) * scale)), height: max(2, floor(CGFloat(height) * scale)))
+    }
+    private func previewBufferPool(size: CGSize) -> CVPixelBufferPool? {
+        guard size != previewPoolSize || previewPool == nil else { return previewPool }
+        previewPool = nil; previewPoolSize = size
+        let attributes: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey as String: Int(size.width), kCVPixelBufferHeightKey as String: Int(size.height),
+            kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferMetalCompatibilityKey as String: true]
+        var pool: CVPixelBufferPool?
+        guard CVPixelBufferPoolCreate(kCFAllocatorDefault, [kCVPixelBufferPoolMinimumBufferCountKey as String: 2] as CFDictionary,
+            attributes as CFDictionary, &pool) == kCVReturnSuccess else { return nil }
+        previewPool = pool
+        return pool
+    }
+    private func updateAnalysisIfDue(_ source: CIImage) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard !pickedNeutral, now - lastAnalysisTime >= 0.5 else { return }
+        lastAnalysisTime = now
+        guard let data = analysisPixels(source),
+              let analysis = try? NativeBalancedMath.analyse(rgba: data, width: 64, height: 48) else { return }
+        recipeLock.lock()
+        let previous = currentRecipe
+        currentRecipe = NativeBalancedMath.makeCameraRecipe(analysis: analysis, strength: previous.strength, previous: previous)
+        recipeLock.unlock()
+    }
+    private func analysisPixels(_ source: CIImage) -> Data? {
+        let width = 64, height = 48, bounds = CGRect(x: 0, y: 0, width: 64, height: 48)
+        let scale = max(bounds.width / source.extent.width, bounds.height / source.extent.height)
+        let scaled = source.transformed(by: CGAffineTransform(scaleX: scale, y: scale)).cropped(to: bounds)
+        guard let cg = ciContext.createCGImage(scaled, from: bounds) else { return nil }
+        let data = NSMutableData(length: width * height * 4)!
+        guard let context = CGContext(data: data.mutableBytes, width: width, height: height, bitsPerComponent: 8,
+            bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.draw(cg, in: bounds)
+        return data as Data
+    }
+    private func render(_ source: CIImage, recipe: NativeBalancedRecipe, size: CGSize, pool: CVPixelBufferPool?) -> CVPixelBuffer? {
+        let w = max(1, Int(size.width)), h = max(1, Int(size.height))
+        var destination: CVPixelBuffer?
+        if let pool {
+            let attributes = [kCVPixelBufferPoolAllocationThresholdKey as String: 3] as CFDictionary
+            guard CVPixelBufferPoolCreatePixelBufferWithAuxAttributes(kCFAllocatorDefault, pool, attributes, &destination) == kCVReturnSuccess else { return nil }
+        }
+        else {
+            let attrs: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA, kCVPixelBufferWidthKey as String: w, kCVPixelBufferHeightKey as String: h, kCVPixelBufferIOSurfacePropertiesKey as String: [:], kCVPixelBufferMetalCompatibilityKey as String: true]
+            guard CVPixelBufferCreate(kCFAllocatorDefault, w, h, kCVPixelFormatType_32BGRA, attrs as CFDictionary, &destination) == kCVReturnSuccess else { return nil }
+        }
+        guard let destination else { return nil }
+        let scale = max(CGFloat(w) / source.extent.width, CGFloat(h) / source.extent.height)
+        let fitted = source.transformed(by: CGAffineTransform(scaleX: scale, y: scale)).cropped(to: CGRect(x: 0, y: 0, width: w, height: h))
+        do { try processor.render(source: fitted, into: destination, recipe: recipe); return destination } catch { return nil }
+    }
+    private func snapshotRecipe(forClip: Bool = false) -> NativeBalancedRecipe {
+        recipeLock.lock(); defer { recipeLock.unlock() }
+        if forClip, let clipRecipe { return clipRecipe }
+        return currentRecipe
+    }
+
+    @objc private func photoTapped() {
+        guard state == "ready", !captureInFlight else { return }
+        captureInFlight = true; photoButton.isEnabled = false; setState("capturing")
+        let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg]); settings.photoQualityPrioritization = .quality
+        if #available(iOS 16.0, *) { settings.maxPhotoDimensions = photoOutput.maxPhotoDimensions }
+        recipeLock.lock(); photoRecipes[settings.uniqueID] = currentRecipe; recipeLock.unlock()
+        photoOutput.capturePhoto(with: settings, delegate: self)
+    }
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        autoreleasepool { processPhoto(photo, error: error) }
+    }
+    private func processPhoto(_ photo: AVCapturePhoto, error: Error?) {
+        recipeLock.lock(); let recipe = photoRecipes.removeValue(forKey: photo.resolvedSettings.uniqueID) ?? currentRecipe; recipeLock.unlock()
+        if let error { photoFailed(error); return }
+        guard let sourceData = photo.fileDataRepresentation(), let image = CIImage(data: sourceData, options: [.applyOrientationProperty: true]),
+              let dims = imageDimensions(image), let enhanced = renderedJPEG(image, sourceData: sourceData, recipe: recipe), let thumb = thumbnail(enhanced) else { photoFailed(CameraError.processing); return }
+        let id = ClearWaterCaptureStore.shared.newCaptureID()
+        storageQueue.async { [weak self] in
+            do {
+                let descriptor = try ClearWaterCaptureStore.shared.commitPhoto(id: id, originalData: sourceData, enhancedData: enhanced, thumbnailData: thumb, width: dims.width, height: dims.height, recipe: try NativeBalancedMath.recipeDictionary(recipe))
+                DispatchQueue.main.async {
+                    guard let self else { return }; self.captureInFlight = false; self.setState("ready")
+                    self.savedPhotoCount += 1; self.updateCounters()
+                    self.delegate?.cameraViewController(self, didComplete: descriptor)
+                    if self.closeRequested { self.finishClose(); return }
+                    if self.options.saveEnhancedPhotos {
+                        self.delegate?.cameraViewController(self, saveCaptureToPhotos: id) { saved, warning in
+                            DispatchQueue.main.async {
+                                guard !self.closeRequested else { return }
+                                if saved {
+                                    self.statusLabel.text = self.text("Photo saved to ClearWater and Photos.", "Photo saved to ClearWater and Photos.")
+                                    if let warning { self.statusLabel.text?.append(" \(warning)") }
+                                } else {
+                                    self.statusLabel.text = self.text("Photo saved privately. Photos copy failed; you can retry later.", "Photo saved privately. Photos copy failed; you can retry later.")
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch { self?.photoFailed(error) }
+            self?.processor.purgeIntermediatePools()
+        }
+    }
+    private func renderedJPEG(_ image: CIImage, sourceData: Data, recipe: NativeBalancedRecipe) -> Data? {
+        guard let dims = imageDimensions(image), let buffer = render(image, recipe: recipe, size: CGSize(width: dims.width, height: dims.height), pool: nil) else { return nil }
+        guard let source = CGImageSourceCreateWithData(sourceData as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
+        let output = NSMutableData()
+        let rendered = CIImage(cvPixelBuffer: buffer)
+        let bounds = rendered.extent.integral
+        guard let cg = ciContext.createCGImage(rendered, from: bounds, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!),
+              let destination = CGImageDestinationCreateWithData(output, "public.jpeg" as CFString, 1, nil) else { return nil }
+        var metadata = properties
+        metadata[kCGImagePropertyOrientation] = 1
+        metadata[kCGImagePropertyPixelWidth] = dims.width
+        metadata[kCGImagePropertyPixelHeight] = dims.height
+        metadata[kCGImageDestinationLossyCompressionQuality] = 0.94
+        if var tiff = metadata[kCGImagePropertyTIFFDictionary] as? [CFString: Any] {
+            tiff[kCGImagePropertyTIFFOrientation] = 1
+            metadata[kCGImagePropertyTIFFDictionary] = tiff
+        }
+        if var exif = metadata[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            exif[kCGImagePropertyExifPixelXDimension] = dims.width
+            exif[kCGImagePropertyExifPixelYDimension] = dims.height
+            metadata[kCGImagePropertyExifDictionary] = exif
+        }
+        CGImageDestinationAddImage(destination, cg, metadata as CFDictionary)
+        return CGImageDestinationFinalize(destination) ? output as Data : nil
+    }
+    private func imageDimensions(_ image: CIImage) -> (width: Int, height: Int)? {
+        let e = image.extent.integral; guard e.width > 0, e.height > 0 else { return nil }; return (Int(e.width), Int(e.height))
+    }
+    private func thumbnail(_ jpeg: Data) -> Data? {
+        guard let src = CGImageSourceCreateWithData(jpeg as CFData, nil), let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: 480] as CFDictionary) else { return nil }
+        let data = NSMutableData(); guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, [kCGImageDestinationLossyCompressionQuality: 0.75] as CFDictionary); return CGImageDestinationFinalize(dest) ? data as Data : nil
+    }
+    private func photoFailed(_ error: Error) {
+        processor.purgeIntermediatePools()
+        DispatchQueue.main.async { self.captureInFlight = false; self.setState("ready"); self.delegate?.cameraViewController(self, didFail: self.text("Photo could not be saved.", "Photo could not be saved."), captureID: nil); if self.closeRequested { self.finishClose() } }
+    }
+    @objc private func recordTapped() {
+        if state == "recording" { stopRecording(reason: nil); return }
+        guard state == "ready" else { return }
+        if audioEnabled && AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in DispatchQueue.main.async { guard let self else { return }; self.audioEnabled = granted; self.startRecording() } }
+        } else { startRecording() }
+    }
+    private func startRecording() {
+        guard state == "ready", !closeRequested, !backgrounded else { return }
+        setState("startingRecording")
+        recipeLock.lock(); let frozenRecipe = currentRecipe; clipRecipe = frozenRecipe; recipeLock.unlock()
+        let profile: ClearWaterMovieWriter.QualityProfile = options.quality == "high" ? .high : .standard
+        frameLock.lock(); let sourceSize = latestSource?.extent.size ?? CGSize(width: 1280, height: 720); frameLock.unlock()
+        // Session inputs are only changed on sessionQueue. Wait for optional microphone
+        // authorization/input setup before constructing the writer on mediaQueue.
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.orientationLocked = true
+            self.session.beginConfiguration()
+            if self.audioEnabled, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
+                do { try self.addAudioIfGranted() } catch { self.audioEnabled = false }
+            }
+            let withAudio = self.audioEnabled && self.audioInput != nil
+            self.session.commitConfiguration()
+            self.mediaQueue.async {
+                do {
+                    let id = ClearWaterCaptureStore.shared.newCaptureID()
+                    let url = try ClearWaterCaptureStore.shared.makeVideoOutputURL(id: id)
+                    let writer = try ClearWaterMovieWriter(outputURL: url, sourceSize: sourceSize, profile: profile, audioEnabled: withAudio,
+                        recipe: frozenRecipe, processor: self.processor, maximumDuration: Double(self.options.minutes * 60), maximumBytes: self.videoByteLimit)
+                    try writer.start()
+                    if self.closeRequested || self.backgrounded {
+                        writer.cancel {
+                            ClearWaterCaptureStore.shared.discardStagedCapture(id: id)
+                            DispatchQueue.main.async { self.setState("ready"); self.unlockRecordingOrientation(); if self.closeRequested { self.finishClose() } }
+                        }
+                        return
+                    }
+                    self.movieWriter = writer; self.captureID = id; self.videoURL = url; self.writerAcceptingFrames = true
+                    DispatchQueue.main.async {
+                        self.setState("recording"); self.recordButton.setImage(UIImage(systemName: "stop.circle.fill"), for: .normal)
+                        self.recordingStartedAt = ProcessInfo.processInfo.systemUptime
+                        self.updateElapsedTime()
+                        self.elapsedTimer?.invalidate()
+                        self.elapsedTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.updateElapsedTime() }
+                        self.recordButton.accessibilityLabel = self.text("Stop recording", "Stop recording")
+                        self.delegate?.cameraViewController(self, recordingState: "recording")
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.delegate?.cameraViewController(self, didFail: self.text("Recording could not start.", "Recording could not start."), captureID: nil)
+                        self.setState("ready")
+                        self.unlockRecordingOrientation()
+                    }
+                }
+            }
+        }
+    }
+    private func appendAudio(_ sample: CMSampleBuffer) {
+        guard writerAcceptingFrames, let movieWriter else { return }
+        do { _ = try movieWriter.appendAudio(sample) }
+        catch { DispatchQueue.main.async { self.stopRecordingWithError(self.text("Audio could not be encoded.", "Audio could not be encoded.")) } }
+    }
+    private func stopRecording(reason: String?) {
+        guard state == "recording" else { return }
+        setState("finalising"); mediaQueue.async { [weak self] in
+            guard let self else { return }
+            self.writerAcceptingFrames = false
+            self.finishWriter()
+        }
+    }
+    private func stopRecordingWithError(_ message: String) {
+        guard state == "recording" else { return }
+        delegate?.cameraViewController(self, didFail: message, captureID: nil)
+        stopRecording(reason: message)
+    }
+    private func finishWriter() {
+        guard let writer = movieWriter, let url = videoURL, let id = captureID else {
+            if closeRequested { DispatchQueue.main.async { self.finishClose() } }
+            else { DispatchQueue.main.async { self.setState("ready") } }
+            return
+        }
+        writer.finish { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error):
+                self.failStagedVideo(error, id: id, url: url)
+                self.clearWriter()
+            case .success(let metadata):
+                self.mediaQueue.async {
+                    let asset = AVURLAsset(url: url), generator = AVAssetImageGenerator(asset: asset)
+                    generator.appliesPreferredTrackTransform = true; generator.maximumSize = CGSize(width: 480, height: 480)
+                    guard let image = try? generator.copyCGImage(at: .zero, actualTime: nil), let thumbnail = self.jpegThumbnail(image) else {
+                        self.failStagedVideo(CameraError.processing, id: id, url: url); self.clearWriter(); return
+                    }
+                    let editorRecipe = NativeBalancedMath.editorRecipeAfterCapture()
+                    self.storageQueue.async {
+                        do {
+                            let descriptor = try ClearWaterCaptureStore.shared.commitVideo(id: id, outputURL: url,
+                                thumbnailData: thumbnail, width: metadata.width, height: metadata.height,
+                                duration: metadata.duration, fps: metadata.nominalFrameRate, codec: metadata.codec,
+                                recipe: try NativeBalancedMath.recipeDictionary(editorRecipe))
+                            DispatchQueue.main.async {
+                                self.savedVideoCount += 1; self.updateCounters()
+                                self.delegate?.cameraViewController(self, didComplete: descriptor)
+                                self.delegate?.cameraViewController(self, recordingState: "ready")
+                                self.setState("ready"); self.endBackgroundTask()
+                                if self.closeRequested { self.finishClose() }
+                            }
+                        } catch { self.failStagedVideo(error, id: id, url: url) }
+                    }
+                    self.clearWriter()
+                }
+            }
+        }
+    }
+    private func jpegThumbnail(_ image: CGImage) -> Data? {
+        let output = NSMutableData(); guard let dest = CGImageDestinationCreateWithData(output, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.75] as CFDictionary); return CGImageDestinationFinalize(dest) ? output as Data : nil
+    }
+    private func failStagedVideo(_ error: Error, id: UUID?, url: URL?) {
+        if let id { try? ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }; if let url { try? FileManager.default.removeItem(at: url) }
+        DispatchQueue.main.async { self.delegate?.cameraViewController(self, didFail: self.text("Video could not be saved.", "Video could not be saved."), captureID: id); self.delegate?.cameraViewController(self, recordingState: "ready"); self.setState("ready"); self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
+    }
+    private func clearWriter() {
+        movieWriter = nil; writerAcceptingFrames = false; captureID = nil; videoURL = nil; clipRecipe = nil
+        DispatchQueue.main.async { self.recordingStartedAt = nil; self.elapsedTimer?.invalidate(); self.elapsedTimer = nil }
+        unlockRecordingOrientation()
+    }
+    private func unlockRecordingOrientation() {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.orientationLocked = false
+            self.requestOrientationUpdate()
+        }
+    }
+    @objc private func closeTapped() {
+        guard !closeRequested else { return }
+        if captureInFlight { closeRequested = true; return }
+        if state == "recording" || state == "startingRecording" || state == "finalising" {
+            closeRequested = true
+            if state == "recording" { stopRecording(reason: nil) }
+            return
+        }
+        finishClose()
+    }
+    @objc private func resetTapped() {
+        guard state == "ready" else { return }
+        releaseHardwareWhiteBalance()
+        pickerArmed = false; pickerButton.tintColor = .white
+        statusLabel.text = text("White balance reset", "White balance reset")
+    }
+    private func updateCounters() {
+        let format = text("Photos: %d · Videos: %d", "Photos: %d · Videos: %d")
+        countersLabel.text = String(format: format, locale: Locale(identifier: options.locale), savedPhotoCount, savedVideoCount)
+    }
+    private func updateElapsedTime() {
+        guard let started = recordingStartedAt else { durationLabel.text = ""; return }
+        let seconds = max(0, Int(ProcessInfo.processInfo.systemUptime - started))
+        durationLabel.text = String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+    private func finishClose() {
+        closeRequested = true; releaseHardwareWhiteBalance()
+        sessionQueue.async { [weak self] in
+            self?.session.stopRunning()
+            DispatchQueue.main.async { guard let self else { return }; self.dismiss(animated: true) { self.delegate?.cameraViewControllerDidClose(self) } }
+        }
+    }
+    @objc private func flipTapped() {
+        guard state == "ready" else { return }
+        releaseHardwareWhiteBalance()
+        sessionQueue.async { [weak self] in
+            guard let self else { return }; self.session.stopRunning(); self.session.beginConfiguration()
+            do {
+                if let old = self.cameraInput { self.session.removeInput(old) }
+                self.cameraPosition = self.cameraPosition == .back ? .front : .back
+                let input = try AVCaptureDeviceInput(device: self.selectCamera())
+                guard self.session.canAddInput(input) else { throw CameraError.unavailable }
+                self.session.addInput(input); self.cameraInput = input; try self.configureDeviceFormat(input.device); self.configurePhotoDimensions(for: input.device); self.session.commitConfiguration(); self.requestOrientationUpdate(); self.session.startRunning()
+                DispatchQueue.main.async { self.setState("ready") }
+            } catch { self.session.commitConfiguration(); DispatchQueue.main.async { self.fail(self.text("The selected camera is unavailable.", "The selected camera is unavailable.")) } }
+        }
+    }
+    @objc private func microphoneTapped() {
+        guard state == "ready" else { return }
+        let enable = !audioEnabled
+        if enable && AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in DispatchQueue.main.async { self?.setMicrophoneEnabled(granted) } }
+        } else { setMicrophoneEnabled(enable) }
+    }
+    private func setMicrophoneEnabled(_ enabled: Bool) {
+        audioEnabled = enabled; micButton.setImage(UIImage(systemName: enabled ? "mic.fill" : "mic.slash.fill"), for: .normal)
+        sessionQueue.async { [weak self] in
+            guard let self else { return }; self.session.beginConfiguration()
+            if enabled { do { try self.addAudioIfGranted() } catch { self.audioEnabled = false } }
+            else if let input = self.audioInput { self.session.removeInput(input); self.session.removeOutput(self.audioOutput); self.audioInput = nil }
+            self.session.commitConfiguration()
+        }
+    }
+    @objc private func pickerTapped() {
+        guard state == "ready" else { return }; pickerArmed.toggle()
+        pickerButton.tintColor = pickerArmed ? .systemYellow : .white
+        statusLabel.text = pickerArmed ? text("Drag over a neutral white or grey area.", "Drag over a neutral white or grey area.") : ""
+    }
+    @objc private func strengthChanged() {
+        guard state == "ready" else { return }
+        recipeLock.lock(); currentRecipe.strength = Double(strengthSlider.value / 100); recipeLock.unlock()
+    }
+    @objc private func previewDragged(_ gesture: UIPanGestureRecognizer) {
+        guard pickerArmed else { return }
+        let point = gesture.location(in: metalView)
+        switch gesture.state {
+        case .began, .changed:
+            if let patch = neutralPatch(at: point) {
+                pendingNeutralPatch = patch.data
+                if loupeView == nil {
+                    let loupe = UIImageView(); loupe.backgroundColor = .black; loupe.layer.borderWidth = 2
+                    loupe.layer.borderColor = UIColor.white.cgColor; loupe.layer.cornerRadius = 48
+                    loupe.clipsToBounds = true; loupe.contentMode = .scaleAspectFit
+                    loupe.frame = CGRect(x: 0, y: 0, width: 96, height: 96); view.addSubview(loupe); loupeView = loupe
+                }
+                loupeView?.image = patch.image
+                loupeView?.center = CGPoint(x: min(max(50, point.x), metalView.bounds.width - 50), y: max(55, point.y - 80))
+            }
+        case .ended:
+            if let patch = pendingNeutralPatch { applyNeutral(patch) }
+            pendingNeutralPatch = nil; loupeView?.removeFromSuperview(); loupeView = nil
+        case .cancelled, .failed:
+            pendingNeutralPatch = nil; loupeView?.removeFromSuperview(); loupeView = nil
+        default: break
+        }
+    }
+    private func neutralPatch(at point: CGPoint) -> (data: Data, image: UIImage)? {
+        frameLock.lock(); let source = latestSource; frameLock.unlock()
+        guard let source else { return nil }
+        let extent = source.extent
+        let scale = max(metalView.bounds.width / extent.width, metalView.bounds.height / extent.height)
+        let offsetX = max(0, (extent.width * scale - metalView.bounds.width) / 2)
+        let offsetY = max(0, (extent.height * scale - metalView.bounds.height) / 2)
+        let px = extent.minX + (point.x + offsetX) / scale
+        let py = extent.maxY - (point.y + offsetY) / scale
+        let patchRect = CGRect(x: px - 4, y: py - 4, width: 9, height: 9).intersection(extent)
+        guard let cg = ciContext.createCGImage(source.cropped(to: patchRect), from: patchRect) else { return nil }
+        let data = NSMutableData(length: 9 * 9 * 4)!
+        guard let context = CGContext(data: data.mutableBytes, width: 9, height: 9, bitsPerComponent: 8, bytesPerRow: 9 * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.interpolationQuality = .none; context.draw(cg, in: CGRect(x: 0, y: 0, width: 9, height: 9))
+        return (data as Data, UIImage(cgImage: cg))
+    }
+    private func applyNeutral(_ patch: Data) {
+        do {
+            recipeLock.lock(); let updated = try NativeBalancedMath.pickNeutral(patchRGBA: patch, recipe: currentRecipe); currentRecipe = updated; recipeLock.unlock()
+            pickedNeutral = true
+            statusLabel.text = text("Software white balance applied", "Software white balance applied")
+            lockHardwareWhiteBalance { [weak self] locked in
+                guard let self, self.pickedNeutral else { return }
+                self.hardwareWhiteBalanceLocked = locked
+                if locked { self.statusLabel.text = self.text("White balance locked", "White balance locked") }
+            }
+            pickerArmed = false; pickerButton.tintColor = .white
+        } catch { recipeLock.unlock(); delegate?.cameraViewController(self, didFail: text("White balance could not be applied.", "White balance could not be applied."), captureID: nil) }
+    }
+    private func lockHardwareWhiteBalance(completion: @escaping (Bool) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.cameraInput?.device, device.isWhiteBalanceModeSupported(.locked) else {
+                DispatchQueue.main.async { completion(false) }; return
+            }
+            let locked: Bool
+            do {
+                try device.lockForConfiguration()
+                let gains = device.deviceWhiteBalanceGains
+                device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+                device.unlockForConfiguration(); locked = true
+            } catch { locked = false }
+            DispatchQueue.main.async { completion(locked) }
+        }
+    }
+    private func releaseHardwareWhiteBalance() {
+        pickedNeutral = false; hardwareWhiteBalanceLocked = false
+        recipeLock.lock(); currentRecipe.manual.neutral = [1, 1, 1]; recipeLock.unlock()
+        frameLock.lock(); latestSource = nil; latestRendered = nil; frameLock.unlock()
+        sessionQueue.async { [weak self] in
+            guard let device = self?.cameraInput?.device else { return }
+            do { try device.lockForConfiguration(); if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }; device.unlockForConfiguration() } catch {}
+        }
+    }
+    private func enterBackground() {
+        backgrounded = true
+        if state == "recording" {
+            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ClearWaterFinalizeMovie") { [weak self] in
+                guard let self else { return }
+                self.mediaQueue.async {
+                    let id = self.captureID, url = self.videoURL
+                    self.movieWriter?.cancel {
+                        if let id { try? ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }
+                        if let url { try? FileManager.default.removeItem(at: url) }
+                        self.clearWriter()
+                        DispatchQueue.main.async { self.setState("ready"); self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
+                    }
+                }
+            }
+            stopRecording(reason: nil)
+        } else if state == "finalising" {
+            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ClearWaterFinalizeMovie") { [weak self] in
+                guard let self else { return }
+                self.mediaQueue.async {
+                    let id = self.captureID, url = self.videoURL
+                    self.movieWriter?.cancel {
+                        if let id { try? ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }
+                        if let url { try? FileManager.default.removeItem(at: url) }
+                        self.clearWriter()
+                        DispatchQueue.main.async { self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
+                    }
+                }
+            }
+        }
+        sessionQueue.async { [weak self] in self?.session.stopRunning() }
+        releaseHardwareWhiteBalance()
+    }
+    private func enterForeground() { backgrounded = false; restartIfActive() }
+    private func endBackgroundTask() {
+        guard backgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTask); backgroundTask = .invalid
+    }
+    private func interrupted() {
+        if state == "recording" { stopRecording(reason: nil) }
+        setState("error"); statusLabel.text = text("Camera interrupted.", "Camera interrupted.")
+    }
+    private func restartIfActive() {
+        guard !backgrounded, !closeRequested else { return }; releaseHardwareWhiteBalance(); requestCamera()
+    }
+    private func checkThermalState() {
+        if ProcessInfo.processInfo.thermalState == .critical && state == "recording" { stopRecordingWithError(text("Recording stopped because the device is too hot.", "Recording stopped because the device is too hot.")) }
+    }
+    private func setState(_ value: String) {
+        state = value
+        if value != "recording" { elapsedTimer?.invalidate(); elapsedTimer = nil; recordingStartedAt = nil; if value != "finalising" { durationLabel.text = "" } }
+        switch value {
+        case "ready": statusLabel.text = pickedNeutral ? (hardwareWhiteBalanceLocked ? text("White balance locked", "White balance locked") : text("Software white balance applied", "Software white balance applied")) : ""; durationLabel.text = ""
+        case "starting": statusLabel.text = text("Starting camera", "Starting camera")
+        case "capturing": statusLabel.text = text("Saving photo", "Saving photo")
+        case "startingRecording": statusLabel.text = text("Starting recording", "Starting recording")
+        case "recording": statusLabel.text = text("Recording", "Recording")
+        case "finalising": statusLabel.text = text("Finishing video", "Finishing video")
+        default: break
+        }
+        photoButton.isEnabled = value == "ready" && !captureInFlight
+        recordButton.isEnabled = value == "ready" || value == "recording"
+        pickerButton.isEnabled = value == "ready"; strengthSlider.isEnabled = value == "ready"; resetButton.isEnabled = value == "ready"
+        if value != "recording" && value != "finalising" { recordButton.setImage(UIImage(systemName: "record.circle"), for: .normal); recordButton.accessibilityLabel = text("Start recording", "Start recording") }
+    }
+    private func fail(_ message: String) { setState("error"); statusLabel.text = message; delegate?.cameraViewController(self, didFail: message, captureID: nil) }
+    private enum CameraError: Error { case unavailable, processing, writer }
+}
+
+
+
+
+
