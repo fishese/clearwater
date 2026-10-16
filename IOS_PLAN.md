@@ -1,6 +1,6 @@
 # iOS native camera and sideloading plan
 
-Status: native camera/recording phone build ready, 15 October 2026. Final IPA 17d45e9 / run 38733242340; 142 shared tests and 17 native tests pass. Current main 233331d is merged into codex/ios-native-camera. Physical-phone acceptance remains open.
+Status: camera UI catch-up in progress, 16 October 2026. Current origin/main 3298d69 is being integrated into codex/ios-native-camera. User confirmed editor/export and native camera preview/capture work on iPhone; automatic Photos saving and captured-video loading need fixes and a new device retest. The previous IPA remains a historical checkpoint below.
 
 ## Outcome and scope
 
@@ -8,7 +8,7 @@ Build a personal-use iPhone app from the existing ClearWater editor, installed f
 
 Do not implement Android-style gallery linking on iOS. Saving to Apple Photos creates an independent enhanced copy. Editing or removing an item in ClearWater does not update or delete its Photos copy. Keep original photos privately for later editing; retain only enhanced camera video, as on the current camera workflow. Clearing the collection must state whether private originals remain; preserve the existing recoverable-camera-archive behaviour rather than silently discarding them.
 
-First release excludes RAW/ProRAW capture, Live Photos, HDR/Dolby Vision capture or preservation, 4K, live AI inference, an incoming Share extension, and synchronised Photos-library editing. These can be separate follow-ups. Imported HDR video needs an SDR copy initially; the Android converter does not transfer to iOS.
+First release excludes RAW/ProRAW capture, Live Photos, HDR/Dolby Vision capture or preservation, 4K, full-frame live neural restoration, an incoming Share extension, and synchronised Photos-library editing. These can be separate follow-ups. Imported HDR video needs an SDR copy initially; the Android converter does not transfer to iOS.
 
 ## Repository and release strategy
 
@@ -19,11 +19,11 @@ Suggested boundaries (new paths are proposals):
 | Location | Ownership / purpose |
 | --- | --- |
 | `editor/src/core`, workers, locales | Shared algorithms, recipes, editing, translations and model contracts |
-| `editor/src/Camera.tsx` | Existing web/Android stream camera; preserve this implementation |
+| `editor/src/Camera.tsx`, `editor/src/native-camera.ts` | Shared controls and native-camera contract; Android uses CameraX, web uses a stream |
 | `editor/src/platform/capabilities.ts` | Explicit platform/capability detection; no assumption that non-Android means web |
-| `editor/src/platform/ios-camera.ts` | Typed, versioned native-camera bridge and lifecycle adapter |
+| `editor/src/platform/ios-camera.ts` | iOS lifecycle/capability adapter if needed; reuse native-camera.ts rather than inventing a competing schema |
 | `editor/src/platform/ios-media.ts` | Private native file access, import, export/share and recovery |
-| `editor/ios/` | Generated Xcode/SPM project, Swift camera UI/session, Metal processing, media storage |
+| `editor/ios/` | Generated Xcode/SPM project, Swift camera session/preview, Metal processing, media storage |
 | `editor/scripts/ios-sync.mjs` | Root-relative web build and iOS-only Capacitor sync |
 | `.github/workflows/ios-build.yml` | Manually dispatched macOS build, independent of Pages/Android signing |
 
@@ -35,17 +35,17 @@ Commit shared changes separately from the Swift implementation where practical. 
 
 ## Native capture architecture
 
-Use a custom local Capacitor plugin backed by AVFoundation, with a full-screen native camera view controller. A one-shot system camera picker is insufficient for persistent capture, corrected preview and recording controls. UIKit with an MTKView is a straightforward starting point; SwiftUI can wrap it if useful, but avoid two UI frameworks without a reason.
+Use a custom local Capacitor plugin backed by AVFoundation. Since the Android native-camera bridge now exists, prefer reusing Camera.tsx controls over a native MTKView underlay placed at the supplied preview bounds. Configure WKWebView transparency only while native camera mode is open, keep the rest of the screen opaque, and restore it on every close/error. A one-shot system camera picker is insufficient for persistent capture, corrected preview and recording controls. A full-screen native controller remains a fallback if underlay lifecycle or accessibility cannot be made reliable; it must preserve the shared contract.
 
 AVCaptureSession owns the rear/front camera, AVCapturePhotoOutput captures stills, AVCaptureVideoDataOutput supplies pixel buffers, and AVCaptureAudioDataOutput supplies optional audio. Configure/start/stop on a serial session queue, not the main thread. UIKit updates stay on the main thread. Use one camera at a time; default to the rear wide camera, add supported lens selection later if needed.
 
 Render corrected preview using Metal-backed Core Image or a small Metal shader into MTKView. AVCaptureVideoPreviewLayer alone cannot display the processed frames. Keep camera frames, rendering and video encoding native: never send full frames/base64 across the JavaScript bridge. Send only capture descriptors, error/status events and small settings changes.
 
-The native view contains the existing large photo shutter, smaller record/stop control, flip, reset, microphone toggle, restoration strength and neutral-point picker. Stay open after each successful capture; acknowledge saved shots with a counter. Close explicitly, then load the latest capture in the editor. Native strings come from the active shared locale through a structured configuration, including accessibility labels; localise iOS permission descriptions separately. Controls must remain usable in landscape, safe areas and protective cases.
+Reuse the large photo shutter, smaller record/stop control, flip, reset, microphone toggle, strength and neutral-point picker from Camera.tsx. Stay open after successful capture; acknowledge saved shots with a counter. Close explicitly, then load the latest capture in the editor. Shared controls already use the active locale; localise iOS permission descriptions separately. If native controls become necessary, pass translated strings and accessibility labels through structured configuration. Controls must remain usable in landscape, safe areas and protective cases.
 
 ### Restoration and white balance
 
-Keep live capture on Balanced only. Port the small analysis and colour-rendering operations from `core/engine.ts`, `camera-capture.ts`, `white-balance.ts` and `camera-preview.ts` into a separately tested native module. TypeScript remains the reference for recipe meanings. Generate deterministic tiny image/recipe fixtures from the shared engine; compare native analysis and output against those fixtures. Define numeric tolerances for GPU/codec differences. This is an intentional small duplication, not a second editing engine.
+Start the first iOS acceptance milestone with Balanced only. Android now also offers sampled Five A+ assist; adopt it only after raw sampling and matrix parity work on iOS. Reuse shared analysis where practical through the bounded raw sample bridge, and port the per-pixel rendering operations from `core/engine.ts` and `camera-preview.ts` into a separately tested native module. TypeScript remains the reference for recipe meanings. Generate deterministic tiny image/recipe fixtures; compare native output with numeric tolerances for GPU/codec differences. This is a small native renderer, not a second editing engine.
 
 Start with the existing 64x48 analysis sample about every 500 ms, smoothing results; render preview up to 30 fps. Cap preview resolution independently from still capture. Explicitly convert camera YUV/range/colour attachments to the agreed SDR RGB space; do not blindly apply the RGB shader to YUV or wide-gamut values. Match linear-light blending, transfer functions, orientation and mirrored preview coordinates.
 
@@ -204,3 +204,51 @@ Final IPA: commit 17d45e98b7bdccd315bcc45ce2b4384c13153a4b, successful Actions r
 This final packaging-only run passed 142 shared tests, root-relative build/iOS-only sync, native device compilation, physical-platform/archive checks, compiled plugin/Metal checks, shipping model size/SHA-256 checks, WASM/assets and localized privacy checks. It deliberately skipped repeating the unchanged 17-test native suite already passed at ee22678 in run 38731452603. All native sources, Xcode project and native fixtures are identical to that successful suite. Main 233331d was merged into the feature branch, with no Android configuration differences from that baseline.
 
 Deliver this IPA for the native capture phone gate above. Sign/install locally with Sideloadly over the prior app using the same resulting bundle identity. Initial smoke test: repeated rear/front stills with resolution check; replace a WB pick and Reset; short Standard MP4 without/with microphone; share/play externally; Close/reopen and force quit; clear/restore disposable private captures while Photos copies stay unchanged. Then try 1-minute High and the longer/thermal/interruption cases. No actual sensor, native microphone, Photos-save or phone performance results have been reported yet. Milestones 2–3 implementation and automated verification are complete; hardware acceptance and stabilization remain open. No main merge or stable release was performed.
+## Camera follow-up contract (15 October 2026)
+
+The Android camera is being moved to a native CameraX backend. The iOS implementation must provide its own AVFoundation backend; Android CameraX/Media3 code cannot be reused on iOS. Keep the shared HTML controls, recipe meanings and media-result contract where practical, with platform-specific view/permission/lifecycle implementations. The built-in Capacitor Camera plugin is suitable for a system-camera handoff, but does not itself provide ClearWater's persistent filtered preview and capture controls. Do not replace the planned native session with a web camera stream and call that native capture.
+
+Treat `editor/src/native-camera.ts` as the evolving TypeScript contract; inspect the merged implementation before writing Swift. It currently defines startSession, setPreviewBounds, setCorrection, listLenses/setLens/setZoom, sampleFrame, capturePhoto, startRecording/stopRecording, releaseCapture and stopSession, with recordingFinished/cameraError events. Platform detection should recognise a registered native backend, not just Android, once iOS implements it. File results are scoped temporary URIs plus name/type/dimensions; copy to durable storage before releasing the temporary file. Preserve the iOS plan's independent Photos-copy behaviour rather than inheriting Android gallery linking.
+
+Native photo output must use AVCapturePhotoOutput and report actual captured dimensions. Preview dimensions are not photo dimensions. For reference, 608x1080 is approximately 0.66 MP; 1080x1920 is 2.07 MP. The old web preview scaler constrained portrait height to a landscape short-side maximum, so a 1080x1920 source could display and record at only 608x1080 even when its saved stream photo was larger. Negotiate native still dimensions separately from video quality, show actual supported values, and never infer still resolution from the preview canvas. Start with a supported roughly 12 MP processed JPEG where available; do not promise a device's advertised sensor resolution or RAW quality. Keep the original JPEG before ClearWater correction privately, with correct EXIF orientation and metadata.
+
+Both portrait and landscape saved files are required. Update native capture orientation from device/display orientation; freeze a clip's orientation when recording starts and write the appropriate track transform or rotated pixels. Correct front-camera preview mirroring separately from saved-file orientation. Keep controls in their current relative locations; rotating icons/text is optional if easy. Test all four rotations, recording while rotating the phone, EXIF-aware viewers, and re-import into ClearWater. Do not rotate pixels and then also write a conflicting rotation tag.
+
+The optional AI camera button uses sampled Five A+ colour assistance, not full neural processing of every full-resolution frame. A small uncorrected 256x256 sample is analysed in a disposable worker about once per second or slower under load; the fitted affine transform updates the GPU preview. Native iOS sampling must supply uncorrected data in a documented SDR RGB space. Use the source sample, not the already-enhanced preview, to avoid feedback. Allow only one inference in flight, ignore stale session/lens results, and terminate/release on disable or close. Freeze the selected transform and correction parameters for each still or recording. AI errors must visibly return to Balanced rather than silently mark an unavailable AI result as applied.
+
+`Recipe.cameraColour` is optional version-1 metadata: `{source:'fivea', matrix:number[12]}`. Coefficients are row-major RGB affine rows `[rR,rG,rB,rOffset, gR,gG,gB,gOffset, bR,bG,bB,bOffset]`, operating on display-encoded RGB in 0..1. Each row is clamped before the existing linear-light restoration-strength blend. This replaces the automatic Balanced channel-gain/red-reconstruction colour result; the shared tone/manual stages still apply. It is not an additional full model pass. Validate coefficient bounds using parseRecipe, and convert row-major layout correctly when uploading to Metal. The frozen field lets a saved original photo reproduce the camera look without model inference. New already-enhanced camera videos clear this field and start with strength zero, avoiding double correction. Shared engine/white-balance and CPU/GPU parity tests are the reference.
+
+Balanced camera controls include an Auto/Yes/No physical red-filter hint and an optional depth slider. These must affect the automatic Balanced suggestion, not hardware sensor white balance. Explain or disable those hints while AI replaces the automatic colour stage. A fresh neutral-point pick replaces prior software gains. Keep native hardware WB locking policy and software neutral correction distinct, particularly with a physical red filter near the surface.
+
+A compact zoom button cycles useful supported choices; long-press opens a larger chooser. iOS must enumerate supported AVCaptureDevice options, including ultra-wide/virtual multi-camera devices where available. Use device-reported optical/virtual switching factors and zoom bounds; do not assume every iPhone has 0.5x or label arbitrary device order as optical magnification. Disable unsafe lens changes while recording or saving; cancel long-press on pointer cancellation/movement, suppress its subsequent click, and provide an accessible ordinary-open action. Close chooser before handling camera exit/Back. Do not start both WebKit getUserMedia and AVFoundation on the same camera.
+
+The preview footer should be concise: corrected video / no raw video, plus actual video dimensions. Show native photo dimensions separately where useful; avoid a misleading generic 'stream resolution' label. Standard iOS camera UI and native photo output should be tested on an actual iPhone before reporting readiness. Android native implementation and mocked browser tests do not validate iPhone lens availability, Metal colour transfer or orientation.
+
+Relevant primary references: [Capacitor Camera API](https://capacitorjs.com/docs/apis/camera), [Apple AVCamFilter native filtered preview](https://developer.apple.com/documentation/avfoundation/avcamfilter-applying-filters-to-a-capture-stream), and [AVCapturePhotoOutput dimensions](https://developer.apple.com/documentation/avfoundation/avcapturephotooutput/maxphotodimensions).
+### Launcher URL contract (16 October 2026)
+
+Camera-specific device behaviour: keep the screen awake only while capture mode is active (`UIApplication.isIdleTimerDisabled` on iOS, restoring its previous value on close/interruption). Android uses a scoped window flag. Treat capture orientation separately from UI/display orientation so files stay upright even when system auto-rotate is locked. Freeze video orientation at recording start; raw sampling for the picker follows the displayed preview. Android restores the WebView's native background as well as CSS transparency when removing its preview underlay; iOS must similarly restore WKWebView opacity/background on every exit. File sharing uses a separate bounded native bridge on Android; an iOS port should use UIActivityViewController and temporary read-only exports, without Android gallery-linking semantics.
+
+Android now exposes static Edit/Camera shortcuts and consumes 'clearwater://edit' / 'clearwater://camera' on cold and warm launches. The shared 'use-launch-mode.ts' hook consumes web '?mode=camera|edit' and native 'getLaunchMode()' / 'launchMode' events; active saves/exports are left alone. For iOS, register the same scheme in CFBundleURLTypes, forward URL opens through the native plugin once, and support Shortcuts' Open URLs action. This is a routing contract, not a completed iOS camera. Implement AVFoundation behind 'native-camera.ts' and extend the capability guard only after that implementation exists. A browser/PWA cannot expose iPhone native photo output merely by sharing a TS interface.
+
+References: [Apple custom URL schemes](https://developer.apple.com/documentation/xcode/defining-a-custom-url-scheme-for-your-app), [AVCapturePhotoOutput](https://developer.apple.com/documentation/avfoundation/avcapturephotooutput), [CameraX video architecture](https://developer.android.com/media/camera/camerax/video-capture).
+
+
+Camera layout follow-up (16 October): the Android native camera keeps its control layout in portrait while capture mode is open, restoring the previous Activity orientation policy on exit. Physical sensor orientation still determines the saved photo/video orientation independently. Mirror this separation on iOS: keep the capture controls in their portrait positions rather than reflowing them into a short landscape viewport; handle media orientation in AVFoundation. Rotating individual icons/short labels is optional and must not move the controls or shrink the preview. Do not apply the camera orientation policy to the whole editor or force browser orientation through unsupported APIs.
+
+
+## Camera UI catch-up prompt
+
+Use this for an iOS agent that has already started work:
+
+```text
+Continue the existing ClearWater iOS branch/worktree. Read the current AGENTS instructions, HANDOFF.md, MAINTENANCE.md and IOS_PLAN.md, inspect Git status, and preserve existing iOS work. Review current origin/main and integrate the shared camera/editor changes with a reviewed merge or selective commits. Keep Android signing, versioning and platform implementation unchanged. Use lower-cost agents capable of any involved coding.
+
+Bring the AVFoundation camera into sync with the current React camera UI: preview first, no Camera heading, tight outer spacing, large underwater shutter/record/WB/reset/mic/flip controls, icon-only actions, and persistent capture mode. Keep controls in portrait positions while physical orientation determines saved media; freeze orientation when video starts. Rotating individual icons/short labels is optional. Restore the prior orientation, idle-timer and WKWebView background policies on close/interruption.
+
+Support optional sampled Five A+ assist, Balanced red-filter/depth hints, and replacement neutral-point picking from uncorrected frames with a small loupe. Native picker coordinates use cover fit and reject releases outside the preview; browser picking remains contain fit. Keep capture sessions stable during layout/bounds changes, ignore retired-renderer callbacks, and release native resources using the platform's required threading contract.
+
+Zoom tap cycles supported choices; long press opens actual lens/zoom options. Label front-facing lenses explicitly, including 1x choices. Preserve accurate photo/video dimensions, serialised startup/teardown, cancellation, permissions and recovery. Use the native-camera.ts contract and the recipe.cameraColour format documented in this plan. Keep iOS Photos saves independent; Android gallery linking is excluded.
+
+Include the shared landscape editor change that lets the collection scroll off screen. Preserve English, Hong Kong written Traditional Chinese and Japanese. Run shared checks and the isolated iOS build, then report what still needs a real iPhone. Android device checks are currently paused; preserve that boundary and do not claim iPhone validation from browser or Android results.
+```

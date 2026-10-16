@@ -125,10 +125,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -148,15 +148,15 @@
         },
         "auto": {
           "gains": [
-            0.6937895337289028,
-            1.1297787790094043,
-            1.1981528024718853
+            0.7899999999999999,
+            1.07,
+            1.21
           ],
           "redMix": 0.28,
-          "haze": 0.040999999999999995,
+          "haze": 0.014,
           "highlights": -0.28,
-          "mode": "filter",
-          "explanation": "Red / magenta cast detected. Balancing channels while keeping the scene’s brightness."
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     },
@@ -284,10 +284,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -307,15 +307,15 @@
         },
         "auto": {
           "gains": [
-            1.091524424581541,
+            0.7899999999999999,
             1.07,
-            1.165
+            1.21
           ],
-          "redMix": 0.4609146547489247,
-          "haze": 0.03429411764705882,
+          "redMix": 0.28,
+          "haze": 0.014,
           "highlights": -0.28,
-          "mode": "restore",
-          "explanation": "Very little red remains. A conservative colour reconstruction is suggested; original colours are uncertain."
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     },
@@ -443,10 +443,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -466,15 +466,15 @@
         },
         "auto": {
           "gains": [
-            1.091524424581541,
+            0.7899999999999999,
             1.07,
-            1.165
+            1.21
           ],
-          "redMix": 0.4609146547489247,
-          "haze": 0.03429411764705882,
+          "redMix": 0.28,
+          "haze": 0.014,
           "highlights": -0.28,
-          "mode": "restore",
-          "explanation": "Very little red remains. A conservative colour reconstruction is suggested; original colours are uncertain."
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     },
@@ -602,10 +602,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -625,15 +625,15 @@
         },
         "auto": {
           "gains": [
-            0.803048831053105,
-            1.0692519445781254,
-            1.1994791403648748
+            0.7899999999999999,
+            1.07,
+            1.21
           ],
           "redMix": 0.28,
-          "haze": 0.040999999999999995,
+          "haze": 0.014,
           "highlights": -0.28,
           "mode": "gentle",
-          "explanation": "Colour is fairly balanced. A little haze reduction is suggested."
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     },
@@ -761,10 +761,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -784,15 +784,15 @@
         },
         "auto": {
           "gains": [
-            0.8026434561484672,
-            1.0728094000709842,
-            1.1967698465595367
+            0.7899999999999999,
+            1.07,
+            1.21
           ],
           "redMix": 0.28,
           "haze": 0.014,
           "highlights": -0.316,
           "mode": "gentle",
-          "explanation": "A gentle colour balance is suggested. Use manual controls to refine it."
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     },
@@ -920,10 +920,10 @@
         },
         "strength": 0.6,
         "hints": {
-          "scene": "auto",
-          "water": "auto",
-          "filter": "auto",
-          "depth": null
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
         },
         "manual": {
           "warmth": 9,
@@ -943,15 +943,401 @@
         },
         "auto": {
           "gains": [
-            0.8510297860367562,
+            0.7899999999999999,
             1.07,
-            1.165
+            1.21
           ],
-          "redMix": 0.3166178716220537,
-          "haze": 0.040999999999999995,
+          "redMix": 0.28,
+          "haze": 0.014,
           "highlights": -0.28,
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
+        }
+      }
+    },
+    {
+      "name": "fivea-matrix-mild-strength-manual-wb",
+      "width": 64,
+      "height": 48,
+      "input": "CEFz/w9il/8Wgrv/Ckl8/xFpoP8YisT/C1CE/xNxqP8akcz/DViN/xR5sf8cmdX/D2CV/xaAuf8JR3n/EWee/xiIwv8LToL/Em+m/xmQyv8NVor/FHev/xuX0/8OXpP/Fn63/wlFd/8QZZv/F4bA/wtMgP8SbaT/GY7I/wxUiP8Tdaz/G5XR/w5ckf8VfLX/CEN1/xBjmf8XhL3/Ckt+/xFrov8ZjMb/DFKG/xNzqv8ak87/DlqP/xV6s/8IQXP/D2KX/xaCu/8KSXz/EWmg/xiKxP8LUIT/E3Go/xqRzP8NWI3/FHmx/xyZ1f8PYJX/FoC5/wlHef8RZ57/GIjC/xR5sf8IQXP/EGOZ/xeGwP8LToL/E3Go/xqTzv8OXJH/Fn63/wlHef8RaaD/GYzG/wxUiP8Ud6//HJnV/w9il/8XhL3/C0yA/xJvpv8akcz/DlqP/xV8tf8JRXf/EWee/xiKxP8MUob/E3Ws/xuX0/8PYJX/FoK7/wpLfv8ZjMb/DFSI/xR3r/8cmdX/D2KX/xeEvf8LTID/Em+m/xqRzP8OWo//FXy1/wlFd/8RZ57/GIrE/wxShv8Tdaz/G5fT/w9glf8Wgrv/Ckt+/xJtpP8ZkMr/DViN/xV6s/8IQ3X/EGWb/xiIwv8LUIT/E3Oq/xuV0f8OXpP/CUV3/xFnnv8NVor/FXqz/wlFd/8RaaD/GY7I/w1Yjf8VfLX/CUd5/xFrov8ZkMr/DlqP/xZ+t/8KSXz/Em2k/xqRzP8OXJH/CUV3/xFpoP8Zjsj/DViN/xV8tf8JR3n/EWui/xmQyv8OWo//Fn63/wpJfP8SbaT/GpHM/w5ckf8WgLn/EWmg/xmOyP8NWI3/FXy1/wlHef8Ra6L/GZDK/w5aj/8Wfrf/Ckl8/xJtpP8akcz/DlyR/xaAuf8KS37/Em+m/w1Yjf8VfLX/CUd5/xFrov8ZkMr/DlqP/xZ+t/8KSXz/Em2k/xqRzP8OXJH/FoC5/wpLfv8Sb6b/GpPO/xV8tf8JR3n/GY7I/w5aj/8WgLn/C0yA/xNzqv8cmdX/EGWb/xmMxv8NWI3/Fn63/wpLfv8ZkMr/DlyR/xaCu/8LToL/E3Ws/whBc/8RZ57/GY7I/w5aj/8WgLn/EWui/xqRzP8OXpP/F4S9/wtQhP8Ud6//CEN1/xFpoP8ZkMr/DlyR/wlHef8SbaT/GpPO/w9glf8XhsD/DFKG/xR5sf8JRXf/EWui/xqRzP8OXpP/Ckl8/xJvpv8bldH/D2KX/xiIwv8MVIj/FXqz/wlHef8SbaT/GpPO/xZ+t/8KS37/E3Go/xuX0/8QY5n/GIrE/w1Wiv8VfLX/Ckl8/xJvpv8OWo//FoC5/xFrov8ak87/D2KX/xiKxP8NWI3/FoC5/wtOgv8Ud6//EGOZ/xmMxv8OWo//FoK7/wtQhP8UebH/CUd5/xJvpv8OXJH/F4S9/wxShv8VerP/Ckl8/xNxqP8cmdX/EWee/wxUiP8VfLX/Ckt+/xNzqv8IQXP/EWmg/xqRzP8Wfrf/C0yA/xN1rP8IQ3X/EWui/xqTzv8PYpf/GIrE/xR3r/8JRXf/Em2k/xuV0f8QY5n/GYzG/w5aj/8Wgrv/Em+m/xuX0/8QZZv/GY7I/w5ckf8XhL3/DFKG/xV6s/8RZ57/GZDK/w5ek/8XhsD/DFSI/xV8tf8KS37/GpHM/w9glf8KSXz/E3Oq/whDdf8SbaT/G5fT/xFnnv8akcz/FoC5/wtQhP8VerP/Ckt+/xN1rP8JRXf/GY7I/w5ek/8YiML/DViN/xaCu/8MUob/CEFz/xFrov8bldH/EGWb/xmQyv8PYJX/C06C/xR5sf8KSXz/E3Oq/whDdf8SbaT/DlyR/xeGwP8NVor/FoC5/wtQhP8VerP/Ckt+/xqTzv8QY5n/GY7I/w5ek/8YiML/DViN/wlHef8Tcaj/CEFz/xFrov8bldH/EGWb/wxUiP8Wfrf/C06C/xR5sf8KSXz/E3Oq/w9il/8ZjMb/DlyR/xeGwP8NVor/FoC5/xJvpv8cmdX/FoC5/wxShv8Wfrf/C1CE/xV8tf8LToL/HJnV/xFrov8bl9P/EWmg/xuV0f8XhsD/DViN/xeEvf8NVor/FoK7/xNzqv8JRXf/E3Go/whDdf8Sb6b/D2CV/xmMxv8OXpP/GIrE/w5ckf8LTID/FHmx/wpLfv8Ud6//Ckl8/xqTzv8QZZv/GpHM/xBjmf8ZkMr/D2KX/wxShv8Wfrf/C1CE/xV8tf8LToL/HJnV/xFrov8bl9P/EWmg/xuV0f8XhsD/DViN/xeEvf8NVor/FoK7/xNzqv8JRXf/E3Go/whDdf8Sb6b/D2CV/xmMxv8OXpP/GIrE/w5ckf8LTID/FHmx/w5ek/8ZjMb/D2CV/xmOyP8PYpf/DFSI/xaCu/8NVor/F4S9/xR3r/8KS37/FHmx/wtMgP8VerP/Em2k/whBc/8Sb6b/CEN1/xmQyv8QY5n/GpHM/xBlm/8ak87/F4bA/w5aj/8YiML/DlyR/wtOgv8VfLX/C1CE/xZ+t/8Tcaj/CUV3/xNzqv8JR3n/E3Ws/xFnnv8bldH/EWmg/xuX0/8YisT/Dl6T/xmMxv8PYJX/GY7I/xaAuf8MVIj/FoK7/w1Wiv8KSXz/FHev/wpLfv8UebH/C0yA/xyZ1f8SbaT/CEFz/xJvpv8PYpf/GZDK/xBjmf8akcz/F4S9/w1Yjf8bldH/EWui/whBc/8Tcaj/EGWb/xuV0f8Ra6L/CEFz/xmQyv8QZZv/G5XR/xFrov8PYJX/GZDK/xBlm/8bldH/GIrE/w9glf8ZkMr/EGWb/w5aj/8YisT/D2CV/xmQyv8XhL3/DlqP/xiKxP8PYJX/DFSI/xeEvf8OWo//C06C/xZ+t/8MVIj/F4S9/xR5sf8LToL/Fn63/wxUiP8KSXz/FHmx/wtOgv8Wfrf/E3Oq/wpJfP8UebH/C06C/whDdf8Tc6r/Ckl8/xR5sf8SbaT/CEN1/xNzqv8KSXz/G5fT/xJtpP8IQ3X/E3Oq/xFnnv8bl9P/Em2k/w9il/8akcz/E3Oq/wpLfv8VfLX/DFSI/wpLfv8VfLX/DFSI/wpLfv8VfLX/DFSI/xeGwP8VfLX/DFSI/xeGwP8VfLX/DFSI/xeGwP8OXpP/DFSI/xeGwP8OXpP/DFSI/xeGwP8OXpP/GZDK/xeGwP8OXpP/GZDK/xeGwP8OXpP/GZDK/xeGwP8OXpP/GZDK/xFnnv8OXpP/GZDK/xFnnv8OXpP/GZDK/xFnnv8cmdX/GZDK/xFnnv8cmdX/GZDK/xFnnv8cmdX/E3Go/xFnnv8cmdX/E3Go/xFnnv8cmdX/E3Go/wpJfP8cmdX/E3Go/wpJfP8cmdX/E3Go/wpJfP8cmdX/E3Go/wtQhP8XhL3/Dl6T/xqRzP8YisT/EGOZ/xuX0/8ZkMr/EWmg/whDdf8bldH/Em+m/wpJfP8IQXP/E3Ws/wtOgv8JR3n/FXqz/wxUiP8LTID/FoC5/w5aj/8MUob/F4bA/w9glf8NWI3/GYzG/xBlm/8OXpP/GpHM/xFrov8QY5n/G5fT/xNxqP8KS37/CEN1/xR3r/8LUIT/Ckl8/xV8tf8NVor/C06C/xaCu/8OXJH/DFSI/xiIwv8PYpf/DlqP/xmOyP8RZ57/D2CV/xqTzv8SbaT/EGWb/xyZ1f8Tc6r/EWui/wlFd/8UebH/E3Go/wpLfv8Wfrf/FHev/wtQhP8YiML/EGOZ/xyZ1f8ak87/Em+m/wpLfv8JRXf/FXqz/w1Wiv8LUIT/F4bA/w9il/8OXJH/GpHM/xJtpP8RZ57/CEN1/xuX0/8Tc6r/C06C/wpJfP8Wfrf/DlqP/wxUiP8YisT/EGWb/w9glf8bldH/E3Go/xFrov8JR3n/CEFz/xR3r/8MUob/C0yA/xaCu/8OXpP/DViN/xmOyP8RaaD/EGOZ/xyZ1f8Tdaz/Em+m/wpLfv8WgLn/FXqz/w1Wiv8LUIT/F4bA/w9il/8OXJH/GpHM/xJtpP8RZ57/CEN1/xR5sf8Tc6r/C06C/xeEvf8Wfrf/DlqP/wxUiP8YisT/EGWb/whDdf8VerP/FHev/wxUiP8ZjMb/GIjC/xBlm/8PYpf/HJnV/xR3r/8Tc6r/C1CE/wtMgP8XhL3/D2KX/w5ek/8bldH/E3Oq/xJvpv8LTID/Ckl8/xaAuf8OXpP/DlqP/xqRzP8Zjsj/EWui/wpJfP8JRXf/FXy1/xR5sf8NVor/GY7I/xiKxP8RZ57/CUV3/whBc/8UebH/E3Ws/wxShv8YisT/F4bA/xBjmf8PYJX/G5fT/xN1rP8Tcaj/C06C/xeGwP8Wgrv/D2CV/w5ckf8ak87/E3Go/xJtpP8KS37/CUd5/xZ+t/8OXJH/DViN/xmQyv8ZjMb/EWmg/whDdf8VfLX/DlyR/w5aj/8ak87/GpHM/xNxqP8LUIT/C06C/xiIwv8XhsD/EGWb/xBjmf8IQ3X/FXy1/xV6s/8OWo//DViN/xqRzP8Tcaj/Em+m/wtOgv8LTID/F4bA/xeEvf8QY5n/CEN1/whBc/8VerP/FHmx/w1Yjf8NVor/GZDK/xJvpv8SbaT/C0yA/wpLfv8XhL3/EGOZ/w9il/8IQXP/HJnV/xR5sf8Ud6//DVaK/xmQyv8Zjsj/Em2k/xFrov8KS37/F4S9/xaCu/8PYpf/D2CV/xyZ1f8bl9P/FHev/w1Wiv8MVIj/GY7I/xmMxv8Ra6L/EWmg/wpJfP8VerP/DlyR/xuX0/8bl9P/FHmx/xR5sf8OWo//DlqP/xuV0f8bldH/FHev/w1Yjf8NWI3/GpPO/xqTzv8Tdaz/E3Ws/w1Wiv8NVor/GpHM/xqRzP8Tc6r/DFSI/wxUiP8ZkMr/GZDK/xNxqP8Tcaj/DFKG/wxShv8Zjsj/GY7I/xJvpv8LUIT/C1CE/xmMxv8ZjMb/Em2k/xJtpP8LToL/C06C/xiKxP8Ra6L/EWui/wtMgP8LTID/GIjC/xiIwv8RaaD/EWmg/wpLfv8KS37/F4bA/xFnnv8RZ57/Ckl8/wpJfP8XhL3/F4S9/xBlm/8QZZv/CUd5/wlHef8Wgrv/DViN/xuV0f8UebH/FXqz/w5ek/8PYJX/CEN1/wlFd/8Wgrv/F4S9/xFnnv8RaaD/C0yA/wtOgv8ZjMb/GY7I/xNxqP8Tc6r/DVaK/w1Yjf8bldH/G5fT/xV6s/8VfLX/D2CV/w9il/8JRXf/CUd5/xeEvf8XhsD/EWmg/xFrov8LToL/GYzG/xmOyP8Tcaj/E3Oq/w1Wiv8NWI3/G5XR/xuX0/8VerP/FXy1/w9glf8PYpf/CUV3/wlHef8XhL3/F4bA/xFpoP8Ra6L/C06C/wtQhP8Zjsj/GZDK/xNzqv8Tdaz/DViN/w5aj/8bl9P/HJnV/xV8tf8Wfrf/D2KX/xmQyv8Tdaz/FHmx/w5ek/8PYpf/CUd5/wpLfv8YisT/GY7I/xNzqv8Ud6//DlyR/w9glf8JRXf/Ckl8/xiIwv8ZjMb/E3Go/xN1rP8OWo//Dl6T/whDdf8JR3n/F4bA/xiKxP8Sb6b/E3Oq/w1Yjf8OXJH/CEFz/wlFd/8KSXz/GIjC/xmMxv8Tcaj/E3Ws/w5aj/8OXpP/CEN1/wlHef8XhsD/GIrE/xJvpv8Tc6r/DViN/w5ckf8IQXP/CUV3/xeEvf8YiML/Em2k/xNxqP8NVor/DlqP/xyZ1f8IQ3X/FoK7/xeGwP8Ra6L/Em+m/wxUiP8NWI3/DlyR/whBc/8SbaT/DFSI/w5aj/8IQXP/CUd5/xiIwv8Zjsj/E3Ws/xV6s/8PYpf/EWee/xJtpP8MVIj/DlqP/whBc/8JR3n/GIjC/xmOyP8Tdaz/FXqz/w9il/8RZ57/Em2k/wxUiP8OWo//CEFz/wlHef8YiML/GY7I/xN1rP8VerP/FoC5/xFnnv8SbaT/DFSI/w5aj/8IQXP/CUd5/xiIwv8Zjsj/E3Ws/xV6s/8WgLn/EWee/xJtpP8MVIj/DlqP/whBc/8JR3n/GIjC/xmOyP8Tdaz/FXqz/xaAuf8RZ57/Em2k/wxUiP8OWo//CEFz/wlHef8YiML/GY7I/xqTzv8VerP/Ckt+/xmOyP8bldH/Fn63/xeGwP8Sb6b/FHev/xZ+t/8RZ57/Em+m/w1Yjf8PYJX/Ckl8/wtQhP8NWI3/CEFz/wpJfP8ZjMb/GpPO/whBc/8XhL3/GYzG/xN1rP8VfLX/EGWb/xJtpP8Tdaz/Dl6T/xBlm/8LToL/DVaK/w5ek/8JR3n/C06C/xqRzP8cmdX/FoK7/xiKxP8akcz/FXqz/xaCu/8Ra6L/E3Oq/w5ckf8QY5n/EWui/wxUiP8OXJH/CUV3/wtMgP8MVIj/G5fT/wlFd/8YiML/GZDK/xR5sf8WgLn/GIjC/xNxqP8UebH/D2KX/xFpoP8Tcaj/DlqP/xaCu/8SbaT/FHev/w9il/8Ra6L/E3Ws/w9glf8RaaD/DFSI/w5ek/8RZ57/DFKG/w5ckf8JR3n/C1CE/w5aj/8JRXf/C06C/w1Yjf8IQ3X/C0yA/xqRzP8IQXP/Ckt+/xmQyv8cmdX/F4S9/xmOyP8bl9P/FoK7/xmMxv8bldH/FoC5/xiKxP8Tdaz/Fn63/xiIwv8Tc6r/FXy1/xFnnv8Tcaj/FXqz/xBlm/8Sb6b/DlqP/xBjmf8SbaT/DViN/w9il/8Ra6L/DVaK/w9glf8KS37/DFSI/w5ek/8KSXz/DFKG/xuX0/8JR3n/C1CE/xuV0f8JRXf/C06C/xqTzv8PYJX/C0yA/w1Yjf8JRXf/C1CE/w5ckf8KSXz/DFSI/w9glf8LTID/DViN/xBjmf8LUIT/DlyR/xFnnv8MVIj/D2CV/wtMgP8NWI3/EGOZ/wtQhP8OXJH/EWee/wxUiP8PYJX/EWui/w1Yjf8QY5n/Em+m/w5ckf8RZ57/E3Oq/w9glf8Ra6L/DViN/xBjmf8Sb6b/DlyR/xFnnv8Tc6r/D2CV/xFrov8Ud6//EGOZ/xJvpv8VerP/EWee/xNzqv8PYJX/EWui/xR3r/8QY5n/Em+m/xV6s/8RZ57/E3Oq/xZ+t/8Ra6L/FHev/xaCu/8Sb6b/FXqz/xeGwP8Tc6r/G5fT/xeGwP8ak87/CUd5/xmQyv8IQ3X/C1CE/xyZ1f8LTID/DlqP/wpJfP8NVor/EGOZ/wxShv8PYJX/Em2k/w5ckf8RaaD/FHev/xBlm/8Tc6r/FoC5/xJvpv8VfLX/GIrE/xR5sf8XhsD/GpPO/xaCu/8ZkMr/CEN1/wtQhP8cmdX/C0yA/w5aj/8KSXz/DVaK/xBjmf8MUob/D2CV/xJtpP8OXJH/EWmg/xR3r/8QZZv/E3Oq/xaAuf8Sb6b/FXy1/xiKxP8UebH/F4bA/xqTzv8Wgrv/GZDK/whDdf8ZjMb/HJnV/wtMgP8bldH/Ckl8/w1Wiv8QY5n/DFKG/xN1rP8QZZv/E3Ws/xeEvf8Tdaz/F4S9/xqTzv8XhL3/GpPO/wpJfP8NWI3/Ckl8/w1Yjf8RZ57/DViN/xFnnv8Ud6//F4bA/xR3r/8XhsD/G5XR/xeGwP8bldH/Ckt+/w5aj/8KS37/DlqP/xFpoP8OWo//EWmg/xR5sf8YiML/FHmx/xiIwv8bl9P/GIjC/xuX0/8LTID/G5fT/wtMgP8OXJH/EWui/w5ckf8Ra6L/FXqz/xFrov8VerP/GIrE/xyZ1f8YisT/HJnV/wtOgv8cmdX/C06C/w5ek/8SbaT/Dl6T/xJtpP8VfLX/Em2k/xV8tf8ZjMb/CEFz/xmMxv8MUob/CUV3/w1Wiv8RZ57/DlqP/xFrov8VfLX/GY7I/xaAuf8akcz/Ckl8/w5aj/8LTID/Dl6T/xJvpv8WgLn/E3Oq/xeEvf8bldH/C0yA/xyZ1f8LUIT/D2KX/xNzqv8QZZv/FHev/xiIwv8cmdX/GYzG/whDdf8MVIj/EGWb/w1Yjf8RaaD/FXqz/xJtpP8Wfrf/GZDK/wlHef8ak87/Ckt+/w5ckf8SbaT/D2CV/xNxqP8Wgrv/GpPO/xeGwP8bl9P/C06C/w9glf8MUob/EGOZ/xN1rP8XhsD/FHmx/xiKxP8IQXP/DFKG/wlFd/8NVor/EWee/xR5sf8Ra6L/GIrE/xZ+t/8akcz/Ckt+/w5ek/8MUob/EGWb/xR5sf8ZjMb/FoC5/xqTzv8LTID/D2CV/xNzqv8RZ57/FXqz/xmOyP8JR3n/G5XR/wtOgv8PYpf/E3Ws/xiIwv8VfLX/GZDK/wpJfP8OXJH/C1CE/xBjmf8Ud6//GIrE/whDdf8akcz/Ckt+/w5ek/8Tcaj/EGWb/xR5sf8ZjMb/CUV3/xqTzv8LTID/D2CV/xNzqv8XhsD/FXqz/xmOyP8JR3n/DlqP/wtOgv8PYpf/E3Ws/xiIwv8IQXP/GZDK/wpJfP8OXJH/Em+m/xBjmf8Ud6//GIrE/whDdf8NVor/Ckt+/xFnnv8OXpP/E3Oq/xiIwv8IQ3X/DViN/wtOgv8QY5n/FHmx/xmOyP8KSXz/HJnV/wxUiP8RaaD/Fn63/xqTzv8YisT/CUV3/w5aj/8Sb6b/F4S9/xV6s/8ZkMr/Ckt+/w9glf8Tdaz/EWui/xaAuf8bldH/C1CE/xBlm/8VerP/E3Go/xeGwP8IQXP/DVaK/xFrov8PYpf/FHev/xmMxv8JR3n/DlyR/wxShv8RZ57/FXy1/xqRzP8LTID/CEN1/w1Yjf8SbaT/FoK7/xuX0/8Zjsj/Ckl8/w5ek/8Tc6r/GIjC/xZ+t/8ak87/C06C/xBjmf8UebH/GY7I/xeEvf8JRXf/G5fT/wxUiP8Ra6L/FoK7/xyZ1f8NVor/C06C/xBlm/8VfLX/GpPO/wtQhP8RZ57/D2CV/xR3r/8Zjsj/Ckt+/w9il/8UebH/E3Go/xiIwv8JRXf/DlyR/xNzqv8YisT/FoK7/xyZ1f8NVor/Em2k/xeEvf8IQXP/DViN/wtQhP8RZ57/Fn63/xuV0f8MUob/EWmg/w9il/8UebH/GZDK/wtMgP8QY5n/FXqz/xNzqv8YisT/CUd5/w5ek/8Tdaz/GYzG/xeEvf8IQXP/DViN/xJvpv8XhsD/CEN1/xuV0f8MUob/EWmg/xaAuf8bl9P/DFSI/xFrov8QY5n/FXy1/xR3r/8ZkMr/C06C/xFnnv8WgLn/HJnV/w1Yjf8MUob/EWui/xeEvf8IQ3X/DlyR/xN1rP8Zjsj/C0yA/wlHef8PYJX/FHmx/xqRzP8LUIT/EWmg/xaCu/8IQXP/G5XR/wxUiP8SbaT/F4bA/wlFd/8OXpP/FHev/xmQyv8YisT/Ckl8/w9il/8VerP/GpPO/wxShv8Ra6L/EGWb/xZ+t/8bl9P/DVaK/xJvpv8YiML/CUd5/w9glf8OWo//E3Oq/xmMxv8KS37/EGOZ/xV8tf8bldH/DFSI/wtOgv8RZ57/FoC5/xyZ1f8NWI3/E3Go/xiKxP8KSXz/CEN1/w5aj/8NVor/E3Go/xmMxv8LTID/EWee/xaCu/8IQ3X/Dl6T/xR5sf8ak87/GZDK/wtQhP8Ra6L/F4bA/wlHef8PYpf/FXy1/xuX0/8NWI3/E3Oq/xJvpv8YisT/Ckt+/xBlm/8WgLn/CEFz/w5ckf8Ud6//GpHM/wxShv8SbaT/EWmg/xeEvf8JRXf/D2CV/xV6s/8bldH/DVaK/xNxqP8ZjMb/C0yA/wpJfP8QY5n/Fn63/xyZ1f8OWo//E3Ws/xmQyv8LUIT/EWui/xeGwP8Wgrv/CEN1/w5ek/8UebH/GpPO/wxUiP8Sb6b/GIrE/wpLfv8QZZv/FoC5/xV8tf8akcz/GZDK/wxShv8Sb6b/GYzG/wtOgv8Ra6L/GIjC/wpLfv8RZ57/F4S9/wlHef8QY5n/FoC5/whDdf8PYJX/Dl6T/xV6s/8bl9P/DlqP/xR3r/8ak87/DVaK/xNzqv8ZkMr/DFKG/xJvpv8ZjMb/C06C/xFrov8YiML/Ckt+/wpJfP8QZZv/FoK7/wlFd/8PYpf/Fn63/whBc/8OXpP/FXqz/xuX0/8OWo//FHev/xqTzv8NVor/E3Oq/xNxqP8Zjsj/C1CE/xJtpP8YisT/C0yA/xFpoP8XhsD/Ckl8/xBlm/8Wgrv/CUV3/w9il/8Wfrf/CEFz/w5ek/8OXJH/Em+m/xJvpv8Zjsj/DFKG/xNxqP8ZkMr/DFSI/xNzqv8akcz/DVaK/xN1rP8ak87/DViN/xR3r/8bldH/DlqP/xR5sf8bl9P/DlyR/xV6s/8cmdX/Dl6T/xV8tf8IQXP/D2CV/xZ+t/8IQ3X/D2KX/xaAuf8JRXf/EGOZ/xaCu/8Wgrv/CUd5/xBlm/8XhL3/Ckl8/xFnnv8XhsD/Ckt+/xFpoP8YiML/C0yA/xFrov8YisT/C06C/xJtpP8ZjMb/C1CE/xJvpv8Zjsj/DFKG/xNxqP8ZkMr/DFSI/xNzqv8akcz/DVaK/xN1rP8ak87/DViN/xR3r/8bldH/G5XR/wtMgP8SbaT/GY7I/wxUiP8Tdaz/G5XR/w5ckf8VfLX/CEN1/xBjmf8XhL3/Ckt+/xFrov8ZjMb/DFKG/xNzqv8ak87/DlqP/xV6s/8IQXP/D2KX/xaCu/8KSXz/EWmg/xiKxP8LUIT/E3Go/xqRzP8NWI3/FHmx/xyZ1f8PYJX/FoC5/wlHef8RZ57/GIjC/wtOgv8Sb6b/GZDK/w1Wiv8Ud6//G5fT/w5ek/8Wfrf/CUV3/xBlm/8XhsD/C0yA/xJtpP8Zjsj/DFSI/xN1rP8bldH/DlyR/xV8tf8IQ3X/EGOZ/xeEvf8KS37/EWui/xmMxv8MUob/E3Oq/xqTzv8XhL3/C0yA/xJvpv8akcz/DlqP/xV8tf8JRXf/EWee/xiKxP8MUob/E3Ws/xuX0/8PYJX/FoK7/wpLfv8SbaT/GZDK/w1Yjf8VerP/CEN1/xBlm/8YiML/C1CE/xNzqv8bldH/Dl6T/xaAuf8KSXz/EWui/xmOyP8NVor/G5fT/w9glf8Wgrv/Ckt+/xJtpP8ZkMr/DViN/xV6s/8IQ3X/EGWb/xiIwv8LUIT/E3Oq/xuV0f8OXpP/FoC5/wpJfP8Ra6L/GY7I/w1Wiv8UebH/CEFz/xBjmf8XhsD/C06C/xNxqP8ak87/DlyR/xZ+t/8JR3n/EWmg/wtQhP8Tc6r/D2KX/xeGwP8LUIT/E3Ws/xyZ1f8QY5n/GIjC/wxShv8Ud6//CEFz/xBlm/8YisT/DFSI/xR5sf8IQ3X/EWee/wtQhP8Tdaz/HJnV/xBjmf8YiML/DFKG/xR3r/8IQXP/EGWb/xiKxP8MVIj/FHmx/whDdf8RZ57/GYzG/xN1rP8cmdX/EGOZ/xiIwv8MUob/FHev/whBc/8QZZv/GIrE/wxUiP8UebH/CEN1/xFnnv8ZjMb/DVaK/xV6s/8QY5n/GIjC/wxShv8Ud6//CEFz/xBlm/8YisT/DFSI/xR5sf8IQ3X/EWee/xmMxv8NVor/FXqz/wlFd/8YiML/DFKG/xyZ1f8QZZv/GYzG/w1Yjf8Wfrf/Ckt+/xNxqP8bl9P/EGOZ/xiKxP8NVor/CEFz/xFnnv8Zjsj/DlqP/xaAuf8LTID/E3Oq/xyZ1f8QZZv/GYzG/xR3r/8IQ3X/EWmg/xmQyv8OXJH/FoK7/wtOgv8Tdaz/CEFz/xFnnv8MUob/FHmx/wlFd/8Ra6L/GpHM/w5ek/8XhL3/C1CE/xR3r/8IQ3X/EWmg/wxUiP8VerP/CUd5/xJtpP8ak87/D2CV/xeGwP8MUob/FHmx/wlFd/8YisT/DVaK/xV8tf8KSXz/Em+m/xuV0f8PYpf/GIjC/wxUiP8VerP/EGWb/xmMxv8Ud6//CUV3/xJtpP8bldH/EGOZ/xmMxv8OWo//FoK7/xJvpv8bl9P/EGWb/xmOyP8OXJH/F4S9/wxShv8VerP/EWee/xmQyv8OXpP/F4bA/wxUiP8VfLX/Ckt+/xNzqv8PYJX/GIjC/w1Wiv8Wfrf/C0yA/xN1rP8IQ3X/GIrE/w1Yjf8WgLn/C06C/xR3r/8JRXf/Em2k/xuV0f8Wgrv/C1CE/xR5sf8JR3n/Em+m/xuX0/8QZZv/GY7I/xV6s/8KSXz/E3Go/xyZ1f8RZ57/GZDK/w5ek/8XhsD/E3Oq/whBc/8RaaD/GpHM/w9glf8YiML/DVaK/whDdf8Ra6L/DFSI/xZ+t/8LToL/FHmx/wpJfP8Tc6r/CEN1/xmMxv8OXJH/F4bA/w1Wiv8WgLn/C1CE/xyZ1f8RaaD/GpPO/xBjmf8Zjsj/Dl6T/wtMgP8Ud6//CUd5/xNxqP8IQXP/EWui/w5aj/8XhL3/DFSI/xZ+t/8LToL/FHmx/xFnnv8akcz/D2KX/xmMxv8OXJH/F4bA/w1Wiv8JRXf/Em+m/xyZ1f8RaaD/GpPO/xBjmf8MUob/FXy1/wtMgP8Ud6//CUd5/xNxqP8PYJX/GIrE/w5aj/8XhL3/DFSI/xZ+t/8SbaT/G5fT/xFnnv8akcz/D2KX/xmMxv8VerP/Ckt+/xmMxv8OXpP/GIrE/w5ckf8YiML/DlqP/wpLfv8Ud6//Ckl8/xN1rP8JR3n/GpHM/xBjmf8ZkMr/D2KX/xmOyP8Wfrf/C1CE/xV8tf8LToL/FXqz/xFrov8bl9P/EWmg/xuV0f8RZ57/DViN/xeEvf8NVor/FoK7/wxUiP8JRXf/E3Go/whDdf8Sb6b/CEFz/xJtpP8OXpP/GIrE/w5ckf8YiML/DlqP/wpLfv8Ud6//Ckl8/xN1rP8JR3n/GpHM/xBjmf8ZkMr/D2KX/xmOyP8Wfrf/C1CE/xV8tf8LToL/FXqz/xFrov8bl9P/EWmg/xuV0f8RZ57/DViN/xeEvf8RaaD/G5fT/xFrov8cmdX/Em2k/w9glf8Zjsj/D2KX/xmQyv8Wgrv/DVaK/xeEvf8NWI3/F4bA/xR5sf8LTID/FXqz/wtOgv8IQXP/Em+m/whDdf8Tcaj/CUV3/xqRzP8QZZv/GpPO/xFnnv8OWo//GIjC/w5ckf8YisT/FXy1/wtQhP8Wfrf/DFKG/xaAuf8Tc6r/CUd5/xN1rP8KSXz/G5XR/xFpoP8bl9P/EWui/xyZ1f8ZjMb/D2CV/xmOyP8PYpf/DFSI/xaCu/8NVor/F4S9/w1Yjf8KS37/FHmx/wtMgP8VerP/Em2k/whBc/8Sb6b/CEN1/xmQyv8QY5n/CUd5/xR3r/8LTID/FXy1/xNxqP8JR3n/FHev/wtMgP8IQXP/E3Go/wlHef8Ud6//EWui/whBc/8Tcaj/CUd5/xuV0f8Ra6L/CEFz/xNxqP8QZZv/G5XR/xFrov8IQXP/GZDK/xBlm/8bldH/EWui/w9glf8ZkMr/EGWb/w5aj/8YisT/D2CV/xmQyv8XhL3/DlqP/xiKxP8PYJX/DFSI/xeEvf8OWo//GIrE/xZ+t/8MVIj/F4S9/w5aj/8LToL/Fn63/wxUiP8XhL3/FHmx/wtOgv8Wfrf/DFSI/wpJfP8UebH/C06C/xZ+t/8Tc6r/Ckl8/xR5sf8SbaT/CEN1/xZ+t/8NVor/GIjC/w9glf8NVor/GIjC/w9glf8NVor/GIjC/w9glf8akcz/GIjC/w9glf8akcz/GIjC/w9glf8akcz/EWmg/w9glf8akcz/EWmg/w9glf8akcz/EWmg/whBc/8akcz/EWmg/whBc/8akcz/EWmg/whBc/8akcz/EWmg/whBc/8Tc6r/EWmg/whBc/8Tc6r/EWmg/whBc/8Tc6r/Ckt+/whBc/8Tc6r/Ckt+/whBc/8Tc6r/Ckt+/xV8tf8Tc6r/Ckt+/xV8tf8Tc6r/Ckt+/xV8tf8MVIj/Ckt+/xV8tf8MVIj/Ckt+/xV8tf8MVIj/Ckt+/xV8tf8OXJH/GZDK/xFpoP8IQ3X/G5XR/xJvpv8KSXz/CEFz/xN1rP8LToL/CUd5/xV6s/8MVIj/C0yA/xaAuf8OWo//DFKG/xeGwP8PYJX/DViN/xmMxv8QZZv/Dl6T/xqRzP8Ra6L/EGOZ/xuX0/8Tcaj/EWmg/whDdf8Ud6//Em+m/wpJfP8VfLX/DVaK/wtOgv8Wgrv/DlyR/wxUiP8YiML/D2KX/w5aj/8Zjsj/EWee/w9glf8ak87/Em2k/xBlm/8cmdX/E3Oq/xFrov8JRXf/FHmx/xNxqP8KS37/Fn63/xR3r/8LUIT/F4S9/xV8tf8NVor/GIrE/xaCu/8OXJH/GpPO/xJvpv8KS37/CUV3/xV6s/8NVor/C1CE/xeGwP8PYpf/DlyR/xqRzP8SbaT/EWee/whDdf8UebH/E3Oq/wtOgv8KSXz/Fn63/w5aj/8MVIj/GIrE/xBlm/8PYJX/G5XR/xNxqP8Ra6L/CUd5/xV8tf8Ud6//DFKG/wtMgP8Wgrv/Dl6T/w1Yjf8Zjsj/EWmg/xBjmf8cmdX/E3Ws/xJvpv8KS37/FoC5/xV6s/8NVor/GYzG/xeGwP8PYpf/DlyR/xqRzP8SbaT/EWee/whDdf8UebH/E3Oq/wtOgv8XhL3/Fn63/w5aj/8ZkMr/GIrE/xBlm/8PYJX/G5XR/xNxqP8LToL/F4bA/xaCu/8PYJX/G5fT/xqTzv8Tcaj/Em2k/wpLfv8Wgrv/Fn63/w5ckf8NWI3/GZDK/xJtpP8RaaD/CUd5/xZ+t/8VerP/DViN/wxUiP8ZjMb/EWmg/xBlm/8IQ3X/HJnV/xR3r/8MVIj/C1CE/xiIwv8XhL3/D2KX/xyZ1f8bldH/E3Oq/wtQhP8LTID/F4S9/xaAuf8OXpP/G5XR/xqRzP8Sb6b/EWui/wpJfP8WgLn/FXy1/w5aj/8akcz/GY7I/xFrov8RZ57/CUV3/xV8tf8UebH/DVaK/wxShv8YisT/EWee/xBjmf8IQXP/G5fT/xN1rP8LToL/GIjC/xFnnv8QZZv/CUV3/whDdf8VfLX/DlyR/w5aj/8ak87/GpHM/xNxqP8Sb6b/C06C/xiIwv8XhsD/EGWb/xBjmf8IQ3X/FXy1/xV6s/8OWo//DViN/xqRzP8ZkMr/Em+m/wtOgv8LTID/F4bA/xeEvf8QY5n/D2KX/whBc/8VerP/FHmx/w1Yjf8NVor/GZDK/xJvpv8SbaT/C0yA/wpLfv8XhL3/FoK7/w9il/8IQXP/HJnV/xR5sf8Ud6//DVaK/xmQyv8Zjsj/Em2k/xFrov8KS37/Ckl8/xaCu/8PYpf/D2CV/xyZ1f8bl9P/FHev/xN1rP8MVIj/F4bA/xFnnv8KSXz/Ckl8/xeEvf8XhL3/EGWb/xBlm/8JR3n/CUd5/xaCu/8QY5n/EGOZ/wlFd/8JRXf/FoC5/xaAuf8PYpf/D2KX/whDdf8IQ3X/Fn63/w9glf8PYJX/CEFz/whBc/8VfLX/FXy1/w5ek/8OXpP/HJnV/xyZ1f8VerP/DlyR/w5ckf8bl9P/G5fT/xR5sf8UebH/DlqP/w5aj/8bldH/FHev/xR3r/8NWI3/DViN/xqTzv8ak87/E3Ws/xN1rP8NVor/DVaK/xqRzP8Tc6r/E3Oq/wxUiP8MVIj/GZDK/xmQyv8Tcaj/E3Go/wxShv8MUob/GY7I/xBjmf8JR3n/F4S9/xeGwP8RaaD/EWui/wtOgv8LUIT/GY7I/xmQyv8Tc6r/E3Ws/w1Yjf8OWo//G5fT/xyZ1f8VfLX/Fn63/w9il/8QY5n/CUd5/wpJfP8XhsD/GIjC/xFrov8SbaT/C1CE/wxShv8ZkMr/GpHM/xN1rP8Ud6//DlqP/xuX0/8cmdX/FXy1/xZ+t/8PYpf/EGOZ/wlHef8KSXz/F4bA/xiIwv8Ra6L/Em2k/wtQhP8MUob/GZDK/xqRzP8Tdaz/FHev/w5aj/8OXJH/HJnV/whBc/8Wfrf/FoC5/xBjmf8QZZv/Ckl8/wpLfv8YiML/GIrE/xJtpP8IQXP/FoC5/xeEvf8RaaD/Em2k/wxShv8NVor/G5XR/xyZ1f8Wfrf/FoK7/xFnnv8Ra6L/C1CE/wxUiP8ak87/G5fT/xV8tf8WgLn/EGWb/xFpoP8LToL/DFKG/xqRzP8bldH/FXqz/xZ+t/8QY5n/EWee/wtMgP8LUIT/DFSI/xqTzv8bl9P/FXy1/xaAuf8QZZv/EWmg/wtOgv8MUob/GpHM/xuV0f8VerP/Fn63/xBjmf8RZ57/C0yA/wtQhP8ZkMr/GpPO/xR5sf8VfLX/D2KX/xBlm/8KS37/C06C/xmOyP8akcz/FHev/xV6s/8PYJX/EGOZ/xFnnv8LTID/",
+      "analysis": {
+        "mean": [
+          17.652018229166668,
+          108.4267578125,
+          163.25618489583334
+        ],
+        "neutral": [
+          17.652018229166668,
+          108.4267578125,
+          163.25618489583334
+        ],
+        "p05": 0.23529411764705882,
+        "p50": 0.3607843137254902,
+        "p95": 0.4980392156862745,
+        "clipping": 0,
+        "redRatio": 0.12994572315213093,
+        "magenta": 0.8342415044718047,
+        "confidence": "low"
+      },
+      "auto": {
+        "gains": [
+          2.0050814152718033,
+          1,
+          0.85
+        ],
+        "redMix": 0.6030488491630822,
+        "haze": 0.06764705882352941,
+        "highlights": 0,
+        "mode": "restore",
+        "explanation": "Very little red remains. A conservative colour reconstruction is suggested; original colours are uncertain."
+      },
+      "recipe": {
+        "version": 1,
+        "engine": "balanced",
+        "strength": 0.35,
+        "hints": {
+          "scene": "auto",
+          "water": "auto",
+          "filter": "auto",
+          "depth": null
+        },
+        "auto": {
+          "gains": [
+            2.0050814152718033,
+            1,
+            0.85
+          ],
+          "redMix": 0.6030488491630822,
+          "haze": 0.06764705882352941,
+          "highlights": 0,
           "mode": "restore",
-          "explanation": "Blue / green cast detected. Restoring warmth while preserving the water’s character."
+          "explanation": "Very little red remains. A conservative colour reconstruction is suggested; original colours are uncertain."
+        },
+        "manual": {
+          "warmth": 18,
+          "tint": -11,
+          "red": 7,
+          "exposure": 0.2,
+          "highlights": -12,
+          "shadows": 8,
+          "contrast": 0,
+          "haze": 0,
+          "vibrance": 0,
+          "neutral": [
+            1.18,
+            0.91,
+            0.84
+          ]
+        },
+        "cameraColour": {
+          "source": "fivea",
+          "matrix": [
+            0.35,
+            0.25,
+            0.4,
+            -0.015,
+            0.05,
+            0.92,
+            0.03,
+            0.005,
+            0.02,
+            0.08,
+            0.85,
+            0
+          ]
+        }
+      },
+      "rendered": "NERk/0lifv9fgJr/OUtr/09phf9liKH/PlJw/1Rxi/9qj6f/Q1l3/1l4kv9vlq7/SGF9/15/mP83Smj/TWeD/2SGn/89UG//Um+J/2iOpf9CV3T/WHaQ/26UrP9HX3v/XX2X/zZIZ/9MZYH/YoSd/zxObf9RbYj/Z4yk/0BVc/9WdI7/bZKr/0Zdev9be5X/NUZm/0tjgP9hgpv/Ok1s/09rhv9miqL/P1Ry/1VyjP9rkKj/RVt4/1p5k/80RGT/SWJ+/1+Amv85S2v/T2mF/2WIof8+UnD/VHGL/2qPp/9DWXf/WXiS/2+Wrv9IYX3/Xn+Y/zdKaP9NZ4P/ZIaf/1l4kv80RGT/S2OA/2KEnf89UG//VHGL/2uQqP9GXXr/XX2X/zdKaP9PaYX/Zoqi/0BVc/9YdpD/b5au/0lifv9hgpv/PE5t/1Jvif9qj6f/RVt4/1t7lf82SGf/TWeD/2WIof8/VHL/VnSO/26UrP9IYX3/X4Ca/zpNbP9miqL/QFVz/1h2kP9vlq7/SWJ+/2GCm/88Tm3/Um+J/2qPp/9FW3j/W3uV/zZIZ/9NZ4P/ZYih/z9Ucv9WdI7/bpSs/0hhff9fgJr/Ok1s/1FtiP9ojqX/Q1l3/1p5k/81Rmb/TGWB/2SGn/8+UnD/VXKM/22Sq/9HX3v/Nkhn/01ng/9CV3T/WnmT/zZIZ/9PaYX/Z4yk/0NZd/9be5X/N0po/09rhv9ojqX/RVt4/119l/85S2v/UW2I/2qPp/9GXXr/Nkhn/09phf9njKT/Q1l3/1t7lf83Smj/T2uG/2iOpf9FW3j/XX2X/zlLa/9RbYj/ao+n/0Zdev9ef5j/T2mF/2eMpP9DWXf/W3uV/zdKaP9Pa4b/aI6l/0VbeP9dfZf/OUtr/1FtiP9qj6f/Rl16/15/mP86TWz/Um+J/0NZd/9be5X/N0po/09rhv9ojqX/RVt4/119l/85S2v/UW2I/2qPp/9GXXr/Xn+Y/zpNbP9Sb4n/a5Co/1t7lf83Smj/Z4yk/0VbeP9ef5j/PE5t/1VyjP9vlq7/TGWB/2aKov9DWXf/XX2X/zpNbP9ojqX/Rl16/1+Amv89UG//VnSO/zREZP9NZ4P/Z4yk/0VbeP9ef5j/T2uG/2qPp/9HX3v/YYKb/z5ScP9YdpD/NUZm/09phf9ojqX/Rl16/zdKaP9RbYj/a5Co/0hhff9ihJ3/P1Ry/1l4kv82SGf/T2uG/2qPp/9HX3v/OUtr/1Jvif9tkqv/SWJ+/2SGn/9AVXP/WnmT/zdKaP9RbYj/a5Co/119l/86TWz/VHGL/26UrP9LY4D/ZYih/0JXdP9be5X/OUtr/1Jvif9FW3j/Xn+Y/09rhv9rkKj/SWJ+/2WIof9DWXf/Xn+Y/z1Qb/9YdpD/S2OA/2aKov9FW3j/X4Ca/z5ScP9ZeJL/N0po/1Jvif9GXXr/YYKb/z9Ucv9aeZP/OUtr/1Rxi/9vlq7/TWeD/0BVc/9be5X/Ok1s/1VyjP80RGT/T2mF/2qPp/9dfZf/PE5t/1Z0jv81Rmb/T2uG/2uQqP9JYn7/ZYih/1h2kP82SGf/UW2I/22Sq/9LY4D/Zoqi/0VbeP9fgJr/Um+J/26UrP9MZYH/Z4yk/0Zdev9hgpv/P1Ry/1p5k/9NZ4P/aI6l/0dfe/9ihJ3/QFVz/1t7lf86TWz/ao+n/0hhff85S2v/VXKM/zVGZv9RbYj/bpSs/01ng/9qj6f/Xn+Y/z5ScP9aeZP/Ok1s/1Z0jv82SGf/Z4yk/0dfe/9khp//Q1l3/1+Amv8/VHL/NERk/09rhv9tkqv/TGWB/2iOpf9IYX3/PVBv/1l4kv85S2v/VXKM/zVGZv9RbYj/Rl16/2KEnf9CV3T/Xn+Y/z5ScP9aeZP/Ok1s/2uQqP9LY4D/Z4yk/0dfe/9khp//Q1l3/zdKaP9UcYv/NERk/09rhv9tkqv/TGWB/0BVc/9dfZf/PVBv/1l4kv85S2v/VXKM/0lifv9miqL/Rl16/2KEnf9CV3T/Xn+Y/1Jvif9vlq7/Xn+Y/z9Ucv9dfZf/PlJw/1t7lf89UG//b5au/09rhv9ulKz/T2mF/22Sq/9ihJ3/Q1l3/2GCm/9CV3T/X4Ca/1VyjP82SGf/VHGL/zVGZv9Sb4n/SGF9/2aKov9HX3v/ZYih/0Zdev88Tm3/WXiS/zpNbP9YdpD/OUtr/2uQqP9MZYH/ao+n/0tjgP9ojqX/SWJ+/z9Ucv9dfZf/PlJw/1t7lf89UG//b5au/09rhv9ulKz/T2mF/22Sq/9ihJ3/Q1l3/2GCm/9CV3T/X4Ca/1VyjP82SGf/VHGL/zVGZv9Sb4n/SGF9/2aKov9HX3v/ZYih/0Zdev88Tm3/WXiS/0dfe/9miqL/SGF9/2eMpP9JYn7/QFVz/1+Amv9CV3T/YYKb/1h2kP86TWz/WXiS/zxObf9aeZP/UW2I/zREZP9Sb4n/NUZm/2iOpf9LY4D/ao+n/0xlgf9rkKj/YoSd/0VbeP9khp//Rl16/z1Qb/9be5X/PlJw/119l/9UcYv/Nkhn/1VyjP83Smj/VnSO/01ng/9tkqv/T2mF/26UrP9liKH/R197/2aKov9IYX3/Z4yk/15/mP9AVXP/X4Ca/0JXdP85S2v/WHaQ/zpNbP9ZeJL/PE5t/2+Wrv9RbYj/NERk/1Jvif9JYn7/aI6l/0tjgP9qj6f/YYKb/0NZd/9tkqv/T2uG/zREZP9UcYv/TGWB/22Sq/9Pa4b/NERk/2iOpf9MZYH/bZKr/09rhv9IYX3/aI6l/0xlgf9tkqv/ZYih/0hhff9ojqX/TGWB/0VbeP9liKH/SGF9/2iOpf9hgpv/RVt4/2WIof9IYX3/QFVz/2GCm/9FW3j/PVBv/119l/9AVXP/YYKb/1l4kv89UG//XX2X/0BVc/85S2v/WXiS/z1Qb/9dfZf/VXKM/zlLa/9ZeJL/PVBv/zVGZv9Vcoz/OUtr/1l4kv9RbYj/NUZm/1VyjP85S2v/bpSs/1FtiP81Rmb/VXKM/01ng/9ulKz/UW2I/0lifv9qj6f/VXKM/zpNbP9be5X/QFVz/zpNbP9be5X/QFVz/zpNbP9be5X/QFVz/2KEnf9be5X/QFVz/2KEnf9be5X/QFVz/2KEnf9HX3v/QFVz/2KEnf9HX3v/QFVz/2KEnf9HX3v/aI6l/2KEnf9HX3v/aI6l/2KEnf9HX3v/aI6l/2KEnf9HX3v/aI6l/01ng/9HX3v/aI6l/01ng/9HX3v/aI6l/01ng/9vlq7/aI6l/01ng/9vlq7/aI6l/01ng/9vlq7/VHGL/01ng/9vlq7/VHGL/01ng/9vlq7/VHGL/zlLa/9vlq7/VHGL/zlLa/9vlq7/VHGL/zlLa/9vlq7/VHGL/z5ScP9hgpv/R197/2qPp/9liKH/S2OA/26UrP9ojqX/T2mF/zVGZv9tkqv/Um+J/zlLa/80RGT/VnSO/z1Qb/83Smj/WnmT/0BVc/88Tm3/Xn+Y/0VbeP8/VHL/YoSd/0hhff9DWXf/Zoqi/0xlgf9HX3v/ao+n/09rhv9LY4D/bpSs/1Rxi/86TWz/NUZm/1h2kP8+UnD/OUtr/1t7lf9CV3T/PVBv/1+Amv9GXXr/QFVz/2SGn/9JYn7/RVt4/2eMpP9NZ4P/SGF9/2uQqP9RbYj/TGWB/2+Wrv9Vcoz/T2uG/zZIZ/9ZeJL/VHGL/zpNbP9dfZf/WHaQ/z5ScP9khp//S2OA/2+Wrv9rkKj/Um+J/zpNbP82SGf/WnmT/0JXdP8+UnD/YoSd/0lifv9GXXr/ao+n/1FtiP9NZ4P/NUZm/26UrP9Vcoz/PVBv/zlLa/9dfZf/RVt4/0BVc/9liKH/TGWB/0hhff9tkqv/VHGL/09rhv83Smj/NERk/1h2kP8/VHL/PE5t/1+Amv9HX3v/Q1l3/2eMpP9PaYX/S2OA/2+Wrv9WdI7/Um+J/zpNbP9ef5j/WnmT/0JXdP8+UnD/YoSd/0lifv9GXXr/ao+n/1FtiP9NZ4P/NUZm/1l4kv9Vcoz/PVBv/2GCm/9dfZf/RVt4/0BVc/9liKH/TGWB/zVGZv9aeZP/WHaQ/0BVc/9miqL/ZIaf/0xlgf9JYn7/b5au/1h2kP9Vcoz/PlJw/zxObf9hgpv/SWJ+/0dfe/9tkqv/VXKM/1Jvif88Tm3/OUtr/15/mP9HX3v/RVt4/2qPp/9njKT/T2uG/zlLa/82SGf/W3uV/1l4kv9CV3T/Z4yk/2WIof9NZ4P/Nkhn/zREZP9ZeJL/VnSO/z9Ucv9liKH/YoSd/0tjgP9IYX3/bpSs/1Z0jv9UcYv/PVBv/2KEnf9fgJr/SGF9/0Zdev9rkKj/VHGL/1FtiP86TWz/N0po/119l/9GXXr/Q1l3/2iOpf9miqL/T2mF/zVGZv9be5X/Rl16/0VbeP9rkKj/ao+n/1Rxi/8+UnD/PVBv/2SGn/9ihJ3/TGWB/0tjgP81Rmb/W3uV/1p5k/9FW3j/Q1l3/2qPp/9UcYv/Um+J/z1Qb/88Tm3/YoSd/2GCm/9LY4D/NUZm/zREZP9aeZP/WXiS/0NZd/9CV3T/aI6l/1Jvif9RbYj/PE5t/zpNbP9hgpv/S2OA/0lifv80RGT/b5au/1l4kv9YdpD/Qld0/2iOpf9njKT/UW2I/09rhv86TWz/YYKb/1+Amv9JYn7/SGF9/2+Wrv9ulKz/WHaQ/0JXdP9AVXP/Z4yk/2aKov9Pa4b/T2mF/zlLa/9aeZP/Rl16/26UrP9ulKz/WXiS/1l4kv9FW3j/RVt4/22Sq/9tkqv/WHaQ/0NZd/9DWXf/a5Co/2uQqP9WdI7/VnSO/0JXdP9CV3T/ao+n/2qPp/9Vcoz/QFVz/0BVc/9ojqX/aI6l/1Rxi/9UcYv/P1Ry/z9Ucv9njKT/Z4yk/1Jvif8+UnD/PlJw/2aKov9miqL/UW2I/1FtiP89UG//PVBv/2WIof9Pa4b/T2uG/zxObf88Tm3/ZIaf/2SGn/9PaYX/T2mF/zpNbP86TWz/YoSd/01ng/9NZ4P/OUtr/zlLa/9hgpv/YYKb/0xlgf9MZYH/N0po/zdKaP9fgJr/Q1l3/22Sq/9ZeJL/WnmT/0dfe/9IYX3/NUZm/zZIZ/9fgJr/YYKb/01ng/9PaYX/PE5t/z1Qb/9miqL/Z4yk/1Rxi/9Vcoz/Qld0/0NZd/9tkqv/bpSs/1p5k/9be5X/SGF9/0lifv82SGf/N0po/2GCm/9ihJ3/T2mF/09rhv89UG//Zoqi/2eMpP9UcYv/VXKM/0JXdP9DWXf/bZKr/26UrP9aeZP/W3uV/0hhff9JYn7/Nkhn/zdKaP9hgpv/YoSd/09phf9Pa4b/PVBv/z5ScP9njKT/aI6l/1VyjP9WdI7/Q1l3/0VbeP9ulKz/b5au/1t7lf9dfZf/SWJ+/2iOpf9WdI7/WXiS/0dfe/9JYn7/N0po/zpNbP9liKH/Z4yk/1VyjP9YdpD/Rl16/0hhff82SGf/OUtr/2SGn/9miqL/VHGL/1Z0jv9FW3j/R197/zVGZv83Smj/YoSd/2WIof9Sb4n/VXKM/0NZd/9GXXr/NERk/zZIZ/85S2v/ZIaf/2aKov9UcYv/VnSO/0VbeP9HX3v/NUZm/zdKaP9ihJ3/ZYih/1Jvif9Vcoz/Q1l3/0Zdev80RGT/Nkhn/2GCm/9khp//UW2I/1Rxi/9CV3T/RVt4/2+Wrv81Rmb/X4Ca/2KEnf9Pa4b/Um+J/0BVc/9DWXf/Rl16/zREZP9RbYj/QFVz/0VbeP80RGT/N0po/2SGn/9njKT/VnSO/1p5k/9JYn7/TWeD/1FtiP9AVXP/RVt4/zREZP83Smj/ZIaf/2eMpP9WdI7/WnmT/0lifv9NZ4P/UW2I/0BVc/9FW3j/NERk/zdKaP9khp//Z4yk/1Z0jv9aeZP/Xn+Y/01ng/9RbYj/QFVz/0VbeP80RGT/N0po/2SGn/9njKT/VnSO/1p5k/9ef5j/TWeD/1FtiP9AVXP/RVt4/zREZP83Smj/ZIaf/2eMpP9WdI7/WnmT/15/mP9NZ4P/UW2I/0BVc/9FW3j/NERk/zdKaP9khp//Z4yk/2uQqP9aeZP/Ok1s/2eMpP9tkqv/XX2X/2KEnf9Sb4n/WHaQ/119l/9NZ4P/Um+J/0NZd/9IYX3/OUtr/z5ScP9DWXf/NERk/zlLa/9miqL/a5Co/zREZP9hgpv/Zoqi/1Z0jv9be5X/TGWB/1FtiP9WdI7/R197/0xlgf89UG//Qld0/0dfe/83Smj/PVBv/2qPp/9vlq7/X4Ca/2WIof9qj6f/WnmT/1+Amv9Pa4b/VXKM/0Zdev9LY4D/T2uG/0BVc/9GXXr/Nkhn/zxObf9AVXP/bpSs/zZIZ/9khp//aI6l/1l4kv9ef5j/ZIaf/1Rxi/9ZeJL/SWJ+/09phf9UcYv/RVt4/1+Amv9RbYj/WHaQ/0lifv9Pa4b/VnSO/0hhff9PaYX/QFVz/0dfe/9NZ4P/P1Ry/0Zdev83Smj/PlJw/0VbeP82SGf/PVBv/0NZd/81Rmb/PE5t/2qPp/80RGT/Ok1s/2iOpf9vlq7/YYKb/2eMpP9ulKz/X4Ca/2aKov9tkqv/Xn+Y/2WIof9WdI7/XX2X/2SGn/9Vcoz/W3uV/01ng/9UcYv/WnmT/0xlgf9Sb4n/RVt4/0tjgP9RbYj/Q1l3/0lifv9Pa4b/Qld0/0hhff86TWz/QFVz/0dfe/85S2v/P1Ry/26UrP83Smj/PlJw/22Sq/82SGf/PVBv/2uQqP9IYX3/PE5t/0NZd/82SGf/PlJw/0Zdev85S2v/QFVz/0hhff88Tm3/Q1l3/0tjgP8+UnD/Rl16/01ng/9AVXP/SGF9/zxObf9DWXf/S2OA/z5ScP9GXXr/TWeD/0BVc/9IYX3/T2uG/0NZd/9LY4D/Um+J/0Zdev9NZ4P/VXKM/0hhff9Pa4b/Q1l3/0tjgP9Sb4n/Rl16/01ng/9Vcoz/SGF9/09rhv9YdpD/S2OA/1Jvif9aeZP/TWeD/1VyjP9IYX3/T2uG/1h2kP9LY4D/Um+J/1p5k/9NZ4P/VXKM/119l/9Pa4b/WHaQ/1+Amv9Sb4n/WnmT/2KEnf9Vcoz/bpSs/2KEnf9rkKj/N0po/2iOpf81Rmb/PlJw/2+Wrv88Tm3/RVt4/zlLa/9CV3T/S2OA/z9Ucv9IYX3/UW2I/0Zdev9PaYX/WHaQ/0xlgf9Vcoz/Xn+Y/1Jvif9be5X/ZYih/1l4kv9ihJ3/a5Co/1+Amv9ojqX/NUZm/z5ScP9vlq7/PE5t/0VbeP85S2v/Qld0/0tjgP8/VHL/SGF9/1FtiP9GXXr/T2mF/1h2kP9MZYH/VXKM/15/mP9Sb4n/W3uV/2WIof9ZeJL/YoSd/2uQqP9fgJr/aI6l/zVGZv9miqL/b5au/zxObf9tkqv/OUtr/0JXdP9LY4D/P1Ry/1Z0jv9MZYH/VnSO/2GCm/9WdI7/YYKb/2uQqP9hgpv/a5Co/zlLa/9DWXf/OUtr/0NZd/9NZ4P/Q1l3/01ng/9YdpD/YoSd/1h2kP9ihJ3/bZKr/2KEnf9tkqv/Ok1s/0VbeP86TWz/RVt4/09phf9FW3j/T2mF/1l4kv9khp//WXiS/2SGn/9ulKz/ZIaf/26UrP88Tm3/bpSs/zxObf9GXXr/T2uG/0Zdev9Pa4b/WnmT/09rhv9aeZP/ZYih/2+Wrv9liKH/b5au/z1Qb/9vlq7/PVBv/0dfe/9RbYj/R197/1FtiP9be5X/UW2I/1t7lf9miqL/NERk/2aKov8/VHL/Nkhn/0JXdP9NZ4P/RVt4/09rhv9be5X/Z4yk/15/mP9qj6f/OUtr/0VbeP88Tm3/R197/1Jvif9ef5j/VXKM/2GCm/9tkqv/PE5t/2+Wrv8+UnD/SWJ+/1VyjP9MZYH/WHaQ/2SGn/9vlq7/Zoqi/zVGZv9AVXP/TGWB/0NZd/9PaYX/WnmT/1FtiP9dfZf/aI6l/zdKaP9rkKj/Ok1s/0Zdev9RbYj/SGF9/1Rxi/9fgJr/a5Co/2KEnf9ulKz/PVBv/0hhff8/VHL/S2OA/1Z0jv9ihJ3/WXiS/2WIof80RGT/P1Ry/zZIZ/9CV3T/TWeD/1l4kv9Pa4b/ZYih/119l/9qj6f/Ok1s/0dfe/8/VHL/TGWB/1l4kv9miqL/Xn+Y/2uQqP88Tm3/SGF9/1VyjP9NZ4P/WnmT/2eMpP83Smj/bZKr/z1Qb/9JYn7/VnSO/2SGn/9be5X/aI6l/zlLa/9GXXr/PlJw/0tjgP9YdpD/ZYih/zVGZv9qj6f/Ok1s/0dfe/9UcYv/TGWB/1l4kv9miqL/Nkhn/2uQqP88Tm3/SGF9/1VyjP9ihJ3/WnmT/2eMpP83Smj/RVt4/z1Qb/9JYn7/VnSO/2SGn/80RGT/aI6l/zlLa/9GXXr/Um+J/0tjgP9YdpD/ZYih/zVGZv9CV3T/Ok1s/01ng/9HX3v/VXKM/2SGn/81Rmb/Q1l3/z1Qb/9LY4D/WXiS/2eMpP85S2v/b5au/0BVc/9PaYX/XX2X/2uQqP9liKH/Nkhn/0VbeP9Sb4n/YYKb/1p5k/9ojqX/Ok1s/0hhff9WdI7/T2uG/15/mP9tkqv/PlJw/0xlgf9aeZP/VHGL/2KEnf80RGT/Qld0/09rhv9JYn7/WHaQ/2aKov83Smj/Rl16/z9Ucv9NZ4P/W3uV/2qPp/88Tm3/NUZm/0NZd/9RbYj/X4Ca/26UrP9njKT/OUtr/0dfe/9Vcoz/ZIaf/119l/9rkKj/PVBv/0tjgP9ZeJL/Z4yk/2GCm/82SGf/bpSs/0BVc/9Pa4b/X4Ca/2+Wrv9CV3T/PVBv/0xlgf9be5X/a5Co/z5ScP9NZ4P/SGF9/1h2kP9njKT/Ok1s/0lifv9ZeJL/VHGL/2SGn/82SGf/Rl16/1VyjP9liKH/X4Ca/2+Wrv9CV3T/UW2I/2GCm/80RGT/Q1l3/z5ScP9NZ4P/XX2X/22Sq/8/VHL/T2mF/0lifv9ZeJL/aI6l/zxObf9LY4D/WnmT/1VyjP9liKH/N0po/0dfe/9WdI7/Zoqi/2GCm/80RGT/Q1l3/1Jvif9ihJ3/NUZm/22Sq/8/VHL/T2mF/15/mP9ulKz/QFVz/09rhv9LY4D/W3uV/1h2kP9ojqX/PVBv/01ng/9ef5j/b5au/0NZd/8/VHL/T2uG/2GCm/81Rmb/Rl16/1Z0jv9njKT/PE5t/zdKaP9IYX3/WXiS/2qPp/8+UnD/T2mF/1+Amv80RGT/bZKr/0BVc/9RbYj/YoSd/zZIZ/9HX3v/WHaQ/2iOpf9liKH/OUtr/0lifv9aeZP/a5Co/z9Ucv9Pa4b/TGWB/119l/9ulKz/Qld0/1Jvif9khp//N0po/0hhff9FW3j/VXKM/2aKov86TWz/S2OA/1t7lf9tkqv/QFVz/z1Qb/9NZ4P/Xn+Y/2+Wrv9DWXf/VHGL/2WIof85S2v/NUZm/0VbeP9CV3T/VHGL/2aKov88Tm3/TWeD/1+Amv81Rmb/R197/1l4kv9rkKj/aI6l/z5ScP9Pa4b/YoSd/zdKaP9JYn7/W3uV/26UrP9DWXf/VXKM/1Jvif9liKH/Ok1s/0xlgf9ef5j/NERk/0Zdev9YdpD/ao+n/z9Ucv9RbYj/T2mF/2GCm/82SGf/SGF9/1p5k/9tkqv/Qld0/1Rxi/9miqL/PE5t/zlLa/9LY4D/XX2X/2+Wrv9FW3j/VnSO/2iOpf8+UnD/T2uG/2KEnf9fgJr/NUZm/0dfe/9ZeJL/a5Co/0BVc/9Sb4n/ZYih/zpNbP9MZYH/Xn+Y/1t7lf9qj6f/aI6l/z9Ucv9Sb4n/Zoqi/z1Qb/9Pa4b/ZIaf/zpNbP9NZ4P/YYKb/zdKaP9LY4D/Xn+Y/zVGZv9IYX3/R197/1p5k/9ulKz/RVt4/1h2kP9rkKj/Qld0/1VyjP9ojqX/P1Ry/1Jvif9miqL/PVBv/09rhv9khp//Ok1s/zlLa/9MZYH/X4Ca/zZIZ/9JYn7/XX2X/zREZP9HX3v/WnmT/26UrP9FW3j/WHaQ/2uQqP9CV3T/VXKM/1Rxi/9njKT/PlJw/1FtiP9liKH/PE5t/09phf9ihJ3/OUtr/0xlgf9fgJr/Nkhn/0lifv9dfZf/NERk/0dfe/9GXXr/Um+J/1Jvif9njKT/P1Ry/1Rxi/9ojqX/QFVz/1VyjP9qj6f/Qld0/1Z0jv9rkKj/Q1l3/1h2kP9tkqv/RVt4/1l4kv9ulKz/Rl16/1p5k/9vlq7/R197/1t7lf80RGT/SGF9/119l/81Rmb/SWJ+/15/mP82SGf/S2OA/1+Amv9fgJr/N0po/0xlgf9hgpv/OUtr/01ng/9ihJ3/Ok1s/09phf9khp//PE5t/09rhv9liKH/PVBv/1FtiP9miqL/PlJw/1Jvif9njKT/P1Ry/1Rxi/9ojqX/QFVz/1VyjP9qj6f/Qld0/1Z0jv9rkKj/Q1l3/1h2kP9tkqv/bZKr/zxObf9RbYj/Z4yk/0BVc/9WdI7/bZKr/0Zdev9be5X/NUZm/0tjgP9hgpv/Ok1s/09rhv9miqL/P1Ry/1VyjP9rkKj/RVt4/1p5k/80RGT/SWJ+/1+Amv85S2v/T2mF/2WIof8+UnD/VHGL/2qPp/9DWXf/WXiS/2+Wrv9IYX3/Xn+Y/zdKaP9NZ4P/ZIaf/z1Qb/9Sb4n/aI6l/0JXdP9YdpD/bpSs/0dfe/9dfZf/Nkhn/0xlgf9ihJ3/PE5t/1FtiP9njKT/QFVz/1Z0jv9tkqv/Rl16/1t7lf81Rmb/S2OA/2GCm/86TWz/T2uG/2aKov8/VHL/VXKM/2uQqP9hgpv/PE5t/1Jvif9qj6f/RVt4/1t7lf82SGf/TWeD/2WIof8/VHL/VnSO/26UrP9IYX3/X4Ca/zpNbP9RbYj/aI6l/0NZd/9aeZP/NUZm/0xlgf9khp//PlJw/1VyjP9tkqv/R197/15/mP85S2v/T2uG/2eMpP9CV3T/bpSs/0hhff9fgJr/Ok1s/1FtiP9ojqX/Q1l3/1p5k/81Rmb/TGWB/2SGn/8+UnD/VXKM/22Sq/9HX3v/Xn+Y/zlLa/9Pa4b/Z4yk/0JXdP9ZeJL/NERk/0tjgP9ihJ3/PVBv/1Rxi/9rkKj/Rl16/119l/83Smj/T2mF/z5ScP9Vcoz/SWJ+/2KEnf8+UnD/VnSO/2+Wrv9LY4D/ZIaf/z9Ucv9YdpD/NERk/0xlgf9liKH/QFVz/1l4kv81Rmb/TWeD/z5ScP9WdI7/b5au/0tjgP9khp//P1Ry/1h2kP80RGT/TGWB/2WIof9AVXP/WXiS/zVGZv9NZ4P/Zoqi/1Z0jv9vlq7/S2OA/2SGn/8/VHL/WHaQ/zREZP9MZYH/ZYih/0BVc/9ZeJL/NUZm/01ng/9miqL/Qld0/1p5k/9LY4D/ZIaf/z9Ucv9YdpD/NERk/0xlgf9liKH/QFVz/1l4kv81Rmb/TWeD/2aKov9CV3T/WnmT/zZIZ/9khp//P1Ry/2+Wrv9MZYH/Zoqi/0NZd/9dfZf/Ok1s/1Rxi/9ulKz/S2OA/2WIof9CV3T/NERk/01ng/9njKT/RVt4/15/mP88Tm3/VXKM/2+Wrv9MZYH/Zoqi/1h2kP81Rmb/T2mF/2iOpf9GXXr/X4Ca/z1Qb/9WdI7/NERk/01ng/8/VHL/WXiS/zZIZ/9Pa4b/ao+n/0dfe/9hgpv/PlJw/1h2kP81Rmb/T2mF/0BVc/9aeZP/N0po/1FtiP9rkKj/SGF9/2KEnf8/VHL/WXiS/zZIZ/9liKH/Qld0/1t7lf85S2v/Um+J/22Sq/9JYn7/ZIaf/0BVc/9aeZP/TGWB/2aKov9YdpD/Nkhn/1FtiP9tkqv/S2OA/2aKov9FW3j/X4Ca/1Jvif9ulKz/TGWB/2eMpP9GXXr/YYKb/z9Ucv9aeZP/TWeD/2iOpf9HX3v/YoSd/0BVc/9be5X/Ok1s/1VyjP9IYX3/ZIaf/0JXdP9dfZf/PE5t/1Z0jv81Rmb/ZYih/0NZd/9ef5j/PVBv/1h2kP82SGf/UW2I/22Sq/9fgJr/PlJw/1l4kv83Smj/Um+J/26UrP9MZYH/Z4yk/1p5k/85S2v/VHGL/2+Wrv9NZ4P/aI6l/0dfe/9ihJ3/VXKM/zREZP9PaYX/ao+n/0hhff9khp//Qld0/zVGZv9Pa4b/QFVz/119l/89UG//WXiS/zlLa/9Vcoz/NUZm/2aKov9GXXr/YoSd/0JXdP9ef5j/PlJw/2+Wrv9PaYX/a5Co/0tjgP9njKT/R197/zxObf9YdpD/N0po/1Rxi/80RGT/T2uG/0VbeP9hgpv/QFVz/119l/89UG//WXiS/01ng/9qj6f/SWJ+/2aKov9GXXr/YoSd/0JXdP82SGf/Um+J/2+Wrv9PaYX/a5Co/0tjgP8/VHL/W3uV/zxObf9YdpD/N0po/1Rxi/9IYX3/ZYih/0VbeP9hgpv/QFVz/119l/9RbYj/bpSs/01ng/9qj6f/SWJ+/2aKov9aeZP/Ok1s/2aKov9HX3v/ZYih/0Zdev9khp//RVt4/zpNbP9YdpD/OUtr/1Z0jv83Smj/ao+n/0tjgP9ojqX/SWJ+/2eMpP9dfZf/PlJw/1t7lf89UG//WnmT/09rhv9ulKz/T2mF/22Sq/9NZ4P/Q1l3/2GCm/9CV3T/X4Ca/0BVc/82SGf/VHGL/zVGZv9Sb4n/NERk/1FtiP9HX3v/ZYih/0Zdev9khp//RVt4/zpNbP9YdpD/OUtr/1Z0jv83Smj/ao+n/0tjgP9ojqX/SWJ+/2eMpP9dfZf/PlJw/1t7lf89UG//WnmT/09rhv9ulKz/T2mF/22Sq/9NZ4P/Q1l3/2GCm/9PaYX/bpSs/09rhv9vlq7/UW2I/0hhff9njKT/SWJ+/2iOpf9fgJr/Qld0/2GCm/9DWXf/YoSd/1l4kv88Tm3/WnmT/z1Qb/80RGT/Um+J/zVGZv9UcYv/Nkhn/2qPp/9MZYH/a5Co/01ng/9FW3j/ZIaf/0Zdev9liKH/W3uV/z5ScP9dfZf/P1Ry/15/mP9Vcoz/N0po/1Z0jv85S2v/bZKr/09phf9ulKz/T2uG/2+Wrv9miqL/SGF9/2eMpP9JYn7/QFVz/1+Amv9CV3T/YYKb/0NZd/86TWz/WXiS/zxObf9aeZP/UW2I/zREZP9Sb4n/NUZm/2iOpf9LY4D/N0po/1h2kP88Tm3/W3uV/1Rxi/83Smj/WHaQ/zxObf80RGT/VHGL/zdKaP9YdpD/T2uG/zREZP9UcYv/N0po/22Sq/9Pa4b/NERk/1Rxi/9MZYH/bZKr/09rhv80RGT/aI6l/0xlgf9tkqv/T2uG/0hhff9ojqX/TGWB/0VbeP9liKH/SGF9/2iOpf9hgpv/RVt4/2WIof9IYX3/QFVz/2GCm/9FW3j/ZYih/119l/9AVXP/YYKb/0VbeP89UG//XX2X/0BVc/9hgpv/WXiS/z1Qb/9dfZf/QFVz/zlLa/9ZeJL/PVBv/119l/9Vcoz/OUtr/1l4kv9RbYj/NUZm/119l/9CV3T/ZIaf/0hhff9CV3T/ZIaf/0hhff9CV3T/ZIaf/0hhff9qj6f/ZIaf/0hhff9qj6f/ZIaf/0hhff9qj6f/T2mF/0hhff9qj6f/T2mF/0hhff9qj6f/T2mF/zREZP9qj6f/T2mF/zREZP9qj6f/T2mF/zREZP9qj6f/T2mF/zREZP9Vcoz/T2mF/zREZP9Vcoz/T2mF/zREZP9Vcoz/Ok1s/zREZP9Vcoz/Ok1s/zREZP9Vcoz/Ok1s/1t7lf9Vcoz/Ok1s/1t7lf9Vcoz/Ok1s/1t7lf9AVXP/Ok1s/1t7lf9AVXP/Ok1s/1t7lf9AVXP/Ok1s/1t7lf9GXXr/aI6l/09phf81Rmb/bZKr/1Jvif85S2v/NERk/1Z0jv89UG//N0po/1p5k/9AVXP/PE5t/15/mP9FW3j/P1Ry/2KEnf9IYX3/Q1l3/2aKov9MZYH/R197/2qPp/9Pa4b/S2OA/26UrP9UcYv/T2mF/zVGZv9YdpD/Um+J/zlLa/9be5X/Qld0/z1Qb/9fgJr/Rl16/0BVc/9khp//SWJ+/0VbeP9njKT/TWeD/0hhff9rkKj/UW2I/0xlgf9vlq7/VXKM/09rhv82SGf/WXiS/1Rxi/86TWz/XX2X/1h2kP8+UnD/YYKb/1t7lf9CV3T/ZYih/1+Amv9GXXr/a5Co/1Jvif86TWz/Nkhn/1p5k/9CV3T/PlJw/2KEnf9JYn7/Rl16/2qPp/9RbYj/TWeD/zVGZv9ZeJL/VXKM/z1Qb/85S2v/XX2X/0VbeP9AVXP/ZYih/0xlgf9IYX3/bZKr/1Rxi/9Pa4b/N0po/1t7lf9YdpD/P1Ry/zxObf9fgJr/R197/0NZd/9njKT/T2mF/0tjgP9vlq7/VnSO/1Jvif86TWz/Xn+Y/1p5k/9CV3T/Zoqi/2KEnf9JYn7/Rl16/2qPp/9RbYj/TWeD/zVGZv9ZeJL/VXKM/z1Qb/9hgpv/XX2X/0VbeP9ojqX/ZYih/0xlgf9IYX3/bZKr/1Rxi/89UG//YoSd/1+Amv9IYX3/bpSs/2uQqP9UcYv/UW2I/zpNbP9fgJr/XX2X/0Zdev9DWXf/aI6l/1FtiP9PaYX/N0po/119l/9aeZP/Q1l3/0BVc/9miqL/T2mF/0xlgf81Rmb/b5au/1h2kP9AVXP/PlJw/2SGn/9hgpv/SWJ+/2+Wrv9tkqv/VXKM/z5ScP88Tm3/YYKb/15/mP9HX3v/bZKr/2qPp/9Sb4n/T2uG/zlLa/9ef5j/W3uV/0VbeP9qj6f/Z4yk/09rhv9NZ4P/Nkhn/1t7lf9ZeJL/Qld0/z9Ucv9liKH/TWeD/0tjgP80RGT/bpSs/1Z0jv89UG//ZIaf/01ng/9MZYH/Nkhn/zVGZv9be5X/Rl16/0VbeP9rkKj/ao+n/1Rxi/9Sb4n/PVBv/2SGn/9ihJ3/TGWB/0tjgP81Rmb/W3uV/1p5k/9FW3j/Q1l3/2qPp/9ojqX/Um+J/z1Qb/88Tm3/YoSd/2GCm/9LY4D/SWJ+/zREZP9aeZP/WXiS/0NZd/9CV3T/aI6l/1Jvif9RbYj/PE5t/zpNbP9hgpv/X4Ca/0lifv80RGT/b5au/1l4kv9YdpD/Qld0/2iOpf9njKT/UW2I/09rhv86TWz/OUtr/1+Amv9JYn7/SGF9/2+Wrv9ulKz/WHaQ/1Z0jv9AVXP/YoSd/01ng/85S2v/OUtr/2GCm/9hgpv/TGWB/0xlgf83Smj/N0po/1+Amv9LY4D/S2OA/zZIZ/82SGf/Xn+Y/15/mP9JYn7/SWJ+/zVGZv81Rmb/XX2X/0hhff9IYX3/NERk/zREZP9be5X/W3uV/0dfe/9HX3v/b5au/2+Wrv9aeZP/Rl16/0Zdev9ulKz/bpSs/1l4kv9ZeJL/RVt4/0VbeP9tkqv/WHaQ/1h2kP9DWXf/Q1l3/2uQqP9rkKj/VnSO/1Z0jv9CV3T/Qld0/2qPp/9Vcoz/VXKM/0BVc/9AVXP/aI6l/2iOpf9UcYv/VHGL/z9Ucv8/VHL/Z4yk/0tjgP83Smj/YYKb/2KEnf9PaYX/T2uG/z1Qb/8+UnD/Z4yk/2iOpf9Vcoz/VnSO/0NZd/9FW3j/bpSs/2+Wrv9be5X/XX2X/0lifv9LY4D/N0po/zlLa/9ihJ3/ZIaf/09rhv9RbYj/PlJw/z9Ucv9ojqX/ao+n/1Z0jv9YdpD/RVt4/26UrP9vlq7/W3uV/119l/9JYn7/S2OA/zdKaP85S2v/YoSd/2SGn/9Pa4b/UW2I/z5ScP8/VHL/aI6l/2qPp/9WdI7/WHaQ/0VbeP9GXXr/b5au/zREZP9dfZf/Xn+Y/0tjgP9MZYH/OUtr/zpNbP9khp//ZYih/1FtiP80RGT/Xn+Y/2GCm/9PaYX/UW2I/z9Ucv9CV3T/bZKr/2+Wrv9dfZf/X4Ca/01ng/9Pa4b/PlJw/0BVc/9rkKj/bpSs/1t7lf9ef5j/TGWB/09phf89UG//P1Ry/2qPp/9tkqv/WnmT/119l/9LY4D/TWeD/zxObf8+UnD/QFVz/2uQqP9ulKz/W3uV/15/mP9MZYH/T2mF/z1Qb/8/VHL/ao+n/22Sq/9aeZP/XX2X/0tjgP9NZ4P/PE5t/z5ScP9ojqX/a5Co/1l4kv9be5X/SWJ+/0xlgf86TWz/PVBv/2eMpP9qj6f/WHaQ/1p5k/9IYX3/S2OA/01ng/88Tm3/",
+      "replacementPatch": "CEFz/w9il/8Wgrv/Ckl8/xFpoP8YisT/C1CE/xNxqP8akcz/DViN/xR5sf8cmdX/D2CV/xaAuf8JR3n/EWee/xiIwv8LToL/Em+m/xmQyv8=",
+      "replacementNeutral": [
+        1.752844738778456,
+        0.9727424987134742,
+        0.7127509703483399
+      ],
+      "smoothing": {
+        "previous": {
+          "version": 1,
+          "engine": "balanced",
+          "strength": 0.35,
+          "hints": {
+            "scene": "surface",
+            "water": "green",
+            "filter": "no",
+            "depth": 23
+          },
+          "auto": {
+            "gains": [
+              0.7,
+              1.1,
+              1.3
+            ],
+            "redMix": 0.4,
+            "haze": 0.02,
+            "highlights": -0.4,
+            "mode": "restore",
+            "explanation": "Very little red remains. A conservative colour reconstruction is suggested; original colours are uncertain."
+          },
+          "manual": {
+            "warmth": 9,
+            "tint": -6,
+            "red": 4,
+            "exposure": 0.2,
+            "highlights": -12,
+            "shadows": 8,
+            "contrast": 0,
+            "haze": 0,
+            "vibrance": 0,
+            "neutral": [
+              1.2,
+              0.8,
+              1.4
+            ]
+          },
+          "cameraColour": {
+            "source": "fivea",
+            "matrix": [
+              0.35,
+              0.25,
+              0.4,
+              -0.015,
+              0.05,
+              0.92,
+              0.03,
+              0.005,
+              0.02,
+              0.08,
+              0.85,
+              0
+            ]
+          }
+        },
+        "strength": 0.6,
+        "hints": {
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
+        },
+        "manual": {
+          "warmth": 9,
+          "tint": -6,
+          "red": 4,
+          "exposure": 0.2,
+          "highlights": -12,
+          "shadows": 8,
+          "contrast": 0,
+          "haze": 0,
+          "vibrance": 0,
+          "neutral": [
+            1.2,
+            0.8,
+            1.4
+          ]
+        },
+        "auto": {
+          "gains": [
+            0.7899999999999999,
+            1.07,
+            1.21
+          ],
+          "redMix": 0.28,
+          "haze": 0.014,
+          "highlights": -0.28,
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
+        }
+      }
+    },
+    {
+      "name": "fivea-matrix-full-strength-manual-wb",
+      "width": 64,
+      "height": 48,
+      "input": "qkZc/8Jcef/ZcZb/sEtj/8dhgP/fd53/tVBq/81mh//kfKP/u1Vw/9Jrjf/qgar/wFp3/9hwlP+uSmH/xmB+/911m/+0T2j/y2WF/+N6ov+5VG//0WqM/+h/qf+/WXb/1m+S/61JX//EXnz/3HSZ/7JOZv/KY4P/4Xmg/7hTbf/PaIr/536n/71YdP/VbpH/q0de/8Nde//ac5j/sUxl/8higf/geJ7/tlFr/85niP/lfaX/vFdy/9Nsj/+qRlz/wlx5/9lxlv+wS2P/x2GA/993nf+1UGr/zWaH/+R8o/+7VXD/0muN/+qBqv/AWnf/2HCU/65KYf/GYH7/3XWb/9Jrjf+qRlz/w117/9x0mf+0T2j/zWaH/+V9pf+9WHT/1m+S/65KYf/HYYD/4Hie/7hTbf/Raoz/6oGq/8Jcef/ac5j/sk5m/8tlhf/kfKP/vFdy/9Vukf+tSV//xmB+/993nf+2UWv/z2iK/+h/qf/AWnf/2XGW/7FMZf/geJ7/uFNt/9FqjP/qgar/wlx5/9pzmP+yTmb/y2WF/+R8o/+8V3L/1W6R/61JX//GYH7/33ed/7ZRa//PaIr/6H+p/8Bad//ZcZb/sUxl/8pjg//jeqL/u1Vw/9Nsj/+rR17/xF58/911m/+1UGr/zmeI/+d+p/+/WXb/rUlf/8Zgfv+5VG//02yP/61JX//HYYD/4Xmg/7tVcP/VbpH/rkph/8higf/jeqL/vFdy/9Zvkv+wS2P/ymOD/+R8o/+9WHT/rUlf/8dhgP/heaD/u1Vw/9Vukf+uSmH/yGKB/+N6ov+8V3L/1m+S/7BLY//KY4P/5Hyj/71YdP/YcJT/x2GA/+F5oP+7VXD/1W6R/65KYf/IYoH/43qi/7xXcv/Wb5L/sEtj/8pjg//kfKP/vVh0/9hwlP+xTGX/y2WF/7tVcP/VbpH/rkph/8higf/jeqL/vFdy/9Zvkv+wS2P/ymOD/+R8o/+9WHT/2HCU/7FMZf/LZYX/5X2l/9Vukf+uSmH/4Xmg/7xXcv/YcJT/sk5m/85niP/qgar/xF58/+B4nv+7VXD/1m+S/7FMZf/jeqL/vVh0/9lxlv+0T2j/z2iK/6pGXP/GYH7/4Xmg/7xXcv/YcJT/yGKB/+R8o/+/WXb/2nOY/7VQav/Raoz/q0de/8dhgP/jeqL/vVh0/65KYf/KY4P/5X2l/8Bad//cdJn/tlFr/9Jrjf+tSV//yGKB/+R8o/+/WXb/sEtj/8tlhf/nfqf/wlx5/911m/+4U23/02yP/65KYf/KY4P/5X2l/9Zvkv+xTGX/zWaH/+h/qf/DXXv/33ed/7lUb//VbpH/sEtj/8tlhf+8V3L/2HCU/8higf/lfaX/wlx5/993nf+7VXD/2HCU/7RPaP/Raoz/w117/+B4nv+8V3L/2XGW/7VQav/Sa43/rkph/8tlhf+9WHT/2nOY/7ZRa//TbI//sEtj/81mh//qgar/xmB+/7hTbf/VbpH/sUxl/85niP+qRlz/x2GA/+R8o//Wb5L/sk5m/89oiv+rR17/yGKB/+V9pf/CXHn/33ed/9FqjP+tSV//ymOD/+d+p//DXXv/4Hie/7xXcv/ZcZb/y2WF/+h/qf/EXnz/4Xmg/71YdP/ac5j/tlFr/9Nsj//GYH7/43qi/79Zdv/cdJn/uFNt/9Vukf+xTGX/5Hyj/8Bad/+wS2P/zmeI/6tHXv/KY4P/6H+p/8Zgfv/kfKP/2HCU/7VQav/TbI//sUxl/89oiv+tSV//4Xmg/79Zdv/ddZv/u1Vw/9lxlv+2UWv/qkZc/8higf/nfqf/xF58/+N6ov/AWnf/tE9o/9Jrjf+wS2P/zmeI/6tHXv/KY4P/vVh0/9x0mf+5VG//2HCU/7VQav/TbI//sUxl/+V9pf/DXXv/4Xmg/79Zdv/ddZv/u1Vw/65KYf/NZof/qkZc/8higf/nfqf/xF58/7hTbf/Wb5L/tE9o/9Jrjf+wS2P/zmeI/8Jcef/geJ7/vVh0/9x0mf+5VG//2HCU/8tlhf/qgar/2HCU/7ZRa//Wb5L/tVBq/9Vukf+0T2j/6oGq/8higf/of6n/x2GA/+d+p//cdJn/u1Vw/9pzmP+5VG//2XGW/85niP+tSV//zWaH/6tHXv/LZYX/wFp3/+B4nv+/WXb/33ed/71YdP+yTmb/0muN/7FMZf/Raoz/sEtj/+V9pf/EXnz/5Hyj/8Nde//jeqL/wlx5/7ZRa//Wb5L/tVBq/9Vukf+0T2j/6oGq/8higf/of6n/x2GA/+d+p//cdJn/u1Vw/9pzmP+5VG//2XGW/85niP+tSV//zWaH/6tHXv/LZYX/wFp3/+B4nv+/WXb/33ed/71YdP+yTmb/0muN/79Zdv/geJ7/wFp3/+F5oP/CXHn/uFNt/9lxlv+5VG//2nOY/9FqjP+xTGX/0muN/7JOZv/TbI//ymOD/6pGXP/LZYX/q0de/+N6ov/DXXv/5Hyj/8RefP/lfaX/3HSZ/7xXcv/ddZv/vVh0/7RPaP/VbpH/tVBq/9Zvkv/NZof/rUlf/85niP+uSmH/z2iK/8Zgfv/nfqf/x2GA/+h/qf/fd53/v1l2/+B4nv/AWnf/4Xmg/9hwlP+4U23/2XGW/7lUb/+wS2P/0WqM/7FMZf/Sa43/sk5m/+qBqv/KY4P/qkZc/8tlhf/CXHn/43qi/8Nde//kfKP/2nOY/7tVcP/nfqf/yGKB/6pGXP/NZof/xF58/+d+p//IYoH/qkZc/+N6ov/EXnz/536n/8higf/AWnf/43qi/8RefP/nfqf/33ed/8Bad//jeqL/xF58/7xXcv/fd53/wFp3/+N6ov/ac5j/vFdy/993nf/AWnf/uFNt/9pzmP+8V3L/tE9o/9Zvkv+4U23/2nOY/9Jrjf+0T2j/1m+S/7hTbf+wS2P/0muN/7RPaP/Wb5L/zmeI/7BLY//Sa43/tE9o/6tHXv/OZ4j/sEtj/9Jrjf/KY4P/q0de/85niP+wS2P/6H+p/8pjg/+rR17/zmeI/8Zgfv/of6n/ymOD/8Jcef/kfKP/zmeI/7FMZf/VbpH/uFNt/7FMZf/VbpH/uFNt/7FMZf/VbpH/uFNt/9x0mf/VbpH/uFNt/9x0mf/VbpH/uFNt/9x0mf+/WXb/uFNt/9x0mf+/WXb/uFNt/9x0mf+/WXb/43qi/9x0mf+/WXb/43qi/9x0mf+/WXb/43qi/9x0mf+/WXb/43qi/8Zgfv+/WXb/43qi/8Zgfv+/WXb/43qi/8Zgfv/qgar/43qi/8Zgfv/qgar/43qi/8Zgfv/qgar/zWaH/8Zgfv/qgar/zWaH/8Zgfv/qgar/zWaH/7BLY//qgar/zWaH/7BLY//qgar/zWaH/7BLY//qgar/zWaH/7VQav/ac5j/v1l2/+R8o//fd53/w117/+h/qf/jeqL/x2GA/6tHXv/nfqf/y2WF/7BLY/+qRlz/z2iK/7RPaP+uSmH/02yP/7hTbf+yTmb/2HCU/7xXcv+2UWv/3HSZ/8Bad/+7VXD/4Hie/8RefP+/WXb/5Hyj/8higf/DXXv/6H+p/81mh/+xTGX/q0de/9FqjP+1UGr/sEtj/9Vukf+5VG//tE9o/9lxlv+9WHT/uFNt/911m//CXHn/vFdy/+F5oP/GYH7/wFp3/+V9pf/KY4P/xF58/+qBqv/OZ4j/yGKB/61JX//Sa43/zWaH/7FMZf/Wb5L/0WqM/7VQav/ddZv/w117/+qBqv/lfaX/y2WF/7FMZf+tSV//02yP/7lUb/+1UGr/3HSZ/8Jcef+9WHT/5Hyj/8pjg//GYH7/q0de/+h/qf/OZ4j/tE9o/7BLY//Wb5L/vFdy/7hTbf/fd53/xF58/8Bad//nfqf/zWaH/8higf+uSmH/qkZc/9FqjP+2UWv/sk5m/9lxlv+/WXb/u1Vw/+F5oP/HYYD/w117/+qBqv/PaIr/y2WF/7FMZf/YcJT/02yP/7lUb/+1UGr/3HSZ/8Jcef+9WHT/5Hyj/8pjg//GYH7/q0de/9Jrjf/OZ4j/tE9o/9pzmP/Wb5L/vFdy/7hTbf/fd53/xF58/6tHXv/TbI//0WqM/7hTbf/geJ7/3XWb/8RefP/CXHn/6oGq/9FqjP/OZ4j/tVBq/7JOZv/ac5j/wlx5/79Zdv/nfqf/zmeI/8tlhf+yTmb/sEtj/9hwlP+/WXb/vFdy/+R8o//heaD/yGKB/7BLY/+tSV//1W6R/9Jrjf+5VG//4Xmg/993nf/GYH7/rUlf/6pGXP/Sa43/z2iK/7ZRa//fd53/3HSZ/8Nde//AWnf/6H+p/89oiv/NZof/tE9o/9x0mf/ZcZb/wFp3/71YdP/lfaX/zWaH/8pjg/+xTGX/rkph/9Zvkv+9WHT/u1Vw/+N6ov/geJ7/x2GA/6tHXv/VbpH/vVh0/7xXcv/lfaX/5Hyj/81mh/+1UGr/tE9o/911m//cdJn/xF58/8Nde/+rR17/1W6R/9Nsj/+8V3L/u1Vw/+R8o//NZof/y2WF/7RPaP+yTmb/3HSZ/9pzmP/DXXv/q0de/6pGXP/TbI//0muN/7tVcP+5VG//43qi/8tlhf/KY4P/sk5m/7FMZf/ac5j/w117/8Jcef+qRlz/6oGq/9Jrjf/Raoz/uVRv/+N6ov/heaD/ymOD/8higf+xTGX/2nOY/9lxlv/CXHn/wFp3/+qBqv/of6n/0WqM/7lUb/+4U23/4Xmg/+B4nv/IYoH/x2GA/7BLY//TbI//vVh0/+h/qf/of6n/0muN/9Jrjf+8V3L/vFdy/+d+p//nfqf/0WqM/7tVcP+7VXD/5X2l/+V9pf/PaIr/z2iK/7lUb/+5VG//5Hyj/+R8o//OZ4j/uFNt/7hTbf/jeqL/43qi/81mh//NZof/tlFr/7ZRa//heaD/4Xmg/8tlhf+1UGr/tVBq/+B4nv/geJ7/ymOD/8pjg/+0T2j/tE9o/993nf/IYoH/yGKB/7JOZv+yTmb/3XWb/911m//HYYD/x2GA/7FMZf+xTGX/3HSZ/8Zgfv/GYH7/sEtj/7BLY//ac5j/2nOY/8RefP/EXnz/rkph/65KYf/ZcZb/u1Vw/+d+p//Sa43/02yP/79Zdv/AWnf/q0de/61JX//ZcZb/2nOY/8Zgfv/HYYD/sk5m/7RPaP/geJ7/4Xmg/81mh//OZ4j/uVRv/7tVcP/nfqf/6H+p/9Nsj//VbpH/wFp3/8Jcef+tSV//rkph/9pzmP/cdJn/x2GA/8higf+0T2j/4Hie/+F5oP/NZof/zmeI/7lUb/+7VXD/536n/+h/qf/TbI//1W6R/8Bad//CXHn/rUlf/65KYf/ac5j/3HSZ/8dhgP/IYoH/tE9o/7VQav/heaD/43qi/85niP/PaIr/u1Vw/7xXcv/of6n/6oGq/9Vukf/Wb5L/wlx5/+N6ov/PaIr/0muN/79Zdv/CXHn/rkph/7FMZf/fd53/4Xmg/85niP/Raoz/vVh0/8Bad/+tSV//sEtj/911m//geJ7/zWaH/89oiv+8V3L/v1l2/6tHXv+uSmH/3HSZ/993nf/LZYX/zmeI/7tVcP+9WHT/qkZc/61JX/+wS2P/3XWb/+B4nv/NZof/z2iK/7xXcv+/WXb/q0de/65KYf/cdJn/33ed/8tlhf/OZ4j/u1Vw/71YdP+qRlz/rUlf/9pzmP/ddZv/ymOD/81mh/+5VG//vFdy/+qBqv+rR17/2XGW/9x0mf/IYoH/y2WF/7hTbf+7VXD/vVh0/6pGXP/KY4P/uFNt/7xXcv+qRlz/rkph/911m//heaD/z2iK/9Nsj//CXHn/xmB+/8pjg/+4U23/vFdy/6pGXP+uSmH/3XWb/+F5oP/PaIr/02yP/8Jcef/GYH7/ymOD/7hTbf+8V3L/qkZc/65KYf/ddZv/4Xmg/89oiv/TbI//2HCU/8Zgfv/KY4P/uFNt/7xXcv+qRlz/rkph/911m//heaD/z2iK/9Nsj//YcJT/xmB+/8pjg/+4U23/vFdy/6pGXP+uSmH/3XWb/+F5oP/PaIr/02yP/9hwlP/GYH7/ymOD/7hTbf+8V3L/qkZc/65KYf/ddZv/4Xmg/+V9pf/TbI//sUxl/+F5oP/nfqf/1m+S/9x0mf/LZYX/0WqM/9Zvkv/GYH7/y2WF/7tVcP/AWnf/sEtj/7VQav+7VXD/qkZc/7BLY//geJ7/5X2l/6pGXP/ac5j/4Hie/89oiv/VbpH/xF58/8pjg//PaIr/v1l2/8RefP+0T2j/uVRv/79Zdv+uSmH/tE9o/+R8o//qgar/2XGW/993nf/kfKP/02yP/9lxlv/IYoH/zmeI/71YdP/DXXv/yGKB/7hTbf+9WHT/rUlf/7JOZv+4U23/6H+p/61JX//ddZv/43qi/9Jrjf/YcJT/3XWb/81mh//Sa43/wlx5/8dhgP/NZof/vFdy/9lxlv/KY4P/0WqM/8Jcef/IYoH/z2iK/8Bad//HYYD/uFNt/79Zdv/GYH7/tlFr/71YdP+uSmH/tVBq/7xXcv+tSV//tE9o/7tVcP+rR17/sk5m/+R8o/+qRlz/sUxl/+N6ov/qgar/2nOY/+F5oP/of6n/2XGW/+B4nv/nfqf/2HCU/993nf/PaIr/1m+S/911m//OZ4j/1W6R/8Zgfv/NZof/02yP/8RefP/LZYX/vFdy/8Nde//KY4P/u1Vw/8Jcef/IYoH/uVRv/8Bad/+xTGX/uFNt/79Zdv+wS2P/tlFr/+h/qf+uSmH/tVBq/+d+p/+tSV//tE9o/+V9pf/AWnf/sk5m/7tVcP+tSV//tVBq/71YdP+wS2P/uFNt/8Bad/+yTmb/u1Vw/8Nde/+1UGr/vVh0/8Zgfv+4U23/wFp3/7JOZv+7VXD/w117/7VQav+9WHT/xmB+/7hTbf/AWnf/yGKB/7tVcP/DXXv/y2WF/71YdP/GYH7/zmeI/8Bad//IYoH/u1Vw/8Nde//LZYX/vVh0/8Zgfv/OZ4j/wFp3/8higf/Raoz/w117/8tlhf/TbI//xmB+/85niP/AWnf/yGKB/9FqjP/DXXv/y2WF/9Nsj//GYH7/zmeI/9Zvkv/IYoH/0WqM/9lxlv/LZYX/02yP/9x0mf/OZ4j/6H+p/9x0mf/lfaX/rkph/+N6ov+rR17/tVBq/+qBqv+yTmb/vFdy/7BLY/+5VG//w117/7ZRa//AWnf/ymOD/71YdP/HYYD/0WqM/8RefP/OZ4j/2HCU/8tlhf/VbpH/33ed/9Jrjf/cdJn/5X2l/9lxlv/jeqL/q0de/7VQav/qgar/sk5m/7xXcv+wS2P/uVRv/8Nde/+2UWv/wFp3/8pjg/+9WHT/x2GA/9FqjP/EXnz/zmeI/9hwlP/LZYX/1W6R/993nf/Sa43/3HSZ/+V9pf/ZcZb/43qi/6tHXv/geJ7/6oGq/7JOZv/nfqf/sEtj/7lUb//DXXv/tlFr/89oiv/EXnz/z2iK/9pzmP/PaIr/2nOY/+V9pf/ac5j/5X2l/7BLY/+7VXD/sEtj/7tVcP/GYH7/u1Vw/8Zgfv/Raoz/3HSZ/9FqjP/cdJn/536n/9x0mf/nfqf/sUxl/7xXcv+xTGX/vFdy/8dhgP+8V3L/x2GA/9Jrjf/ddZv/0muN/911m//of6n/3XWb/+h/qf+yTmb/6H+p/7JOZv+9WHT/yGKB/71YdP/IYoH/02yP/8higf/TbI//33ed/+qBqv/fd53/6oGq/7RPaP/qgar/tE9o/79Zdv/KY4P/v1l2/8pjg//VbpH/ymOD/9Vukf/geJ7/qkZc/+B4nv+2UWv/rUlf/7lUb//GYH7/vFdy/8higf/VbpH/4Xmg/9hwlP/kfKP/sEtj/7xXcv+yTmb/v1l2/8tlhf/YcJT/zmeI/9pzmP/nfqf/sk5m/+qBqv+1UGr/wlx5/85niP/EXnz/0WqM/911m//qgar/4Hie/6tHXv+4U23/xF58/7tVcP/HYYD/02yP/8pjg//Wb5L/43qi/65KYf/lfaX/sUxl/71YdP/KY4P/wFp3/81mh//ZcZb/5X2l/9x0mf/of6n/tE9o/8Bad/+2UWv/w117/89oiv/cdJn/0muN/993nf+qRlz/tlFr/61JX/+5VG//xmB+/9Jrjf/IYoH/33ed/9Zvkv/kfKP/sUxl/79Zdv+2UWv/xF58/9Jrjf/geJ7/2HCU/+V9pf+yTmb/wFp3/85niP/GYH7/02yP/+F5oP+uSmH/536n/7RPaP/CXHn/z2iK/911m//VbpH/43qi/7BLY/+9WHT/tVBq/8Nde//Raoz/33ed/6tHXv/kfKP/sUxl/79Zdv/NZof/xF58/9Jrjf/geJ7/rUlf/+V9pf+yTmb/wFp3/85niP/cdJn/02yP/+F5oP+uSmH/vFdy/7RPaP/CXHn/z2iK/911m/+qRlz/43qi/7BLY/+9WHT/y2WF/8Nde//Raoz/33ed/6tHXv+5VG//sUxl/8Zgfv+/WXb/zmeI/911m/+rR17/u1Vw/7RPaP/DXXv/0muN/+F5oP+wS2P/6oGq/7hTbf/HYYD/1m+S/+V9pf/fd53/rUlf/7xXcv/LZYX/2nOY/9Nsj//jeqL/sUxl/8Bad//PaIr/yGKB/9hwlP/nfqf/tVBq/8RefP/TbI//zWaH/9x0mf+qRlz/uVRv/8higf/CXHn/0WqM/+B4nv+uSmH/vVh0/7ZRa//GYH7/1W6R/+R8o/+yTmb/q0de/7tVcP/KY4P/2XGW/+h/qf/heaD/sEtj/79Zdv/OZ4j/3XWb/9Zvkv/lfaX/tE9o/8Nde//Sa43/4Xmg/9pzmP+tSV//6H+p/7hTbf/IYoH/2XGW/+qBqv+5VG//tE9o/8RefP/VbpH/5X2l/7VQav/GYH7/wFp3/9FqjP/heaD/sUxl/8Jcef/Sa43/zWaH/911m/+tSV//vVh0/85niP/fd53/2XGW/+qBqv+5VG//ymOD/9pzmP+qRlz/u1Vw/7VQav/GYH7/1m+S/+d+p/+2UWv/x2GA/8Jcef/Sa43/43qi/7JOZv/DXXv/02yP/85niP/fd53/rkph/79Zdv/PaIr/4Hie/9pzmP+qRlz/u1Vw/8tlhf/cdJn/q0de/+d+p/+2UWv/x2GA/9hwlP/of6n/uFNt/8higf/DXXv/1W6R/9FqjP/jeqL/tE9o/8Zgfv/YcJT/6oGq/7tVcP+2UWv/yGKB/9pzmP+rR17/vVh0/89oiv/heaD/sk5m/65KYf/AWnf/0muN/+R8o/+1UGr/x2GA/9lxlv+qRlz/536n/7hTbf/KY4P/3HSZ/61JX/+/WXb/0WqM/+N6ov/fd53/sEtj/8Jcef/TbI//5X2l/7ZRa//IYoH/xF58/9Zvkv/of6n/uVRv/8tlhf/ddZv/rkph/8Bad/+8V3L/zmeI/+B4nv+xTGX/w117/9Vukf/nfqf/uFNt/7RPaP/GYH7/2HCU/+qBqv+7VXD/zWaH/993nf+wS2P/q0de/7xXcv+5VG//zWaH/+B4nv+yTmb/xmB+/9lxlv+rR17/v1l2/9Jrjf/lfaX/43qi/7VQav/IYoH/3HSZ/65KYf/CXHn/1W6R/+h/qf+7VXD/zmeI/8tlhf/fd53/sUxl/8RefP/YcJT/qkZc/71YdP/Raoz/5Hyj/7ZRa//KY4P/x2GA/9pzmP+tSV//wFp3/9Nsj//nfqf/uVRv/81mh//geJ7/sk5m/7BLY//DXXv/1m+S/+qBqv+8V3L/z2iK/+N6ov+1UGr/yGKB/9x0mf/ZcZb/q0de/79Zdv/Sa43/5X2l/7hTbf/LZYX/33ed/7FMZf/EXnz/2HCU/9Vukf/kfKP/43qi/7ZRa//LZYX/4Hie/7RPaP/IYoH/3XWb/7FMZf/GYH7/2nOY/65KYf/DXXv/2HCU/6tHXv/AWnf/v1l2/9Nsj//of6n/vFdy/9FqjP/lfaX/uVRv/85niP/jeqL/tlFr/8tlhf/geJ7/tE9o/8higf/ddZv/sUxl/7BLY//EXnz/2XGW/61JX//CXHn/1m+S/6pGXP+/WXb/02yP/+h/qf+8V3L/0WqM/+V9pf+5VG//zmeI/81mh//heaD/tVBq/8pjg//fd53/sk5m/8dhgP/cdJn/sEtj/8RefP/ZcZb/rUlf/8Jcef/Wb5L/qkZc/79Zdv+9WHT/y2WF/8tlhf/heaD/tlFr/81mh//jeqL/uFNt/85niP/kfKP/uVRv/89oiv/lfaX/u1Vw/9FqjP/nfqf/vFdy/9Jrjf/of6n/vVh0/9Nsj//qgar/v1l2/9Vukf+qRlz/wFp3/9Zvkv+rR17/wlx5/9hwlP+tSV//w117/9lxlv/ZcZb/rkph/8RefP/ac5j/sEtj/8Zgfv/cdJn/sUxl/8dhgP/ddZv/sk5m/8higf/fd53/tE9o/8pjg//geJ7/tVBq/8tlhf/heaD/tlFr/81mh//jeqL/uFNt/85niP/kfKP/uVRv/89oiv/lfaX/u1Vw/9FqjP/nfqf/536n/7JOZv/KY4P/4Xmg/7hTbf/PaIr/536n/71YdP/VbpH/q0de/8Nde//ac5j/sUxl/8higf/geJ7/tlFr/85niP/lfaX/vFdy/9Nsj/+qRlz/wlx5/9lxlv+wS2P/x2GA/993nf+1UGr/zWaH/+R8o/+7VXD/0muN/+qBqv/AWnf/2HCU/65KYf/GYH7/3XWb/7RPaP/LZYX/43qi/7lUb//Raoz/6H+p/79Zdv/Wb5L/rUlf/8RefP/cdJn/sk5m/8pjg//heaD/uFNt/89oiv/nfqf/vVh0/9Vukf+rR17/w117/9pzmP+xTGX/yGKB/+B4nv+2UWv/zmeI/+V9pf/ac5j/sk5m/8tlhf/kfKP/vFdy/9Vukf+tSV//xmB+/993nf+2UWv/z2iK/+h/qf/AWnf/2XGW/7FMZf/KY4P/43qi/7tVcP/TbI//q0de/8RefP/ddZv/tVBq/85niP/nfqf/v1l2/9hwlP+wS2P/yGKB/+F5oP+5VG//6H+p/8Bad//ZcZb/sUxl/8pjg//jeqL/u1Vw/9Nsj/+rR17/xF58/911m/+1UGr/zmeI/+d+p/+/WXb/2HCU/7BLY//IYoH/4Xmg/7lUb//Sa43/qkZc/8Nde//cdJn/tE9o/81mh//lfaX/vVh0/9Zvkv+uSmH/x2GA/7VQav/OZ4j/wlx5/9x0mf+1UGr/z2iK/+qBqv/DXXv/3XWb/7ZRa//Raoz/qkZc/8RefP/fd53/uFNt/9Jrjf+rR17/xmB+/7VQav/PaIr/6oGq/8Nde//ddZv/tlFr/9FqjP+qRlz/xF58/993nf+4U23/0muN/6tHXv/GYH7/4Hie/89oiv/qgar/w117/911m/+2UWv/0WqM/6pGXP/EXnz/33ed/7hTbf/Sa43/q0de/8Zgfv/geJ7/uVRv/9Nsj//DXXv/3XWb/7ZRa//Raoz/qkZc/8RefP/fd53/uFNt/9Jrjf+rR17/xmB+/+B4nv+5VG//02yP/61JX//ddZv/tlFr/+qBqv/EXnz/4Hie/7tVcP/Wb5L/sUxl/81mh//of6n/w117/993nf+5VG//qkZc/8Zgfv/heaD/vFdy/9hwlP+yTmb/zmeI/+qBqv/EXnz/4Hie/9FqjP+rR17/x2GA/+N6ov+9WHT/2XGW/7RPaP/PaIr/qkZc/8Zgfv+2UWv/0muN/61JX//IYoH/5Hyj/79Zdv/ac5j/tVBq/9FqjP+rR17/x2GA/7hTbf/TbI//rkph/8pjg//lfaX/wFp3/9x0mf+2UWv/0muN/61JX//fd53/uVRv/9Vukf+wS2P/y2WF/+d+p//CXHn/3XWb/7hTbf/TbI//xF58/+B4nv/Raoz/rUlf/8pjg//nfqf/w117/+B4nv+8V3L/2XGW/8tlhf/of6n/xF58/+F5oP+9WHT/2nOY/7ZRa//TbI//xmB+/+N6ov+/WXb/3HSZ/7hTbf/VbpH/sUxl/85niP/AWnf/3XWb/7lUb//Wb5L/sk5m/89oiv+rR17/33ed/7tVcP/YcJT/tE9o/9FqjP+tSV//ymOD/+d+p//ZcZb/tVBq/9Jrjf+uSmH/y2WF/+h/qf/EXnz/4Xmg/9Nsj/+wS2P/zWaH/+qBqv/GYH7/43qi/79Zdv/cdJn/zmeI/6pGXP/HYYD/5Hyj/8Bad//ddZv/uVRv/6tHXv/IYoH/uFNt/9Zvkv+0T2j/0muN/7BLY//OZ4j/q0de/+B4nv+9WHT/3HSZ/7lUb//YcJT/tVBq/+qBqv/HYYD/5X2l/8Nde//heaD/v1l2/7JOZv/Raoz/rkph/81mh/+qRlz/yGKB/7xXcv/ac5j/uFNt/9Zvkv+0T2j/0muN/8Zgfv/kfKP/wlx5/+B4nv+9WHT/3HSZ/7lUb/+tSV//y2WF/+qBqv/HYYD/5X2l/8Nde/+2UWv/1W6R/7JOZv/Raoz/rkph/81mh//AWnf/33ed/7xXcv/ac5j/uFNt/9Zvkv/KY4P/6H+p/8Zgfv/kfKP/wlx5/+B4nv/TbI//sUxl/+B4nv+/WXb/33ed/71YdP/ddZv/vFdy/7FMZf/Raoz/sEtj/89oiv+uSmH/5Hyj/8Nde//jeqL/wlx5/+F5oP/Wb5L/tVBq/9Vukf+0T2j/02yP/8higf/of6n/x2GA/+d+p//GYH7/u1Vw/9pzmP+5VG//2XGW/7hTbf+tSV//zWaH/6tHXv/LZYX/qkZc/8pjg/+/WXb/33ed/71YdP/ddZv/vFdy/7FMZf/Raoz/sEtj/89oiv+uSmH/5Hyj/8Nde//jeqL/wlx5/+F5oP/Wb5L/tVBq/9Vukf+0T2j/02yP/8higf/of6n/x2GA/+d+p//GYH7/u1Vw/9pzmP/HYYD/6H+p/8higf/qgar/ymOD/8Bad//heaD/wlx5/+N6ov/ZcZb/uVRv/9pzmP+7VXD/3HSZ/9Jrjf+yTmb/02yP/7RPaP+qRlz/y2WF/6tHXv/NZof/rUlf/+R8o//EXnz/5X2l/8Zgfv+8V3L/3XWb/71YdP/fd53/1W6R/7VQav/Wb5L/tlFr/9hwlP/OZ4j/rkph/89oiv+wS2P/536n/8dhgP/of6n/yGKB/+qBqv/geJ7/wFp3/+F5oP/CXHn/uFNt/9lxlv+5VG//2nOY/7tVcP+xTGX/0muN/7JOZv/TbI//ymOD/6pGXP/LZYX/q0de/+N6ov/DXXv/rkph/9FqjP+yTmb/1W6R/81mh/+uSmH/0WqM/7JOZv+qRlz/zWaH/65KYf/Raoz/yGKB/6pGXP/NZof/rkph/+d+p//IYoH/qkZc/81mh//EXnz/536n/8higf+qRlz/43qi/8RefP/nfqf/yGKB/8Bad//jeqL/xF58/7xXcv/fd53/wFp3/+N6ov/ac5j/vFdy/993nf/AWnf/uFNt/9pzmP+8V3L/33ed/9Zvkv+4U23/2nOY/7xXcv+0T2j/1m+S/7hTbf/ac5j/0muN/7RPaP/Wb5L/uFNt/7BLY//Sa43/tE9o/9Zvkv/OZ4j/sEtj/9Jrjf/KY4P/q0de/9Zvkv+5VG//3XWb/8Bad/+5VG//3XWb/8Bad/+5VG//3XWb/8Bad//kfKP/3XWb/8Bad//kfKP/3XWb/8Bad//kfKP/x2GA/8Bad//kfKP/x2GA/8Bad//kfKP/x2GA/6pGXP/kfKP/x2GA/6pGXP/kfKP/x2GA/6pGXP/kfKP/x2GA/6pGXP/OZ4j/x2GA/6pGXP/OZ4j/x2GA/6pGXP/OZ4j/sUxl/6pGXP/OZ4j/sUxl/6pGXP/OZ4j/sUxl/9Vukf/OZ4j/sUxl/9Vukf/OZ4j/sUxl/9Vukf+4U23/sUxl/9Vukf+4U23/sUxl/9Vukf+4U23/sUxl/9Vukf+9WHT/43qi/8dhgP+rR17/536n/8tlhf+wS2P/qkZc/89oiv+0T2j/rkph/9Nsj/+4U23/sk5m/9hwlP+8V3L/tlFr/9x0mf/AWnf/u1Vw/+B4nv/EXnz/v1l2/+R8o//IYoH/w117/+h/qf/NZof/x2GA/6tHXv/Raoz/y2WF/7BLY//VbpH/uVRv/7RPaP/ZcZb/vVh0/7hTbf/ddZv/wlx5/7xXcv/heaD/xmB+/8Bad//lfaX/ymOD/8RefP/qgar/zmeI/8higf+tSV//0muN/81mh/+xTGX/1m+S/9FqjP+1UGr/2nOY/9Vukf+5VG//33ed/9lxlv+9WHT/5X2l/8tlhf+xTGX/rUlf/9Nsj/+5VG//tVBq/9x0mf/CXHn/vVh0/+R8o//KY4P/xmB+/6tHXv/Sa43/zmeI/7RPaP+wS2P/1m+S/7xXcv+4U23/33ed/8RefP/AWnf/536n/81mh//IYoH/rkph/9Vukf/Raoz/tlFr/7JOZv/ZcZb/v1l2/7tVcP/heaD/x2GA/8Nde//qgar/z2iK/8tlhf+xTGX/2HCU/9Nsj/+5VG//4Hie/9x0mf/CXHn/vVh0/+R8o//KY4P/xmB+/6tHXv/Sa43/zmeI/7RPaP/ac5j/1m+S/7xXcv/jeqL/33ed/8RefP/AWnf/536n/81mh/+0T2j/3HSZ/9lxlv/AWnf/6H+p/+V9pf/NZof/ymOD/7FMZf/ZcZb/1m+S/71YdP+7VXD/43qi/8pjg//HYYD/rkph/9Zvkv/TbI//u1Vw/7hTbf/geJ7/x2GA/8RefP+rR17/6oGq/9FqjP+4U23/tVBq/911m//ac5j/wlx5/+qBqv/nfqf/zmeI/7VQav+yTmb/2nOY/9hwlP+/WXb/536n/+R8o//LZYX/yGKB/7BLY//YcJT/1W6R/7xXcv/kfKP/4Xmg/8higf/GYH7/rUlf/9Vukf/Sa43/uVRv/7ZRa//fd53/xmB+/8Nde/+qRlz/6H+p/89oiv+0T2j/3XWb/8Zgfv/EXnz/rUlf/6tHXv/VbpH/vVh0/7xXcv/lfaX/5Hyj/81mh//LZYX/tE9o/911m//cdJn/xF58/8Nde/+rR17/1W6R/9Nsj/+8V3L/u1Vw/+R8o//jeqL/y2WF/7RPaP+yTmb/3HSZ/9pzmP/DXXv/wlx5/6pGXP/TbI//0muN/7tVcP+5VG//43qi/8tlhf/KY4P/sk5m/7FMZf/ac5j/2XGW/8Jcef+qRlz/6oGq/9Jrjf/Raoz/uVRv/+N6ov/heaD/ymOD/8higf+xTGX/sEtj/9lxlv/CXHn/wFp3/+qBqv/of6n/0WqM/89oiv+4U23/3HSZ/8Zgfv+wS2P/sEtj/9pzmP/ac5j/xF58/8RefP+uSmH/rkph/9lxlv/DXXv/w117/61JX/+tSV//2HCU/9hwlP/CXHn/wlx5/6tHXv+rR17/1m+S/8Bad//AWnf/qkZc/6pGXP/VbpH/1W6R/79Zdv+/WXb/6oGq/+qBqv/TbI//vVh0/71YdP/of6n/6H+p/9Jrjf/Sa43/vFdy/7xXcv/nfqf/0WqM/9FqjP+7VXD/u1Vw/+V9pf/lfaX/z2iK/89oiv+5VG//uVRv/+R8o//OZ4j/zmeI/7hTbf+4U23/43qi/+N6ov/NZof/zWaH/7ZRa/+2UWv/4Xmg/8Nde/+uSmH/2nOY/9x0mf/HYYD/yGKB/7RPaP+1UGr/4Xmg/+N6ov/OZ4j/z2iK/7tVcP+8V3L/6H+p/+qBqv/VbpH/1m+S/8Jcef/DXXv/rkph/7BLY//cdJn/3XWb/8higf/KY4P/tVBq/7ZRa//jeqL/5Hyj/89oiv/Raoz/vFdy/+h/qf/qgar/1W6R/9Zvkv/CXHn/w117/65KYf+wS2P/3HSZ/911m//IYoH/ymOD/7VQav+2UWv/43qi/+R8o//PaIr/0WqM/7xXcv+9WHT/6oGq/6pGXP/Wb5L/2HCU/8Nde//EXnz/sEtj/7FMZf/ddZv/33ed/8pjg/+qRlz/2HCU/9pzmP/HYYD/ymOD/7ZRa/+5VG//536n/+qBqv/Wb5L/2XGW/8Zgfv/IYoH/tVBq/7hTbf/lfaX/6H+p/9Vukf/YcJT/xF58/8dhgP+0T2j/tlFr/+R8o//nfqf/02yP/9Zvkv/DXXv/xmB+/7JOZv+1UGr/uFNt/+V9pf/of6n/1W6R/9hwlP/EXnz/x2GA/7RPaP+2UWv/5Hyj/+d+p//TbI//1m+S/8Nde//GYH7/sk5m/7VQav/jeqL/5X2l/9Jrjf/VbpH/wlx5/8RefP+xTGX/tE9o/+F5oP/kfKP/0WqM/9Nsj//AWnf/w117/8Zgfv+yTmb/",
+      "analysis": {
+        "mean": [
+          201.3662109375,
+          98.95084635416667,
+          130.59765625
+        ],
+        "neutral": [
+          201.3662109375,
+          98.95084635416667,
+          130.59765625
+        ],
+        "p05": 0.3764705882352941,
+        "p50": 0.47843137254901963,
+        "p95": 0.592156862745098,
+        "clipping": 0,
+        "redRatio": 1.7544545806490037,
+        "magenta": 1.6774180283376703,
+        "confidence": "medium"
+      },
+      "auto": {
+        "gains": [
+          0.6792984457630097,
+          1.1992625966980142,
+          0.9605093415729508
+        ],
+        "redMix": 0,
+        "haze": 0.09,
+        "highlights": 0,
+        "mode": "filter",
+        "explanation": "Red / magenta cast detected. Balancing channels while keeping the scene’s brightness."
+      },
+      "recipe": {
+        "version": 1,
+        "engine": "balanced",
+        "strength": 1,
+        "hints": {
+          "scene": "auto",
+          "water": "auto",
+          "filter": "auto",
+          "depth": null
+        },
+        "auto": {
+          "gains": [
+            0.6792984457630097,
+            1.1992625966980142,
+            0.9605093415729508
+          ],
+          "redMix": 0,
+          "haze": 0.09,
+          "highlights": 0,
+          "mode": "filter",
+          "explanation": "Red / magenta cast detected. Balancing channels while keeping the scene’s brightness."
+        },
+        "manual": {
+          "warmth": -9,
+          "tint": 13,
+          "red": -4,
+          "exposure": -0.15,
+          "highlights": 0,
+          "shadows": 0,
+          "contrast": 15,
+          "haze": 0,
+          "vibrance": -10,
+          "neutral": [
+            0.88,
+            1.12,
+            1.24
+          ]
+        },
+        "cameraColour": {
+          "source": "fivea",
+          "matrix": [
+            0.15,
+            0.3,
+            0.65,
+            0,
+            0.02,
+            0.96,
+            0.02,
+            0,
+            0,
+            0.18,
+            0.82,
+            0
+          ]
+        }
+      },
+      "rendered": "PTJX/1pOf/91aKf/RDhg/2BUiP98cLH/Sz9q/2dakv+Cdrn/UUVy/21hm/+JfMP/V0t8/3RnpP9CN17/XlOG/3ptrv9JPWf/ZVmP/4FzuP9QRHH/bF+Z/4d6wf9WSnr/cmai/0E2W/9cUIP/eGyr/0c8Zf9jVo3/f3K1/05Cbv9qXZb/hni+/1VJeP9xZKD/PzNZ/1tPgf93a6r/Rjpj/2FViv99cbL/TEBr/2hclP+Ed7z/U0d1/29inf89Mlf/Wk5//3Vop/9EOGD/YFSI/3xwsf9LP2r/Z1qS/4J2uf9RRXL/bWGb/4l8w/9XS3z/dGek/0I3Xv9eU4b/em2u/21hm/89Mlf/W0+B/3hsq/9JPWf/Z1qS/4R3vP9VSXj/cmai/0I3Xv9gVIj/fXGy/05Cbv9sX5n/iXzD/1pOf/93a6r/Rzxl/2VZj/+Cdrn/U0d1/3FkoP9BNlv/XlOG/3xwsf9MQGv/al2W/4d6wf9XS3z/dWin/0Y6Y/99cbL/TkJu/2xfmf+JfMP/Wk5//3drqv9HPGX/ZVmP/4J2uf9TR3X/cWSg/0E2W/9eU4b/fHCx/0xAa/9qXZb/h3rB/1dLfP91aKf/Rjpj/2NWjf+Bc7j/UUVy/29inf8/M1n/XFCD/3ptrv9LP2r/aFyU/4Z4vv9WSnr/QTZb/15Thv9QRHH/b2Kd/0E2W/9gVIj/f3K1/1FFcv9xZKD/Qjde/2FViv+Bc7j/U0d1/3Jmov9EOGD/Y1aN/4J2uf9VSXj/QTZb/2BUiP9/crX/UUVy/3FkoP9CN17/YVWK/4FzuP9TR3X/cmai/0Q4YP9jVo3/gna5/1VJeP90Z6T/YFSI/39ytf9RRXL/cWSg/0I3Xv9hVYr/gXO4/1NHdf9yZqL/RDhg/2NWjf+Cdrn/VUl4/3RnpP9GOmP/ZVmP/1FFcv9xZKD/Qjde/2FViv+Bc7j/U0d1/3Jmov9EOGD/Y1aN/4J2uf9VSXj/dGek/0Y6Y/9lWY//hHe8/3FkoP9CN17/f3K1/1NHdf90Z6T/Rzxl/2hclP+JfMP/XFCD/31xsv9RRXL/cmai/0Y6Y/+Bc7j/VUl4/3Vop/9JPWf/al2W/z0yV/9eU4b/f3K1/1NHdf90Z6T/YVWK/4J2uf9WSnr/d2uq/0s/av9sX5n/PzNZ/2BUiP+Bc7j/VUl4/0I3Xv9jVo3/hHe8/1dLfP94bKv/TEBr/21hm/9BNlv/YVWK/4J2uf9WSnr/RDhg/2VZj/+GeL7/Wk5//3ptrv9OQm7/b2Kd/0I3Xv9jVo3/hHe8/3Jmov9GOmP/Z1qS/4d6wf9bT4H/fHCx/1BEcf9xZKD/RDhg/2VZj/9TR3X/dGek/2FViv+Ed7z/Wk5//3xwsf9RRXL/dGek/0k9Z/9sX5n/W0+B/31xsv9TR3X/dWin/0s/av9tYZv/Qjde/2VZj/9VSXj/d2uq/0xAa/9vYp3/RDhg/2dakv+JfMP/XlOG/05Cbv9xZKD/Rjpj/2hclP89Mlf/YFSI/4J2uf9yZqL/Rzxl/2pdlv8/M1n/YVWK/4R3vP9aTn//fHCx/2xfmf9BNlv/Y1aN/4Z4vv9bT4H/fXGy/1NHdf91aKf/ZVmP/4d6wf9cUIP/f3K1/1VJeP93a6r/TEBr/29inf9eU4b/gXO4/1ZKev94bKv/TkJu/3FkoP9GOmP/gna5/1dLfP9EOGD/aFyU/z8zWf9jVo3/h3rB/15Thv+Cdrn/dGek/0s/av9vYp3/Rjpj/2pdlv9BNlv/f3K1/1ZKev96ba7/UUVy/3Vop/9MQGv/PTJX/2FViv+GeL7/XFCD/4FzuP9XS3z/ST1n/21hm/9EOGD/aFyU/z8zWf9jVo3/VUl4/3hsq/9QRHH/dGek/0s/av9vYp3/Rjpj/4R3vP9bT4H/f3K1/1ZKev96ba7/UUVy/0I3Xv9nWpL/PTJX/2FViv+GeL7/XFCD/05Cbv9yZqL/ST1n/21hm/9EOGD/aFyU/1pOf/99cbL/VUl4/3hsq/9QRHH/dGek/2VZj/+JfMP/dGek/0xAa/9yZqL/Sz9q/3FkoP9JPWf/iXzD/2FViv+HesH/YFSI/4Z4vv94bKv/UUVy/3drqv9QRHH/dWin/2hclP9BNlv/Z1qS/z8zWf9lWY//V0t8/31xsv9WSnr/fHCx/1VJeP9HPGX/bWGb/0Y6Y/9sX5n/RDhg/4R3vP9cUIP/gna5/1tPgf+Bc7j/Wk5//0xAa/9yZqL/Sz9q/3FkoP9JPWf/iXzD/2FViv+HesH/YFSI/4Z4vv94bKv/UUVy/3drqv9QRHH/dWin/2hclP9BNlv/Z1qS/z8zWf9lWY//V0t8/31xsv9WSnr/fHCx/1VJeP9HPGX/bWGb/1ZKev99cbL/V0t8/39ytf9aTn//TkJu/3Vop/9QRHH/d2uq/2xfmf9GOmP/bWGb/0c8Zf9vYp3/Y1aN/z0yV/9lWY//PzNZ/4FzuP9bT4H/gna5/1xQg/+Ed7z/eGyr/1NHdf96ba7/VUl4/0k9Z/9xZKD/Sz9q/3Jmov9nWpL/QTZb/2hclP9CN17/al2W/15Thv+GeL7/YFSI/4d6wf98cLH/Vkp6/31xsv9XS3z/f3K1/3RnpP9OQm7/dWin/1BEcf9EOGD/bF+Z/0Y6Y/9tYZv/Rzxl/4l8w/9jVo3/PTJX/2VZj/9aTn//gXO4/1tPgf+Cdrn/d2uq/1FFcv+GeL7/YVWK/z0yV/9nWpL/XFCD/4Z4vv9hVYr/PTJX/4FzuP9cUIP/hni+/2FViv9XS3z/gXO4/1xQg/+GeL7/fHCx/1dLfP+Bc7j/XFCD/1NHdf98cLH/V0t8/4FzuP93a6r/U0d1/3xwsf9XS3z/TkJu/3drqv9TR3X/ST1n/3Jmov9OQm7/d2uq/21hm/9JPWf/cmai/05Cbv9EOGD/bWGb/0k9Z/9yZqL/aFyU/0Q4YP9tYZv/ST1n/z8zWf9oXJT/RDhg/21hm/9jVo3/PzNZ/2hclP9EOGD/h3rB/2NWjf8/M1n/aFyU/15Thv+HesH/Y1aN/1pOf/+Cdrn/aFyU/0Y6Y/9xZKD/TkJu/0Y6Y/9xZKD/TkJu/0Y6Y/9xZKD/TkJu/3hsq/9xZKD/TkJu/3hsq/9xZKD/TkJu/3hsq/9WSnr/TkJu/3hsq/9WSnr/TkJu/3hsq/9WSnr/gXO4/3hsq/9WSnr/gXO4/3hsq/9WSnr/gXO4/3hsq/9WSnr/gXO4/15Thv9WSnr/gXO4/15Thv9WSnr/gXO4/15Thv+JfMP/gXO4/15Thv+JfMP/gXO4/15Thv+JfMP/Z1qS/15Thv+JfMP/Z1qS/15Thv+JfMP/Z1qS/0Q4YP+JfMP/Z1qS/0Q4YP+JfMP/Z1qS/0Q4YP+JfMP/Z1qS/0s/av93a6r/Vkp6/4J2uf98cLH/W0+B/4d6wf+Bc7j/YFSI/z8zWf+GeL7/ZVmP/0Q4YP89Mlf/al2W/0k9Z/9CN17/b2Kd/05Cbv9HPGX/dGek/1NHdf9MQGv/eGyr/1dLfP9RRXL/fXGy/1xQg/9WSnr/gna5/2FViv9bT4H/h3rB/2dakv9GOmP/PzNZ/2xfmf9LP2r/RDhg/3FkoP9QRHH/ST1n/3Vop/9VSXj/TkJu/3ptrv9aTn//U0d1/39ytf9eU4b/V0t8/4R3vP9jVo3/XFCD/4l8w/9oXJT/YVWK/0E2W/9tYZv/Z1qS/0Y6Y/9yZqL/bF+Z/0s/av96ba7/W0+B/4l8w/+Ed7z/ZVmP/0Y6Y/9BNlv/b2Kd/1BEcf9LP2r/eGyr/1pOf/9VSXj/gna5/2NWjf9eU4b/PzNZ/4d6wf9oXJT/ST1n/0Q4YP9yZqL/U0d1/05Cbv98cLH/XFCD/1dLfP+GeL7/Z1qS/2FViv9CN17/PTJX/2xfmf9MQGv/Rzxl/3Vop/9WSnr/UUVy/39ytf9gVIj/W0+B/4l8w/9qXZb/ZVmP/0Y6Y/90Z6T/b2Kd/1BEcf9LP2r/eGyr/1pOf/9VSXj/gna5/2NWjf9eU4b/PzNZ/21hm/9oXJT/ST1n/3drqv9yZqL/U0d1/05Cbv98cLH/XFCD/z8zWf9vYp3/bF+Z/05Cbv99cbL/em2u/1xQg/9aTn//iXzD/2xfmf9oXJT/Sz9q/0c8Zf93a6r/Wk5//1ZKev+GeL7/aFyU/2VZj/9HPGX/RDhg/3RnpP9WSnr/U0d1/4J2uf9/crX/YVWK/0Q4YP9BNlv/cWSg/21hm/9QRHH/f3K1/3xwsf9eU4b/QTZb/z0yV/9tYZv/al2W/0xAa/98cLH/eGyr/1tPgf9XS3z/h3rB/2pdlv9nWpL/ST1n/3hsq/91aKf/V0t8/1VJeP+Ed7z/Z1qS/2NWjf9GOmP/Qjde/3Jmov9VSXj/UUVy/4FzuP99cbL/YFSI/z8zWf9xZKD/VUl4/1NHdf+Ed7z/gna5/2dakv9LP2r/ST1n/3ptrv94bKv/XFCD/1tPgf8/M1n/cWSg/29inf9TR3X/UUVy/4J2uf9nWpL/ZVmP/0k9Z/9HPGX/eGyr/3drqv9bT4H/PzNZ/z0yV/9vYp3/bWGb/1FFcv9QRHH/gXO4/2VZj/9jVo3/Rzxl/0Y6Y/93a6r/W0+B/1pOf/89Mlf/iXzD/21hm/9sX5n/UERx/4FzuP9/crX/Y1aN/2FViv9GOmP/d2uq/3Vop/9aTn//V0t8/4l8w/+HesH/bF+Z/1BEcf9OQm7/f3K1/31xsv9hVYr/YFSI/0Q4YP9vYp3/VUl4/4d6wf+HesH/bWGb/21hm/9TR3X/U0d1/4Z4vv+GeL7/bF+Z/1FFcv9RRXL/hHe8/4R3vP9qXZb/al2W/1BEcf9QRHH/gna5/4J2uf9oXJT/TkJu/05Cbv+Bc7j/gXO4/2dakv9nWpL/TEBr/0xAa/9/crX/f3K1/2VZj/9LP2r/Sz9q/31xsv99cbL/Y1aN/2NWjf9JPWf/ST1n/3xwsf9hVYr/YVWK/0c8Zf9HPGX/em2u/3ptrv9gVIj/YFSI/0Y6Y/9GOmP/eGyr/15Thv9eU4b/RDhg/0Q4YP93a6r/d2uq/1xQg/9cUIP/Qjde/0I3Xv91aKf/UUVy/4Z4vv9tYZv/b2Kd/1ZKev9XS3z/PzNZ/0E2W/91aKf/d2uq/15Thv9gVIj/Rzxl/0k9Z/99cbL/f3K1/2dakv9oXJT/UERx/1FFcv+GeL7/h3rB/29inf9xZKD/V0t8/1pOf/9BNlv/Qjde/3drqv94bKv/YFSI/2FViv9JPWf/fXGy/39ytf9nWpL/aFyU/1BEcf9RRXL/hni+/4d6wf9vYp3/cWSg/1dLfP9aTn//QTZb/0I3Xv93a6r/eGyr/2BUiP9hVYr/ST1n/0s/av9/crX/gXO4/2hclP9qXZb/UUVy/1NHdf+HesH/iXzD/3FkoP9yZqL/Wk5//4FzuP9qXZb/bWGb/1ZKev9aTn//Qjde/0Y6Y/98cLH/f3K1/2hclP9sX5n/VUl4/1dLfP9BNlv/RDhg/3ptrv99cbL/Z1qS/2pdlv9TR3X/Vkp6/z8zWf9CN17/eGyr/3xwsf9lWY//aFyU/1FFcv9VSXj/PTJX/0E2W/9EOGD/em2u/31xsv9nWpL/al2W/1NHdf9WSnr/PzNZ/0I3Xv94bKv/fHCx/2VZj/9oXJT/UUVy/1VJeP89Mlf/QTZb/3drqv96ba7/Y1aN/2dakv9QRHH/U0d1/4l8w/8/M1n/dWin/3hsq/9hVYr/ZVmP/05Cbv9RRXL/VUl4/z0yV/9jVo3/TkJu/1NHdf89Mlf/Qjde/3ptrv9/crX/al2W/29inf9aTn//XlOG/2NWjf9OQm7/U0d1/z0yV/9CN17/em2u/39ytf9qXZb/b2Kd/1pOf/9eU4b/Y1aN/05Cbv9TR3X/PTJX/0I3Xv96ba7/f3K1/2pdlv9vYp3/dGek/15Thv9jVo3/TkJu/1NHdf89Mlf/Qjde/3ptrv9/crX/al2W/29inf90Z6T/XlOG/2NWjf9OQm7/U0d1/z0yV/9CN17/em2u/39ytf9qXZb/b2Kd/3RnpP9eU4b/Y1aN/05Cbv9TR3X/PTJX/0I3Xv96ba7/f3K1/4R3vP9vYp3/Rjpj/39ytf+GeL7/cmai/3hsq/9lWY//bF+Z/3Jmov9eU4b/ZVmP/1FFcv9XS3z/RDhg/0s/av9RRXL/PTJX/0Q4YP99cbL/hHe8/z0yV/93a6r/fXGy/2pdlv9xZKD/XFCD/2NWjf9qXZb/Vkp6/1xQg/9JPWf/UERx/1ZKev9CN17/ST1n/4J2uf+JfMP/dWin/3xwsf+Cdrn/b2Kd/3Vop/9hVYr/aFyU/1VJeP9bT4H/YVWK/05Cbv9VSXj/QTZb/0c8Zf9OQm7/h3rB/0E2W/96ba7/gXO4/21hm/90Z6T/em2u/2dakv9tYZv/Wk5//2BUiP9nWpL/U0d1/3Vop/9jVo3/bF+Z/1pOf/9hVYr/al2W/1dLfP9gVIj/TkJu/1ZKev9eU4b/TEBr/1VJeP9CN17/Sz9q/1NHdf9BNlv/ST1n/1FFcv8/M1n/Rzxl/4J2uf89Mlf/Rjpj/4FzuP+JfMP/d2uq/39ytf+HesH/dWin/31xsv+GeL7/dGek/3xwsf9qXZb/cmai/3ptrv9oXJT/cWSg/15Thv9nWpL/b2Kd/1xQg/9lWY//U0d1/1tPgf9jVo3/UUVy/1pOf/9hVYr/UERx/1dLfP9GOmP/TkJu/1ZKev9EOGD/TEBr/4d6wf9CN17/Sz9q/4Z4vv9BNlv/ST1n/4R3vP9XS3z/Rzxl/1FFcv9BNlv/Sz9q/1VJeP9EOGD/TkJu/1dLfP9HPGX/UUVy/1tPgf9LP2r/VUl4/15Thv9OQm7/V0t8/0c8Zf9RRXL/W0+B/0s/av9VSXj/XlOG/05Cbv9XS3z/YVWK/1FFcv9bT4H/ZVmP/1VJeP9eU4b/aFyU/1dLfP9hVYr/UUVy/1tPgf9lWY//VUl4/15Thv9oXJT/V0t8/2FViv9sX5n/W0+B/2VZj/9vYp3/XlOG/2hclP9XS3z/YVWK/2xfmf9bT4H/ZVmP/29inf9eU4b/aFyU/3Jmov9hVYr/bF+Z/3Vop/9lWY//b2Kd/3hsq/9oXJT/h3rB/3hsq/+Ed7z/Qjde/4FzuP8/M1n/Sz9q/4l8w/9HPGX/U0d1/0Q4YP9QRHH/W0+B/0xAa/9XS3z/Y1aN/1VJeP9gVIj/bF+Z/1xQg/9oXJT/dGek/2VZj/9xZKD/fHCx/21hm/94bKv/hHe8/3Vop/+Bc7j/PzNZ/0s/av+JfMP/Rzxl/1NHdf9EOGD/UERx/1tPgf9MQGv/V0t8/2NWjf9VSXj/YFSI/2xfmf9cUIP/aFyU/3RnpP9lWY//cWSg/3xwsf9tYZv/eGyr/4R3vP91aKf/gXO4/z8zWf99cbL/iXzD/0c8Zf+GeL7/RDhg/1BEcf9bT4H/TEBr/2pdlv9cUIP/al2W/3drqv9qXZb/d2uq/4R3vP93a6r/hHe8/0Q4YP9RRXL/RDhg/1FFcv9eU4b/UUVy/15Thv9sX5n/eGyr/2xfmf94bKv/hni+/3hsq/+GeL7/Rjpj/1NHdf9GOmP/U0d1/2BUiP9TR3X/YFSI/21hm/96ba7/bWGb/3ptrv+HesH/em2u/4d6wf9HPGX/h3rB/0c8Zf9VSXj/YVWK/1VJeP9hVYr/b2Kd/2FViv9vYp3/fHCx/4l8w/98cLH/iXzD/0k9Z/+JfMP/ST1n/1ZKev9jVo3/Vkp6/2NWjf9xZKD/Y1aN/3FkoP99cbL/PTJX/31xsv9MQGv/QTZb/1BEcf9eU4b/U0d1/2FViv9xZKD/f3K1/3RnpP+Cdrn/RDhg/1NHdf9HPGX/Vkp6/2VZj/90Z6T/aFyU/3drqv+GeL7/Rzxl/4l8w/9LP2r/Wk5//2hclP9cUIP/bF+Z/3ptrv+JfMP/fXGy/z8zWf9OQm7/XFCD/1FFcv9gVIj/b2Kd/2NWjf9yZqL/gXO4/0I3Xv+Ed7z/Rjpj/1VJeP9jVo3/V0t8/2dakv91aKf/hHe8/3hsq/+HesH/ST1n/1dLfP9MQGv/W0+B/2pdlv94bKv/bWGb/3xwsf89Mlf/TEBr/0E2W/9QRHH/XlOG/21hm/9hVYr/fHCx/3Jmov+Cdrn/Rjpj/1ZKev9MQGv/XFCD/21hm/99cbL/dGek/4R3vP9HPGX/V0t8/2hclP9eU4b/b2Kd/39ytf9CN17/hni+/0k9Z/9aTn//al2W/3ptrv9xZKD/gXO4/0Q4YP9VSXj/Sz9q/1tPgf9sX5n/fHCx/z8zWf+Cdrn/Rjpj/1ZKev9nWpL/XFCD/21hm/99cbL/QTZb/4R3vP9HPGX/V0t8/2hclP94bKv/b2Kd/39ytf9CN17/U0d1/0k9Z/9aTn//al2W/3ptrv89Mlf/gXO4/0Q4YP9VSXj/ZVmP/1tPgf9sX5n/fHCx/z8zWf9QRHH/Rjpj/15Thv9WSnr/aFyU/3ptrv8/M1n/UUVy/0k9Z/9bT4H/bWGb/39ytf9EOGD/iXzD/05Cbv9gVIj/cmai/4R3vP98cLH/QTZb/1NHdf9lWY//d2uq/29inf+Bc7j/Rjpj/1dLfP9qXZb/YVWK/3RnpP+GeL7/Sz9q/1xQg/9vYp3/Z1qS/3hsq/89Mlf/UERx/2FViv9aTn//bF+Z/31xsv9CN17/VUl4/0xAa/9eU4b/cWSg/4J2uf9HPGX/PzNZ/1FFcv9jVo3/dWin/4d6wf9/crX/RDhg/1ZKev9oXJT/em2u/3Jmov+Ed7z/ST1n/1tPgf9tYZv/f3K1/3drqv9BNlv/h3rB/05Cbv9hVYr/dWin/4l8w/9QRHH/ST1n/1xQg/9xZKD/hHe8/0s/av9eU4b/V0t8/2xfmf9/crX/Rjpj/1pOf/9tYZv/Z1qS/3ptrv9BNlv/VUl4/2hclP98cLH/dWin/4l8w/9QRHH/Y1aN/3drqv89Mlf/UUVy/0s/av9eU4b/cmai/4Z4vv9MQGv/YFSI/1pOf/9tYZv/gXO4/0c8Zf9bT4H/b2Kd/2hclP98cLH/Qjde/1ZKev9qXZb/fXGy/3drqv89Mlf/UUVy/2VZj/94bKv/PzNZ/4Z4vv9MQGv/YFSI/3RnpP+HesH/TkJu/2FViv9bT4H/cWSg/2xfmf+Bc7j/ST1n/15Thv90Z6T/iXzD/1FFcv9MQGv/YVWK/3drqv8/M1n/VUl4/2pdlv9/crX/Rzxl/0I3Xv9XS3z/bWGb/4J2uf9LP2r/YFSI/3Vop/89Mlf/hni+/05Cbv9jVo3/eGyr/0E2W/9WSnr/bF+Z/4FzuP98cLH/RDhg/1pOf/9vYp3/hHe8/0xAa/9hVYr/XFCD/3Jmov+HesH/UERx/2VZj/96ba7/Qjde/1dLfP9TR3X/aFyU/31xsv9GOmP/W0+B/3FkoP+GeL7/TkJu/0k9Z/9eU4b/dGek/4l8w/9RRXL/Z1qS/3xwsf9EOGD/PzNZ/1NHdf9QRHH/Z1qS/31xsv9HPGX/XlOG/3Vop/8/M1n/Vkp6/21hm/+Ed7z/gXO4/0s/av9hVYr/eGyr/0I3Xv9aTn//cWSg/4d6wf9RRXL/aFyU/2VZj/98cLH/Rjpj/1xQg/90Z6T/PTJX/1VJeP9sX5n/gna5/0xAa/9jVo3/YFSI/3drqv9BNlv/V0t8/29inf+GeL7/UERx/2dakv99cbL/Rzxl/0Q4YP9bT4H/cmai/4l8w/9TR3X/al2W/4FzuP9LP2r/YVWK/3hsq/91aKf/PzNZ/1ZKev9tYZv/hHe8/05Cbv9lWY//fHCx/0Y6Y/9cUIP/dGek/3FkoP+Cdrn/gXO4/0xAa/9lWY//fXGy/0k9Z/9hVYr/em2u/0Y6Y/9eU4b/d2uq/0I3Xv9bT4H/dGek/z8zWf9XS3z/Vkp6/29inf+HesH/U0d1/2xfmf+Ed7z/UERx/2hclP+Bc7j/TEBr/2VZj/99cbL/ST1n/2FViv96ba7/Rjpj/0Q4YP9cUIP/dWin/0E2W/9aTn//cmai/z0yV/9WSnr/b2Kd/4d6wf9TR3X/bF+Z/4R3vP9QRHH/aFyU/2dakv9/crX/Sz9q/2NWjf98cLH/Rzxl/2BUiP94bKv/RDhg/1xQg/91aKf/QTZb/1pOf/9yZqL/PTJX/1ZKev9VSXj/ZVmP/2VZj/9/crX/TEBr/2dakv+Bc7j/TkJu/2hclP+Cdrn/UERx/2pdlv+Ed7z/UUVy/2xfmf+GeL7/U0d1/21hm/+HesH/VUl4/29inf+JfMP/Vkp6/3FkoP89Mlf/V0t8/3Jmov8/M1n/Wk5//3RnpP9BNlv/W0+B/3Vop/91aKf/Qjde/1xQg/93a6r/RDhg/15Thv94bKv/Rjpj/2BUiP96ba7/Rzxl/2FViv98cLH/ST1n/2NWjf99cbL/Sz9q/2VZj/9/crX/TEBr/2dakv+Bc7j/TkJu/2hclP+Cdrn/UERx/2pdlv+Ed7z/UUVy/2xfmf+GeL7/hni+/0c8Zf9jVo3/f3K1/05Cbv9qXZb/hni+/1VJeP9xZKD/PzNZ/1tPgf93a6r/Rjpj/2FViv99cbL/TEBr/2hclP+Ed7z/U0d1/29inf89Mlf/Wk5//3Vop/9EOGD/YFSI/3xwsf9LP2r/Z1qS/4J2uf9RRXL/bWGb/4l8w/9XS3z/dGek/0I3Xv9eU4b/em2u/0k9Z/9lWY//gXO4/1BEcf9sX5n/h3rB/1ZKev9yZqL/QTZb/1xQg/94bKv/Rzxl/2NWjf9/crX/TkJu/2pdlv+GeL7/VUl4/3FkoP8/M1n/W0+B/3drqv9GOmP/YVWK/31xsv9MQGv/aFyU/4R3vP93a6r/Rzxl/2VZj/+Cdrn/U0d1/3FkoP9BNlv/XlOG/3xwsf9MQGv/al2W/4d6wf9XS3z/dWin/0Y6Y/9jVo3/gXO4/1FFcv9vYp3/PzNZ/1xQg/96ba7/Sz9q/2hclP+GeL7/Vkp6/3RnpP9EOGD/YVWK/39ytf9QRHH/h3rB/1dLfP91aKf/Rjpj/2NWjf+Bc7j/UUVy/29inf8/M1n/XFCD/3ptrv9LP2r/aFyU/4Z4vv9WSnr/dGek/0Q4YP9hVYr/f3K1/1BEcf9tYZv/PTJX/1tPgf94bKv/ST1n/2dakv+Ed7z/VUl4/3Jmov9CN17/YFSI/0s/av9oXJT/Wk5//3hsq/9LP2r/al2W/4l8w/9bT4H/em2u/0xAa/9sX5n/PTJX/1xQg/98cLH/TkJu/21hm/8/M1n/XlOG/0s/av9qXZb/iXzD/1tPgf96ba7/TEBr/2xfmf89Mlf/XFCD/3xwsf9OQm7/bWGb/z8zWf9eU4b/fXGy/2pdlv+JfMP/W0+B/3ptrv9MQGv/bF+Z/z0yV/9cUIP/fHCx/05Cbv9tYZv/PzNZ/15Thv99cbL/UERx/29inf9bT4H/em2u/0xAa/9sX5n/PTJX/1xQg/98cLH/TkJu/21hm/8/M1n/XlOG/31xsv9QRHH/b2Kd/0E2W/96ba7/TEBr/4l8w/9cUIP/fXGy/1FFcv9yZqL/Rjpj/2dakv+HesH/W0+B/3xwsf9QRHH/PTJX/15Thv9/crX/U0d1/3RnpP9HPGX/aFyU/4l8w/9cUIP/fXGy/2xfmf8/M1n/YFSI/4FzuP9VSXj/dWin/0k9Z/9qXZb/PTJX/15Thv9MQGv/bWGb/0E2W/9hVYr/gna5/1ZKev93a6r/Sz9q/2xfmf8/M1n/YFSI/05Cbv9vYp3/Qjde/2NWjf+Ed7z/V0t8/3hsq/9MQGv/bWGb/0E2W/98cLH/UERx/3FkoP9EOGD/ZVmP/4Z4vv9aTn//em2u/05Cbv9vYp3/XFCD/31xsv9sX5n/QTZb/2NWjf+GeL7/W0+B/31xsv9TR3X/dWin/2VZj/+HesH/XFCD/39ytf9VSXj/d2uq/0xAa/9vYp3/XlOG/4FzuP9WSnr/eGyr/05Cbv9xZKD/Rjpj/2hclP9XS3z/em2u/1BEcf9yZqL/Rzxl/2pdlv8/M1n/fHCx/1FFcv90Z6T/ST1n/2xfmf9BNlv/Y1aN/4Z4vv91aKf/Sz9q/21hm/9CN17/ZVmP/4d6wf9cUIP/f3K1/29inf9EOGD/Z1qS/4l8w/9eU4b/gXO4/1ZKev94bKv/aFyU/z0yV/9gVIj/gna5/1dLfP96ba7/UERx/z8zWf9hVYr/TkJu/3Jmov9JPWf/bWGb/0Q4YP9oXJT/PzNZ/31xsv9VSXj/eGyr/1BEcf90Z6T/Sz9q/4l8w/9gVIj/hHe8/1tPgf9/crX/Vkp6/0c8Zf9sX5n/Qjde/2dakv89Mlf/YVWK/1NHdf93a6r/TkJu/3Jmov9JPWf/bWGb/15Thv+Cdrn/Wk5//31xsv9VSXj/eGyr/1BEcf9BNlv/ZVmP/4l8w/9gVIj/hHe8/1tPgf9MQGv/cWSg/0c8Zf9sX5n/Qjde/2dakv9XS3z/fHCx/1NHdf93a6r/TkJu/3Jmov9jVo3/h3rB/15Thv+Cdrn/Wk5//31xsv9vYp3/Rjpj/31xsv9WSnr/fHCx/1VJeP96ba7/U0d1/0Y6Y/9sX5n/RDhg/2pdlv9CN17/gna5/1tPgf+Bc7j/Wk5//39ytf9yZqL/Sz9q/3FkoP9JPWf/b2Kd/2FViv+HesH/YFSI/4Z4vv9eU4b/UUVy/3drqv9QRHH/dWin/05Cbv9BNlv/Z1qS/z8zWf9lWY//PTJX/2NWjf9WSnr/fHCx/1VJeP96ba7/U0d1/0Y6Y/9sX5n/RDhg/2pdlv9CN17/gna5/1tPgf+Bc7j/Wk5//39ytf9yZqL/Sz9q/3FkoP9JPWf/b2Kd/2FViv+HesH/YFSI/4Z4vv9eU4b/UUVy/3drqv9gVIj/h3rB/2FViv+JfMP/Y1aN/1dLfP9/crX/Wk5//4FzuP91aKf/UERx/3drqv9RRXL/eGyr/21hm/9HPGX/b2Kd/0k9Z/89Mlf/ZVmP/z8zWf9nWpL/QTZb/4J2uf9cUIP/hHe8/15Thv9TR3X/em2u/1VJeP98cLH/cWSg/0s/av9yZqL/TEBr/3RnpP9oXJT/Qjde/2pdlv9EOGD/hni+/2BUiP+HesH/YVWK/4l8w/99cbL/V0t8/39ytf9aTn//TkJu/3Vop/9QRHH/d2uq/1FFcv9GOmP/bWGb/0c8Zf9vYp3/Y1aN/z0yV/9lWY//PzNZ/4FzuP9bT4H/Qjde/2xfmf9HPGX/cWSg/2dakv9CN17/bF+Z/0c8Zf89Mlf/Z1qS/0I3Xv9sX5n/YVWK/z0yV/9nWpL/Qjde/4Z4vv9hVYr/PTJX/2dakv9cUIP/hni+/2FViv89Mlf/gXO4/1xQg/+GeL7/YVWK/1dLfP+Bc7j/XFCD/1NHdf98cLH/V0t8/4FzuP93a6r/U0d1/3xwsf9XS3z/TkJu/3drqv9TR3X/fHCx/3Jmov9OQm7/d2uq/1NHdf9JPWf/cmai/05Cbv93a6r/bWGb/0k9Z/9yZqL/TkJu/0Q4YP9tYZv/ST1n/3Jmov9oXJT/RDhg/21hm/9jVo3/PzNZ/3Jmov9QRHH/em2u/1dLfP9QRHH/em2u/1dLfP9QRHH/em2u/1dLfP+Cdrn/em2u/1dLfP+Cdrn/em2u/1dLfP+Cdrn/YFSI/1dLfP+Cdrn/YFSI/1dLfP+Cdrn/YFSI/z0yV/+Cdrn/YFSI/z0yV/+Cdrn/YFSI/z0yV/+Cdrn/YFSI/z0yV/9oXJT/YFSI/z0yV/9oXJT/YFSI/z0yV/9oXJT/Rjpj/z0yV/9oXJT/Rjpj/z0yV/9oXJT/Rjpj/3FkoP9oXJT/Rjpj/3FkoP9oXJT/Rjpj/3FkoP9OQm7/Rjpj/3FkoP9OQm7/Rjpj/3FkoP9OQm7/Rjpj/3FkoP9VSXj/gXO4/2BUiP8/M1n/hni+/2VZj/9EOGD/PTJX/2pdlv9JPWf/Qjde/29inf9OQm7/Rzxl/3RnpP9TR3X/TEBr/3hsq/9XS3z/UUVy/31xsv9cUIP/Vkp6/4J2uf9hVYr/W0+B/4d6wf9nWpL/YFSI/z8zWf9sX5n/ZVmP/0Q4YP9xZKD/UERx/0k9Z/91aKf/VUl4/05Cbv96ba7/Wk5//1NHdf9/crX/XlOG/1dLfP+Ed7z/Y1aN/1xQg/+JfMP/aFyU/2FViv9BNlv/bWGb/2dakv9GOmP/cmai/2xfmf9LP2r/d2uq/3FkoP9QRHH/fHCx/3Vop/9VSXj/hHe8/2VZj/9GOmP/QTZb/29inf9QRHH/Sz9q/3hsq/9aTn//VUl4/4J2uf9jVo3/XlOG/z8zWf9tYZv/aFyU/0k9Z/9EOGD/cmai/1NHdf9OQm7/fHCx/1xQg/9XS3z/hni+/2dakv9hVYr/Qjde/3FkoP9sX5n/TEBr/0c8Zf91aKf/Vkp6/1FFcv9/crX/YFSI/1tPgf+JfMP/al2W/2VZj/9GOmP/dGek/29inf9QRHH/fXGy/3hsq/9aTn//VUl4/4J2uf9jVo3/XlOG/z8zWf9tYZv/aFyU/0k9Z/93a6r/cmai/1NHdf+Bc7j/fHCx/1xQg/9XS3z/hni+/2dakv9JPWf/eGyr/3Vop/9XS3z/h3rB/4R3vP9nWpL/Y1aN/0Y6Y/91aKf/cmai/1VJeP9RRXL/gXO4/2NWjf9gVIj/Qjde/3Jmov9vYp3/UUVy/05Cbv99cbL/YFSI/1xQg/8/M1n/iXzD/2xfmf9OQm7/Sz9q/3ptrv93a6r/Wk5//4l8w/+GeL7/aFyU/0s/av9HPGX/d2uq/3RnpP9WSnr/hni+/4J2uf9lWY//YVWK/0Q4YP90Z6T/cWSg/1NHdf+Cdrn/f3K1/2FViv9eU4b/QTZb/3FkoP9tYZv/UERx/0xAa/98cLH/XlOG/1tPgf89Mlf/h3rB/2pdlv9JPWf/em2u/15Thv9cUIP/QTZb/z8zWf9xZKD/VUl4/1NHdf+Ed7z/gna5/2dakv9lWY//ST1n/3ptrv94bKv/XFCD/1tPgf8/M1n/cWSg/29inf9TR3X/UUVy/4J2uf+Bc7j/ZVmP/0k9Z/9HPGX/eGyr/3drqv9bT4H/Wk5//z0yV/9vYp3/bWGb/1FFcv9QRHH/gXO4/2VZj/9jVo3/Rzxl/0Y6Y/93a6r/dWin/1pOf/89Mlf/iXzD/21hm/9sX5n/UERx/4FzuP9/crX/Y1aN/2FViv9GOmP/RDhg/3Vop/9aTn//V0t8/4l8w/+HesH/bF+Z/2pdlv9OQm7/eGyr/15Thv9EOGD/RDhg/3drqv93a6r/XFCD/1xQg/9CN17/Qjde/3Vop/9bT4H/W0+B/0E2W/9BNlv/dGek/3RnpP9aTn//Wk5//z8zWf8/M1n/cmai/1dLfP9XS3z/PTJX/z0yV/9xZKD/cWSg/1ZKev9WSnr/iXzD/4l8w/9vYp3/VUl4/1VJeP+HesH/h3rB/21hm/9tYZv/U0d1/1NHdf+GeL7/bF+Z/2xfmf9RRXL/UUVy/4R3vP+Ed7z/al2W/2pdlv9QRHH/UERx/4J2uf9oXJT/aFyU/05Cbv9OQm7/gXO4/4FzuP9nWpL/Z1qS/0xAa/9MQGv/f3K1/1tPgf9CN17/d2uq/3hsq/9gVIj/YVWK/0k9Z/9LP2r/f3K1/4FzuP9oXJT/al2W/1FFcv9TR3X/h3rB/4l8w/9xZKD/cmai/1pOf/9bT4H/Qjde/0Q4YP94bKv/em2u/2FViv9jVo3/Sz9q/0xAa/+Bc7j/gna5/2pdlv9sX5n/U0d1/4d6wf+JfMP/cWSg/3Jmov9aTn//W0+B/0I3Xv9EOGD/eGyr/3ptrv9hVYr/Y1aN/0s/av9MQGv/gXO4/4J2uf9qXZb/bF+Z/1NHdf9VSXj/iXzD/z0yV/9yZqL/dGek/1tPgf9cUIP/RDhg/0Y6Y/96ba7/fHCx/2NWjf89Mlf/dGek/3drqv9gVIj/Y1aN/0xAa/9QRHH/hni+/4l8w/9yZqL/dWin/15Thv9hVYr/Sz9q/05Cbv+Ed7z/h3rB/3FkoP90Z6T/XFCD/2BUiP9JPWf/TEBr/4J2uf+GeL7/b2Kd/3Jmov9bT4H/XlOG/0c8Zf9LP2r/TkJu/4R3vP+HesH/cWSg/3RnpP9cUIP/YFSI/0k9Z/9MQGv/gna5/4Z4vv9vYp3/cmai/1tPgf9eU4b/Rzxl/0s/av+Bc7j/hHe8/21hm/9xZKD/Wk5//1xQg/9GOmP/ST1n/39ytf+Cdrn/bF+Z/29inf9XS3z/W0+B/15Thv9HPGX/",
+      "replacementPatch": "qkZc/8Jcef/ZcZb/sEtj/8dhgP/fd53/tVBq/81mh//kfKP/u1Vw/9Jrjf/qgar/wFp3/9hwlP+uSmH/xmB+/911m/+0T2j/y2WF/+N6ov8=",
+      "replacementNeutral": [
+        0.8701477525028588,
+        1.3288586969626102,
+        0.9613605900400801
+      ],
+      "smoothing": {
+        "previous": {
+          "version": 1,
+          "engine": "balanced",
+          "strength": 1,
+          "hints": {
+            "scene": "surface",
+            "water": "green",
+            "filter": "no",
+            "depth": 23
+          },
+          "auto": {
+            "gains": [
+              0.7,
+              1.1,
+              1.3
+            ],
+            "redMix": 0.4,
+            "haze": 0.02,
+            "highlights": -0.4,
+            "mode": "filter",
+            "explanation": "Red / magenta cast detected. Balancing channels while keeping the scene’s brightness."
+          },
+          "manual": {
+            "warmth": 9,
+            "tint": -6,
+            "red": 4,
+            "exposure": -0.15,
+            "highlights": 0,
+            "shadows": 0,
+            "contrast": 15,
+            "haze": 0,
+            "vibrance": -10,
+            "neutral": [
+              1.2,
+              0.8,
+              1.4
+            ]
+          },
+          "cameraColour": {
+            "source": "fivea",
+            "matrix": [
+              0.15,
+              0.3,
+              0.65,
+              0,
+              0.02,
+              0.96,
+              0.02,
+              0,
+              0,
+              0.18,
+              0.82,
+              0
+            ]
+          }
+        },
+        "strength": 0.6,
+        "hints": {
+          "scene": "surface",
+          "water": "green",
+          "filter": "no",
+          "depth": 23
+        },
+        "manual": {
+          "warmth": 9,
+          "tint": -6,
+          "red": 4,
+          "exposure": -0.15,
+          "highlights": 0,
+          "shadows": 0,
+          "contrast": 15,
+          "haze": 0,
+          "vibrance": -10,
+          "neutral": [
+            1.2,
+            0.8,
+            1.4
+          ]
+        },
+        "auto": {
+          "gains": [
+            0.7899999999999999,
+            1.07,
+            1.21
+          ],
+          "redMix": 0.28,
+          "haze": 0.014,
+          "highlights": -0.28,
+          "mode": "gentle",
+          "explanation": "Surface mode keeps natural warm light. Fine-tune warmth and tint, or enable red-filter correction."
         }
       }
     }

@@ -68,6 +68,27 @@ final class NativeBalancedParityTests: XCTestCase {
         }
     }
 
+    func testCameraColourUsesBoundedFiveARecipeContract() throws {
+        let matrix = [0.35,0.25,0.4,-0.015, 0.05,0.92,0.03,0.005, 0.02,0.08,0.85,0]
+        let colour = try NativeBalancedCameraColour(matrix: matrix)
+        var recipe = try XCTUnwrap(fixtures().first).recipe
+        recipe.cameraColour = colour
+        XCTAssertTrue(recipe.hasValidCameraColour())
+        recipe.engine = "baseline"
+        XCTAssertTrue(recipe.hasValidCameraColour(), "the shared recipe parser allows baseline")
+        recipe.engine = "fivea"
+        XCTAssertFalse(recipe.hasValidCameraColour(), "cameraColour is only valid on balanced/baseline recipes")
+
+        let badBias = "{\"source\":\"fivea\",\"matrix\":[0,0,0,0.5,0,0,0,0,0,0,0,0]}"
+        XCTAssertThrowsError(try JSONDecoder().decode(NativeBalancedCameraColour.self, from: Data(badBias.utf8)))
+        let badCoefficient = "{\"source\":\"fivea\",\"matrix\":[3.01,0,0,0,0,0,0,0,0,0,0,0]}"
+        XCTAssertThrowsError(try JSONDecoder().decode(NativeBalancedCameraColour.self, from: Data(badCoefficient.utf8)))
+        let shortMatrix = "{\"source\":\"fivea\",\"matrix\":[0,0,0,0,0,0,0,0,0,0,0]}"
+        XCTAssertThrowsError(try JSONDecoder().decode(NativeBalancedCameraColour.self, from: Data(shortMatrix.utf8)))
+        let wrongSource = "{\"source\":\"other\",\"matrix\":[0,0,0,0,0,0,0,0,0,0,0,0]}"
+        XCTAssertThrowsError(try JSONDecoder().decode(NativeBalancedCameraColour.self, from: Data(wrongSource.utf8)))
+    }
+
     @MainActor
     func testCameraAnalysisIncludesTheWholePortraitFrame() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal is unavailable on this test device") }

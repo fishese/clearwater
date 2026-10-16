@@ -8,6 +8,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ClearWaterFilesPlugin.class);
         registerPlugin(ClearWaterHdrPlugin.class);
         registerPlugin(ClearWaterBackPlugin.class);
+        registerPlugin(ClearWaterCameraPlugin.class);
+        registerPlugin(ClearWaterSharePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

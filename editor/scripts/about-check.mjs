@@ -12,7 +12,7 @@ try{
  await page.getByRole('slider',{name:'Warmth',exact:true}).focus();await page.keyboard.press('End');
  await page.locator('.about-nav').click();await page.getByRole('heading',{name:'About & guide',exact:true}).waitFor();
  assert.equal(await page.locator('.app-shell').isVisible(),false);
- assert.equal(await page.locator('#about-camera dt').count(),8);const cameraGuide=await page.locator('#about-camera').innerText();for(const description of ['12 Mbps','5 Mbps','zero restoration strength','No raw video is kept','1, 3 or 5 minutes','Each pick replaces'])assert.ok(cameraGuide.includes(description),description);
+ assert.equal(await page.locator('#about-camera dt').count(),9);const cameraGuide=await page.locator('#about-camera').innerText();for(const description of ['12 Mbps','5 Mbps','zero restoration strength','No raw video is kept','1, 3 or 5 minutes','Each pick replaces'])assert.ok(cameraGuide.includes(description),description);
  assert.equal(await page.evaluate(()=>document.activeElement.id),'about-title');
  await page.getByRole('link',{name:'Editing controls',exact:true}).click();
  assert.ok(page.url().endsWith('#about-controls'));

@@ -55,6 +55,29 @@ struct NativeBalancedEnhancement: Codable, Equatable {
 struct NativeBalancedAIFollowup: Codable, Equatable { var strength: Double }
 struct NativeBalancedVideoCorrection: Codable, Equatable { var mode: String; var interval: Int; var referenceTime: Double }
 
+/// Frozen sampled Five A+ colour fit. Matrix values are row-major RGB affine
+/// coefficients over display-encoded sRGB, matching Recipe.cameraColour.
+struct NativeBalancedCameraColour: Codable, Equatable {
+    var source: String
+    var matrix: [Double]
+
+    private enum CodingKeys: String, CodingKey { case source, matrix }
+
+    init(source: String = "fivea", matrix: [Double]) throws {
+        guard source == "fivea", matrix.count == 12,
+              matrix.enumerated().allSatisfy({ index, value in
+                  value.isFinite && value >= (index % 4 == 3 ? -0.4 : -2) && value <= (index % 4 == 3 ? 0.4 : 3)
+              }) else { throw NativeBalancedMathError.invalidRecipe }
+        self.source = source
+        self.matrix = matrix
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(source: c.decode(String.self, forKey: .source), matrix: c.decode([Double].self, forKey: .matrix))
+    }
+}
+
 struct NativeBalancedRecipe: Codable, Equatable {
     var version = 1
     var engine = "balanced"
@@ -66,9 +89,19 @@ struct NativeBalancedRecipe: Codable, Equatable {
     var enhancement: NativeBalancedEnhancement? = nil
     var balancedAfterAI: NativeBalancedAIFollowup? = nil
     var videoCorrection: NativeBalancedVideoCorrection? = nil
+    var cameraColour: NativeBalancedCameraColour? = nil
+
+    func hasValidCameraColour() -> Bool {
+        guard let cameraColour else { return true }
+        return (engine == "balanced" || engine == "baseline") && cameraColour.source == "fivea"
+            && cameraColour.matrix.count == 12
+            && cameraColour.matrix.enumerated().allSatisfy { index, value in
+                value.isFinite && value >= (index % 4 == 3 ? -0.4 : -2) && value <= (index % 4 == 3 ? 0.4 : 3)
+            }
+    }
 }
 
-enum NativeBalancedMathError: Error { case invalidPixels, invalidDimensions, noNeutralPatch }
+enum NativeBalancedMathError: Error { case invalidPixels, invalidDimensions, invalidRecipe, noNeutralPatch }
 
 enum NativeBalancedMath {
     private static func clamp(_ v: Double, _ lo: Double = 0, _ hi: Double = 1) -> Double { min(hi, max(lo, v)) }
@@ -146,7 +179,7 @@ enum NativeBalancedMath {
     }
 
     static func makeCameraRecipe(analysis: NativeBalancedAnalysis, strength: Double = 0.8, previous: NativeBalancedRecipe? = nil) -> NativeBalancedRecipe {
-        let hints = NativeBalancedHints()
+        let hints = previous?.hints ?? NativeBalancedHints()
         let next = suggest(analysis: analysis, hints: hints)
         var auto = next
         if let old = previous?.auto {
@@ -195,21 +228,33 @@ enum NativeBalancedMath {
     static func renderRGBA8(rgba: Data, width: Int, height: Int, recipe: NativeBalancedRecipe) throws -> Data {
         guard width > 0 && height > 0 else { throw NativeBalancedMathError.invalidDimensions }
         guard rgba.count == width*height*4 else { throw NativeBalancedMathError.invalidPixels }
+        guard recipe.hasValidCameraColour() else { throw NativeBalancedMathError.invalidRecipe }
         let a=recipe.auto,m=recipe.manual,s=clamp(recipe.strength)
         let warmth=m.warmth/100,tint=m.tint/100
         let gains=[m.neutral[0]*pow(2,warmth*0.45+m.red/100*0.8),m.neutral[1]*pow(2,-tint*0.4),m.neutral[2]*pow(2,-warmth*0.45)]
         let exposure=pow(2,m.exposure), haze=clamp(a.haze*s+m.haze/100*0.12,-0.1,0.18)
         let highlights=clamp(m.highlights/100+a.highlights*s,-1,1), shadows=m.shadows/100, contrast=1+m.contrast/100*0.65
+        let cameraMatrix = recipe.cameraColour?.matrix
         var out=Data(count:rgba.count)
         rgba.withUnsafeBytes { srcRaw in out.withUnsafeMutableBytes { dstRaw in
             let src=srcRaw.bindMemory(to:UInt8.self),dst=dstRaw.bindMemory(to:UInt8.self)
             for i in stride(from:0,to:rgba.count,by:4) {
                 var r=Double(src[i])/255,g=Double(src[i+1])/255,b=Double(src[i+2])/255
                 let or=toLinear(r),og=toLinear(g),ob=toLinear(b)
-                let maxc=max(r,max(g,b)); let restored=clamp(r*a.gains[0]+a.redMix*max(0,g-0.3*b)*(1-0.45*smooth(0.65,1,maxc)))
-                r=toSrgb(or*(1-s)+toLinear(restored)*s)
-                g=toSrgb(og*(1-s)+toLinear(g*a.gains[1])*s)
-                b=toSrgb(ob*(1-s)+toLinear(b*a.gains[2])*s)
+                let maxc=max(r,max(g,b))
+                let restoredR, restoredG, restoredB: Double
+                if let matrix = cameraMatrix {
+                    restoredR=clamp(matrix[0]*r+matrix[1]*g+matrix[2]*b+matrix[3])
+                    restoredG=clamp(matrix[4]*r+matrix[5]*g+matrix[6]*b+matrix[7])
+                    restoredB=clamp(matrix[8]*r+matrix[9]*g+matrix[10]*b+matrix[11])
+                } else {
+                    restoredR=clamp(r*a.gains[0]+a.redMix*max(0,g-0.3*b)*(1-0.45*smooth(0.65,1,maxc)))
+                    restoredG=g*a.gains[1]
+                    restoredB=b*a.gains[2]
+                }
+                r=toSrgb(or*(1-s)+toLinear(restoredR)*s)
+                g=toSrgb(og*(1-s)+toLinear(restoredG)*s)
+                b=toSrgb(ob*(1-s)+toLinear(restoredB)*s)
                 r=clamp(r*gains[0]);g=clamp(g*gains[1]);b=clamp(b*gains[2])
                 var lr=toLinear(r)*exposure,lg=toLinear(g)*exposure,lb=toLinear(b)*exposure
                 let l=lum(lr,lg,lb), adjusted=l*(1+highlights*0.65*smooth(0.18,0.95,l))+shadows*0.16*(1-smooth(0,0.5,l))

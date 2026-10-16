@@ -1,8 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
+import { CAMERA_MAX_RECORDING_BYTES, CAMERA_MAX_RECORDING_MS, cameraFramePoint, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, chooseCameraVideoMimeType, makeCameraRecipe, pickCameraNeutral, stopStreamTracks } from '../src/core/camera-capture';
 import { analyse } from '../src/core/engine';
 
 describe('camera capture helpers', () => {
+  it('maps contain preview points and rejects its letterbox bars', () => {
+    const rect={left:100,top:50,width:200,height:200};
+    expect(cameraFramePoint(200,150,rect,400,200,'contain')).toEqual({x:200,y:100});
+    expect(cameraFramePoint(200,50,rect,400,200,'contain')).toBeNull();
+  });
+
+  it('maps native cover preview points through the centered source crop', () => {
+    const rect={left:100,top:50,width:200,height:200};
+    expect(cameraFramePoint(100,150,rect,400,200,'cover')).toEqual({x:100,y:100});
+    expect(cameraFramePoint(200,150,rect,400,200,'cover')).toEqual({x:200,y:100});
+    expect(cameraFramePoint(300,150,rect,400,200,'cover')).toEqual({x:300,y:100});
+    expect(cameraFramePoint(99,150,rect,400,200,'cover')).toBeNull();
+    expect(cameraFramePoint(301,150,rect,400,200,'cover')).toBeNull();
+    expect(cameraFramePoint(200,49,rect,400,200,'cover')).toBeNull();
+    expect(cameraFramePoint(200,251,rect,400,200,'cover')).toBeNull();
+  });
+
   it('selects the first supported MP4 profile and never substitutes WebM', () => {
     const supported = vi.fn((mime: string) => mime === 'video/mp4');
     expect(chooseCameraVideoMimeType(supported)).toBe('video/mp4');
@@ -64,6 +81,15 @@ describe('camera capture helpers', () => {
     expect(next.strength).toBe(0.55);
     expect(next.auto.gains[0]).not.toBe(first.auto.gains[0]);
     expect(next.auto.gains[0]).not.toBe(makeCameraRecipe(analyse(teal, 8, 4)).auto.gains[0]);
+  });
+
+  it('applies camera depth and red-filter hints while preserving them across live analysis', () => {
+    const pixels = new Uint8ClampedArray([35, 100, 180, 255]);
+    const hints = { scene: 'underwater' as const, water: 'blue' as const, filter: 'yes' as const, depth: 18 };
+    const first = makeCameraRecipe(analyse(pixels, 1, 1), 0.8, undefined, hints);
+    const next = makeCameraRecipe(analyse(pixels, 1, 1), 0.7, first);
+    expect(first.hints).toEqual(hints);
+    expect(next.hints).toEqual(hints);
   });
 
   it('stops every track and tolerates track stop failures', () => {

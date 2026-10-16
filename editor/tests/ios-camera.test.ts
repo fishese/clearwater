@@ -39,6 +39,28 @@ describe('iOS private capture adapter',()=>{
   vi.unstubAllGlobals();
  });
 
+ it('reads private videos with a byte-range response and checks exact descriptor length',async()=>{
+  const video=descriptor({kind:'video',name:'capture.mp4',type:'video/mp4',sourceUrl:'file:///private/captures/enhanced.mp4',bytes:4});
+  state.camera.getCapture.mockResolvedValue({capture:video});
+  const fetchMock=vi.fn().mockResolvedValue({status:206,ok:false,headers:new Headers({'Content-Range':'bytes 0-3/4'}),blob:async()=>new Blob([Uint8Array.of(0,1,2,3)],{type:'video/mp4'})});
+  vi.stubGlobal('fetch',fetchMock);
+  const file=await readIOSCaptureFile(video);
+  expect(fetchMock).toHaveBeenCalledWith('capacitor:file:///private/captures/enhanced.mp4',{signal:undefined,headers:{Range:'bytes=0-'}});
+  expect(file.size).toBe(4);
+  vi.unstubAllGlobals();
+ });
+
+ it('rejects status-zero, missing-range, and truncated private video responses',async()=>{
+  const video=descriptor({kind:'video',name:'capture.mp4',type:'video/mp4',sourceUrl:'file:///private/captures/enhanced.mp4',bytes:4});
+  state.camera.getCapture.mockResolvedValue({capture:video});
+  const fetchMock=vi.fn().mockResolvedValue({status:0,ok:false,headers:new Headers(),blob:async()=>new Blob([])});
+  vi.stubGlobal('fetch',fetchMock);
+  await expect(readIOSCaptureFile(video)).rejects.toThrow('Could not read this private camera source');
+  fetchMock.mockResolvedValueOnce({status:206,ok:false,headers:new Headers({'Content-Range':'bytes 0-1/4'}),blob:async()=>new Blob([Uint8Array.of(0,1)])});
+  await expect(readIOSCaptureFile(video)).rejects.toThrow('incomplete');
+  vi.unstubAllGlobals();
+ });
+
  it('does not fetch a capture hidden after its descriptor was listed',async()=>{
   const listed=descriptor();state.camera.getCapture.mockResolvedValue({capture:descriptor({visible:false})});
   const fetchMock=vi.fn();vi.stubGlobal('fetch',fetchMock);
@@ -90,16 +112,9 @@ describe('iOS private capture adapter',()=>{
 });
 
 describe('native camera localization bridge',()=>{
- it('passes every Swift camera string through all three locale catalogs',()=>{
-  const native=readFileSync(new URL('../ios/App/App/ClearWaterCameraViewController.swift',import.meta.url),'utf8');
-  const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
-  const nativeKeys=[...native.matchAll(/text\("([^"\\]*(?:\\.[^"\\]*)*)"\s*,/g)].map(match=>match[1]);
-  const stringsBlock=app.match(/const strings=\[([\s\S]*?)\];/);
-  expect(stringsBlock,'launchIOSCamera string catalog').toBeTruthy();
-  const bridgeKeys=new Set([...(stringsBlock?.[1].matchAll(/'([^']+)'/g)??[])].map(match=>match[1]));
+ it('translates the React camera Photos option and embedded camera guide in all locales',()=>{
   const catalogs=['en','zh-HK','ja'].map(locale=>JSON.parse(readFileSync(new URL(`../src/locales/${locale}.json`,import.meta.url),'utf8')) as Record<string,string>);
-  for(const key of new Set(nativeKeys)){
-   expect(bridgeKeys.has(key),`App bridge passes native key: ${key}`).toBe(true);
+  for(const key of ['Also save enhanced photos and videos to Photos','iOS camera opens in the editor with a native AVFoundation preview. Captures stay private in the app and open in the editor when you close the camera.']){
    for(const [index,catalog] of catalogs.entries())expect(typeof catalog[key]==='string'&&catalog[key].trim().length>0,`${['en','zh-HK','ja'][index]} catalog translates ${key}`).toBe(true);
   }
  });

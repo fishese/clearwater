@@ -65,7 +65,7 @@ final class ClearWaterBalancedProcessor {
         guard CVPixelBufferGetPixelFormatType(output) == kCVPixelFormatType_32BGRA else { throw ClearWaterProcessorError.unsupportedPixelBuffer }
         let width = CVPixelBufferGetWidth(output), height = CVPixelBufferGetHeight(output)
         guard width > 0, height > 0, recipe.version == 1, recipe.engine == "balanced", recipe.auto.gains.count == 3,
-              recipe.manual.neutral.count == 3 else { throw ClearWaterProcessorError.invalidRecipe }
+              recipe.manual.neutral.count == 3, recipe.hasValidCameraColour() else { throw ClearWaterProcessorError.invalidRecipe }
         guard let input = makeIntermediate(width: width, height: height) else { throw ClearWaterProcessorError.unsupportedPixelBuffer }
 
         // Core Image reads camera color attachments and normalizes wide-gamut/YCbCr
@@ -122,6 +122,10 @@ final class ClearWaterBalancedProcessor {
 
 private struct Uniforms {
     var autoGains: SIMD4<Float>
+    var cameraColourR: SIMD4<Float>
+    var cameraColourG: SIMD4<Float>
+    var cameraColourB: SIMD4<Float>
+    var cameraColourEnabled: SIMD4<Float>
     var manualGains: SIMD4<Float>
     var controls: SIMD4<Float> // strength, redMix, exposure multiplier, haze
     var tonal: SIMD4<Float> // highlights, shadows, contrast, vibrance
@@ -129,6 +133,15 @@ private struct Uniforms {
         let m = recipe.manual, s = recipe.strength
         let warmth = m.warmth / 100, tint = m.tint / 100
         autoGains = SIMD4(Float(recipe.auto.gains[0]),Float(recipe.auto.gains[1]),Float(recipe.auto.gains[2]),0)
+        if let matrix = recipe.cameraColour?.matrix, matrix.count == 12 {
+            cameraColourR = SIMD4(Float(matrix[0]),Float(matrix[1]),Float(matrix[2]),Float(matrix[3]))
+            cameraColourG = SIMD4(Float(matrix[4]),Float(matrix[5]),Float(matrix[6]),Float(matrix[7]))
+            cameraColourB = SIMD4(Float(matrix[8]),Float(matrix[9]),Float(matrix[10]),Float(matrix[11]))
+            cameraColourEnabled = SIMD4(1,0,0,0)
+        } else {
+            cameraColourR = .zero; cameraColourG = .zero; cameraColourB = .zero
+            cameraColourEnabled = .zero
+        }
         manualGains = SIMD4(Float(m.neutral[0] * pow(2,warmth*0.45+m.red/100*0.8)),Float(m.neutral[1]*pow(2,-tint*0.4)),Float(m.neutral[2]*pow(2,-warmth*0.45)),0)
         controls = SIMD4(Float(s),Float(recipe.auto.redMix),Float(pow(2,m.exposure)),Float(min(0.18,max(-0.1,recipe.auto.haze*s+m.haze/100*0.12))))
         tonal = SIMD4(Float(min(1,max(-1,m.highlights/100+recipe.auto.highlights*s))),Float(m.shadows/100),Float(1+m.contrast/100*0.65),Float(m.vibrance/100*0.8))

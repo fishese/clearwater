@@ -40,10 +40,17 @@ const cases = [
   { name: 'haze', kind: 'haze', hints: { ...types.DEFAULT_HINTS, scene: 'underwater' } },
   { name: 'clipped-highlights', kind: 'highlights', hints: { ...types.DEFAULT_HINTS } },
   { name: 'transparent-replacement-clipped-old-neutral', kind: 'transparent-wb', hints: { ...types.DEFAULT_HINTS } },
+  { name: 'fivea-matrix-mild-strength-manual-wb', kind: 'weak-red', hints: { ...types.DEFAULT_HINTS }, strength: 0.35,
+    cameraColour: { source: 'fivea', matrix: [0.35,0.25,0.4,-0.015, 0.05,0.92,0.03,0.005, 0.02,0.08,0.85,0] },
+    manual: { ...types.DEFAULT_MANUAL, warmth: 18, tint: -11, red: 7, exposure: 0.2, neutral: [1.18,0.91,0.84], highlights: -12, shadows: 8 } },
+  { name: 'fivea-matrix-full-strength-manual-wb', kind: 'filter-cast', hints: { ...types.DEFAULT_HINTS }, strength: 1,
+    cameraColour: { source: 'fivea', matrix: [0.15,0.3,0.65,0, 0.02,0.96,0.02,0, 0,0.18,0.82,0] },
+    manual: { ...types.DEFAULT_MANUAL, warmth: -9, tint: 13, red: -4, exposure: -0.15, neutral: [0.88,1.12,1.24], contrast: 15, vibrance: -10 } },
 ];
-const result = cases.map(({ name, kind, hints }) => {
+const result = cases.map(({ name, kind, hints, strength, cameraColour, manual }) => {
   const input = image(kind), analysis = engine.analyse(input, 64, 48), auto = engine.suggest(analysis, hints);
-  const recipe = { version: 1, engine: 'balanced', strength: 0.8, hints, auto, manual: structuredClone(types.DEFAULT_MANUAL) };
+  const recipe = { version: 1, engine: 'balanced', strength: strength ?? 0.8, hints, auto, manual: structuredClone(manual ?? types.DEFAULT_MANUAL) };
+  if (cameraColour) recipe.cameraColour = cameraColour;
   if (name === 'transparent-replacement-clipped-old-neutral') {
     recipe.manual = { ...recipe.manual, warmth: 12, tint: -8, red: 6, neutral: [4, 4, 4] };
   }

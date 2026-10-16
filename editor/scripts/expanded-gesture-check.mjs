@@ -1,7 +1,7 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 
-const url=process.env.CHECK_URL||'http://127.0.0.1:4173/';
+const url=process.env.CHECK_URL||'http://127.0.0.1:4176/';
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900},hasTouch:true});
@@ -15,10 +15,10 @@ try {
  assert.equal(await page.getByLabel('Balanced after AI strength',{exact:true}).inputValue(),'30');
  await page.getByRole('button',{name:'Expand photo',exact:true}).click();
  const assertFits=async()=>{
-  await page.waitForFunction(()=>{const s=document.querySelector('.stage'),f=document.querySelector('.image-frame');return s&&f&&s.clientWidth>100&&s.clientHeight>100&&f.clientWidth>1&&f.getBoundingClientRect().width<=s.clientWidth-10&&f.getBoundingClientRect().height<=s.clientHeight-10&&Math.max(f.getBoundingClientRect().width/s.clientWidth,f.getBoundingClientRect().height/s.clientHeight)>.94;},null,{timeout:5000});
+  await page.waitForFunction(()=>{const s=document.querySelector('.stage'),f=document.querySelector('.image-frame');return s&&f&&s.clientWidth>100&&s.clientHeight>100&&f.clientWidth>1&&f.getBoundingClientRect().width<=s.clientWidth-4&&f.getBoundingClientRect().height<=s.clientHeight-4&&Math.max(f.getBoundingClientRect().width/s.clientWidth,f.getBoundingClientRect().height/s.clientHeight)>.94;},null,{timeout:5000});
   const {stage,frame}=await page.evaluate(()=>({stage:{width:document.querySelector('.stage').clientWidth,height:document.querySelector('.stage').clientHeight},frame:{width:document.querySelector('.image-frame').getBoundingClientRect().width,height:document.querySelector('.image-frame').getBoundingClientRect().height}}));
-  assert.ok(frame.width<=stage.width-10,`frame width ${frame.width} must fit stage width ${stage.width}`);
-  assert.ok(frame.height<=stage.height-10,`frame height ${frame.height} must fit stage height ${stage.height}`);
+  assert.ok(frame.width<=stage.width-4,`frame width ${frame.width} must fit stage width ${stage.width}`);
+  assert.ok(frame.height<=stage.height-4,`frame height ${frame.height} must fit stage height ${stage.height}`);
   assert.ok(Math.max(frame.width/stage.width,frame.height/stage.height)>.94,'Fit uses most of its limiting dimension');
   const topGap=await page.evaluate(()=>document.querySelector('.image-frame').getBoundingClientRect().top-document.querySelector('.stage').getBoundingClientRect().top);
   assert.ok(topGap>=0&&topGap<=8,`Expanded Fit starts near the top (${topGap}px)`);

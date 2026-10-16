@@ -26,6 +26,8 @@ export interface Recipe {
   version: 1; engine: 'balanced' | 'baseline' | AIEngine; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
   customModel?: CustomModel;
+  /** Frozen sampled Five A+ colour fit from camera capture, replayable without inference. */
+  cameraColour?: {source:'fivea';matrix:number[]};
   enhancement?: PhotoEnhancement;
   /** Optional follow-up Balanced pass for AI photo results. Omitted means disabled. */
   balancedAfterAI?: { strength: number };

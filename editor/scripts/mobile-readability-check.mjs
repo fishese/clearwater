@@ -51,6 +51,14 @@ try{
   }
   await page.setViewportSize({width:390,height:844});await page.locator('[data-control-tab=correction]').click();await page.locator('[data-control-subtab=dive]').click();await page.screenshot({path:fileURLToPath(new URL(`../../analysis/photo-check/mobile-type-${language}.png`,import.meta.url)),fullPage:true});
   for(const width of [901,1280,1920]){await page.setViewportSize({width,height:900});const summary=page.locator('.enhancement-group>summary');const gap=await summary.evaluate(el=>{const node=[...el.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());const range=document.createRange();range.selectNodeContents(node);return range.getBoundingClientRect().left-el.getBoundingClientRect().left;});assert.ok(gap>=9,`${language}/${width}: Effects label needs inset padding`);}
+  await page.setViewportSize({width:844,height:390});
+  const landscape=await page.evaluate(()=>{const library=document.querySelector('.library'),box=library.getBoundingClientRect();return {top:box.top,overflow:getComputedStyle(library).overflowY,pageHeight:document.documentElement.scrollHeight,viewport:innerHeight,widthFits:document.documentElement.scrollWidth<=innerWidth};});
+  assert.equal(landscape.overflow,'visible',`${language}: landscape collection should scroll with the page`);
+  assert.ok(landscape.top>=landscape.viewport-1,`${language}: landscape collection should start below the screen`);
+  assert.ok(landscape.pageHeight>landscape.viewport,`${language}: landscape page should scroll to the collection`);
+  assert.ok(landscape.widthFits,`${language}: landscape page should not overflow horizontally`);
+  await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+  assert.ok(await page.locator('.collection-heading').evaluate(el=>el.getBoundingClientRect().top<innerHeight),`${language}: page scroll should reveal the collection`);
   await page.locator('input[type=file][multiple]').setInputFiles({name:'newer-photo.png',mimeType:'image/png',buffer:Buffer.from(png)});
   await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
   assert.equal(await page.locator('.photo-select').first().getAttribute('title'),'newer-photo.png');await page.reload();await page.locator('.photo-select').first().waitFor();assert.equal(await page.locator('.photo-select').first().getAttribute('title'),'newer-photo.png','Newest-first order survives reload');

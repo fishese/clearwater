@@ -112,6 +112,7 @@ export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:U
   if(neuralBase&&neuralBase.length!==input.length) throw new Error('AI correction dimensions do not match.');
   const out=new Uint8ClampedArray(input.length);
   const {auto:a,manual:m,strength:s}=recipe;
+  const cameraMatrix=!neuralBase?recipe.cameraColour?.matrix:undefined;
   const warmth=m.warmth/100,tint=m.tint/100;
   const gains=[m.neutral[0]*2**(warmth*.45+m.red/100*.8),m.neutral[1]*2**(-tint*.4),m.neutral[2]*2**(-warmth*.45)];
   const exposure=2**m.exposure;
@@ -126,10 +127,13 @@ export function renderPixels(input:Uint8ClampedArray,recipe:Recipe,neuralBase?:U
     let r=input[i]/255,g=input[i+1]/255,b=input[i+2]/255;
     const origR=toLinear(r),origG=toLinear(g),origB=toLinear(b);
     // Cross-channel red reconstruction favours foreground green over pure blue water.
-    const restoredR=neuralBase?neuralBase[i]/255:clamp(r*a.gains[0]+a.redMix*Math.max(0,g-.3*b)*(1-.45*smooth(.65,1,Math.max(r,g,b))));
+    const cr=cameraMatrix?clamp(cameraMatrix[0]*r+cameraMatrix[1]*g+cameraMatrix[2]*b+cameraMatrix[3]):undefined;
+    const cg=cameraMatrix?clamp(cameraMatrix[4]*r+cameraMatrix[5]*g+cameraMatrix[6]*b+cameraMatrix[7]):undefined;
+    const cb=cameraMatrix?clamp(cameraMatrix[8]*r+cameraMatrix[9]*g+cameraMatrix[10]*b+cameraMatrix[11]):undefined;
+    const restoredR=neuralBase?neuralBase[i]/255:cr??clamp(r*a.gains[0]+a.redMix*Math.max(0,g-.3*b)*(1-.45*smooth(.65,1,Math.max(r,g,b))));
     r=toSrgb(origR*(1-s)+toLinear(restoredR)*s);
-    g=toSrgb(origG*(1-s)+toLinear(neuralBase?neuralBase[i+1]/255:g*a.gains[1])*s);
-    b=toSrgb(origB*(1-s)+toLinear(neuralBase?neuralBase[i+2]/255:b*a.gains[2])*s);
+    g=toSrgb(origG*(1-s)+toLinear(neuralBase?neuralBase[i+1]/255:cg??g*a.gains[1])*s);
+    b=toSrgb(origB*(1-s)+toLinear(neuralBase?neuralBase[i+2]/255:cb??b*a.gains[2])*s);
     if(afterStrength&&balancedAfterAI) {
       // This optional low-strength finish blends its channel gains in display-encoded RGB
       // to avoid another six transfer-table lookups per pixel in the full-resolution pass.
@@ -159,6 +163,7 @@ export function parseRecipe(value:unknown): Recipe {
     if(r.videoCorrection&&(!['sampled','fixed'].includes(r.videoCorrection.mode)||![2,5,10].includes(r.videoCorrection.interval)||!Number.isFinite(r.videoCorrection.referenceTime)||r.videoCorrection.referenceTime<0||r.videoCorrection.referenceTime>600))throw new Error('Invalid video correction settings.');
   const finite=(v:unknown,lo:number,hi:number)=>typeof v==='number'&&Number.isFinite(v)&&v>=lo&&v<=hi;
   const triple=(v:unknown,lo:number,hi:number)=>Array.isArray(v)&&v.length===3&&v.every(n=>finite(n,lo,hi));
+  if(r.cameraColour!==undefined&&(!r.cameraColour||r.cameraColour.source!=='fivea'||!Array.isArray(r.cameraColour.matrix)||r.cameraColour.matrix.length!==12||r.cameraColour.matrix.some((v,i)=>!finite(v,i%4===3?-.4:-2,i%4===3?.4:3))||!['balanced','baseline'].includes(r.engine)))throw new Error('Invalid camera AI colour settings.');
   if(r.enhancement!==undefined&&(!r.enhancement||!(['contrast','clarity','sharpness'] as const).every(k=>finite(r.enhancement![k],0,100))||!finite(r.enhancement.black,0,.2)||!finite(r.enhancement.white,.6,1)||(r.enhancement.brightness!==undefined&&!finite(r.enhancement.brightness,-100,100))||(r.enhancement.autoApplied!==undefined&&typeof r.enhancement.autoApplied!=='boolean')))throw new Error('Invalid photo enhancement settings.');
   if(r.balancedAfterAI!==undefined&&(!r.balancedAfterAI||typeof r.balancedAfterAI!=='object'||Array.isArray(r.balancedAfterAI)||!finite(r.balancedAfterAI.strength,0,1)))throw new Error('Invalid Balanced after AI settings.');
   if(r.customModel&&(!/^[a-f0-9]{64}$/.test(r.customModel.sha256)||typeof r.customModel.name!=='string'||r.customModel.name.length>255||!['unit','signed'].includes(r.customModel.inputRange)||!['unit','signed'].includes(r.customModel.outputRange)))throw new Error('Invalid custom model settings.');

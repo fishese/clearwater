@@ -56,7 +56,7 @@ Browser integration scripts use Playwright with Microsoft Edge. Generated fixtur
 
 ## Processing contract and limits
 
-With an output folder selected, exports use `[original stem].jpg` or `.png`. Without an output folder, exports default to the source folder and use `[original stem]-restore.jpg` or `.png`. Browser file inputs do not expose parent directories: choose the source folder once (or at first export). The app remembers it for other imported photos found there with the same name and file size. Folder access lasts for the current session. **Use source folder** clears the output-folder override.
+With an output folder selected, exports use `[original stem].jpg` or `.png`, adding a number for collisions. The top Export action selects an output folder if needed and reuses it for the session; it never checks whether that folder contains the original. Browser downloads and sharing without a selected folder use `[original stem]-restore.jpg` or `.png`. Save as explicitly chooses another destination. Edit presets have separate JSON save/load controls below the file actions.
 
 All app-managed folder saves, including **Save as…**, add ` (1)`, ` (2)` etc. when a filename exists. Save As uses an editable filename and a folder picker so the app can avoid overwriting existing files; it no longer uses the native save-file picker, which cannot choose a numbered sibling without parent-folder access. When directory pickers are unavailable, or when **Download instead** is chosen, the browser controls download location and disk-level collision handling. The app cannot inspect existing files in Downloads without folder access. Write failures fall back to downloading the rendered image. Picker cancellation stops before rendering.
 
@@ -161,13 +161,15 @@ Clear collection removes imported thumbnails, app copies and saved edits after c
 
 Expanded Fit aligns the photo near the top with a small inset while retaining corner zoom, pinch and pan controls. Android Back dismisses the current safe view before leaving the editor; root exit requires two presses within two seconds. Active work remains open. Reset all uses the current photo/video defaults; Auto restore retains the chosen engine and follow-up choice.
 
-### Camera prototype
+### Camera capture
 
-On main, the header camera button opens a local Balanced live preview. Take a JPEG or MP4 (optional microphone). Photos retain untouched originals; videos record the corrected canvas directly, Auto at up to 1080p30 / 12 Mbps on Android or 720p30 / 5 Mbps on web, and reopen at zero restoration strength to avoid a second correction. Settings offers Auto/Standard/High quality and 1/3/5-minute limits with approximate memory and storage estimates. No raw video backup is kept. Photos use the camera stream rather than full-sensor RAW/HDR still capture.
+The Android app uses native CameraX still/video capture through 'src/native-camera.ts'; the web build uses browser getUserMedia. Photos use native ImageCapture dimensions on Android, actual stream dimensions on the web. Preview size is not the native photo size. Native High/Standard video targets FHD/HD; web High/Standard targets 1080p30 at 12 Mbps / 720p30 at 5 Mbps. Portrait and landscape are supported; RAW/HDR capture is not. Device capabilities determine actual dimensions and codecs.
 
-This approach avoids AI inference per frame and uses the GPU for preview; corrected video is rendered at export. MP4 recording is device-dependent ([MediaRecorder support](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder/isTypeSupported_static)). Native CameraX capture would be a later option for full-sensor photos, more codec control and longer recording.
+Balanced live correction runs on the GPU. Optional Five A+ colour assist samples raw 256px frames at most once per second, off-thread, and reuses a global affine colour change. It does not run full spatial restoration per frame. The recipe retains that matrix for photo editing. Red-filter/depth hints apply to Balanced when AI assist is off. White-balance picks replace earlier picks. Recording freezes correction and stores enhanced video only, importing at zero strength. The linked Android gallery photo shows the enhancement, while the untouched photo and settings remain private. Camera mode stays open after shots; duration and file-size guards remain configurable.
 
-Camera mode stays open between shots. Android 10+ saves enhanced JPEGs to Pictures/ClearWater and original video streams to Movies/ClearWater; Android 7-9 uses app-specific storage. Local collection entries retain editable correction recipes. Use White balance to tap a neutral patch; Reset white balance resumes automatic scene analysis. Gallery files remain original captures: use editor Export to save the corrected result.
+Zoom cycles supported ratios; long press opens actual lens/zoom options, including ultra-wide when exposed. Android launcher shortcuts or 'clearwater://camera' / 'clearwater://edit' open the selected mode. PWA shortcuts use '?mode=camera|edit'. The iOS backend must use AVFoundation; see the root IOS_PLAN.md.
+
+Native camera builds compile, but physical-device camera/GL parity, front/rear orientation, lens switching and long-recording thermal/audio checks remain necessary. Browser fake-camera checks do not satisfy that acceptance gate.
 
 ## Settings and Android install link
 

@@ -1,9 +1,55 @@
 import XCTest
 import UIKit
 import WebKit
+import CoreImage
+import ImageIO
 @testable import App
 
 final class NativeSceneBridgeTests: XCTestCase {
+    func testCameraSamplePreservesRawColoursAspectAndJPEGFormat() throws {
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = CIContext(options: [.workingColorSpace: space, .outputColorSpace: space])
+        let blue = CIImage(color: CIColor(red: 0, green: 0, blue: 1)).cropped(to: CGRect(x: 0, y: 0, width: 720, height: 640))
+        let red = CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 640, width: 720, height: 640))
+        let source = red.composited(over: blue)
+        let sample = try XCTUnwrap(ClearWaterCameraOrientation.jpegSample(source: source, context: context))
+        XCTAssertEqual(sample.width, 144)
+        XCTAssertEqual(sample.height, 256)
+        XCTAssertEqual(Array(sample.data.prefix(2)), [0xff, 0xd8])
+        let decoded = try XCTUnwrap(CIImage(data: sample.data))
+        XCTAssertEqual(decoded.extent.size, CGSize(width: 144, height: 256))
+        var upper = [UInt8](repeating: 0, count: 4), lower = upper
+        upper.withUnsafeMutableBytes { context.render(decoded, toBitmap: $0.baseAddress!, rowBytes: 4,
+            bounds: CGRect(x: 72, y: 200, width: 1, height: 1), format: .RGBA8, colorSpace: space) }
+        lower.withUnsafeMutableBytes { context.render(decoded, toBitmap: $0.baseAddress!, rowBytes: 4,
+            bounds: CGRect(x: 72, y: 40, width: 1, height: 1), format: .RGBA8, colorSpace: space) }
+        XCTAssertGreaterThan(upper[0], 240)
+        XCTAssertLessThan(upper[2], 15)
+        XCTAssertGreaterThan(lower[2], 240)
+        XCTAssertLessThan(lower[0], 15)
+        XCTAssertEqual(ClearWaterCameraOrientation.sampleSize(width: 1920, height: 1080), CGSize(width: 256, height: 144))
+        XCTAssertEqual(ClearWaterCameraOrientation.sampleSize(width: 80, height: 120), CGSize(width: 80, height: 120))
+    }
+
+    func testPhysicalOrientationMappingIsIndependentOfPortraitControls() {
+        XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .portrait), 90)
+        XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .portraitUpsideDown), 270)
+        XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .landscapeLeft), 0)
+        XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .landscapeRight), 180)
+        XCTAssertNil(ClearWaterCameraOrientation.angleDegrees(for: .faceUp))
+        XCTAssertNil(ClearWaterCameraOrientation.angleDegrees(for: .unknown))
+        XCTAssertEqual(ClearWaterCameraOrientation.exifOrientation(fromPortraitAngle: 90), 1)
+        XCTAssertEqual(ClearWaterCameraOrientation.exifOrientation(fromPortraitAngle: 270), 3)
+    }
+
+    func testLaunchURLParsing() throws {
+        XCTAssertEqual(ClearWaterLaunchRouting.mode(for: try XCTUnwrap(URL(string: "clearwater://camera"))), "camera")
+        XCTAssertEqual(ClearWaterLaunchRouting.mode(for: try XCTUnwrap(URL(string: "clearwater://edit/"))), "edit")
+        XCTAssertNil(ClearWaterLaunchRouting.mode(for: try XCTUnwrap(URL(string: "https://camera"))))
+        XCTAssertNil(ClearWaterLaunchRouting.mode(for: try XCTUnwrap(URL(string: "clearwater://camera/unexpected"))))
+        XCTAssertNil(ClearWaterLaunchRouting.mode(for: try XCTUnwrap(URL(string: "clearwater://unknown"))))
+    }
+
     @MainActor
     func testConnectedSceneRegistersAndUsesExportAndCameraPlugins() async throws {
         let deadline = Date().addingTimeInterval(30)
@@ -33,16 +79,36 @@ final class NativeSceneBridgeTests: XCTestCase {
         }
         XCTAssertTrue(available, "The running WebView must report the registered ClearWaterExport plugin.")
 
+        // Exercise Capacitor's real custom-scheme media transport. MP4 without a Range
+        // header uses URLResponse (status 0 in fetch); Range selects HTTP 206 instead.
+        let store = ClearWaterCaptureStore.shared
+        let videoID = store.newCaptureID()
+        let staged = try store.makeVideoOutputURL(id: videoID)
+        try Data([0, 1, 2, 255]).write(to: staged)
+        let video = try store.commitVideo(id: videoID, outputURL: staged, thumbnailData: Data([1]),
+            width: 2, height: 2, duration: 1, fps: 30, codec: "h264", recipe: ["version": 1, "engine": "balanced"])
+        defer { try? store.deleteCapture(id: videoID.uuidString.lowercased()) }
+        let videoURLJSON = String(data: try JSONSerialization.data(withJSONObject: [video["sourceUrl"]!]), encoding: .utf8)!
+
         let script = #"""
         void (async () => {
           try {
             const bridge = window.Capacitor;
             if (!bridge.isPluginAvailable('ClearWaterCamera')) throw new Error('Native camera plugin was not registered');
+            const launch = await bridge.nativePromise('ClearWaterCamera', 'getLaunchMode', {});
+            if (launch.mode !== null && launch.mode !== 'edit' && launch.mode !== 'camera') throw new Error('Invalid camera launch routing');
+            await bridge.nativePromise('ClearWaterCamera', 'stopSession', {});
+            await bridge.nativePromise('ClearWaterCamera', 'stopSession', {});
             const inventory = await bridge.nativePromise('ClearWaterCamera', 'listCaptures', {});
             if (!Array.isArray(inventory.captures)) throw new Error('Invalid native capture inventory');
             for (const capture of inventory.captures) {
               if (capture.schemaVersion !== 1 || capture.recipeVersion !== 1) throw new Error('Unsupported capture schema');
             }
+            const mediaURL = \#(videoURLJSON)[0];
+            const mediaResponse = await fetch(bridge.convertFileSrc(mediaURL), {headers: {Range: 'bytes=0-'}});
+            if (!mediaResponse.ok || mediaResponse.status !== 206) throw new Error('Private MP4 range transport failed: ' + mediaResponse.status);
+            const mediaBytes = new Uint8Array(await mediaResponse.arrayBuffer());
+            if (mediaBytes.length !== 4 || mediaBytes[0] !== 0 || mediaBytes[3] !== 255) throw new Error('Private MP4 byte integrity failed');
             const pending = await bridge.nativePromise('ClearWaterCamera', 'drainCaptures', {});
             if (!Array.isArray(pending.captures)) throw new Error('Invalid pending capture inventory');
             const {id} = await bridge.nativePromise('ClearWaterExport', 'beginExport', {

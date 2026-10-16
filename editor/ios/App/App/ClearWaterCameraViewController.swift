@@ -5,6 +5,50 @@ import ImageIO
 import MetalKit
 import UIKit
 
+enum ClearWaterCameraOrientation {
+    static func angleDegrees(for orientation: UIDeviceOrientation) -> CGFloat? {
+        switch orientation {
+        case .portrait: return 90
+        case .portraitUpsideDown: return 270
+        // UIDeviceOrientation is the opposite handedness of the interface
+        // orientation enum used by the older camera UI mapping.
+        case .landscapeLeft: return 0
+        case .landscapeRight: return 180
+        default: return nil
+        }
+    }
+    static func sampleSize(width: CGFloat, height: CGFloat, maximum: CGFloat = 256) -> CGSize {
+        guard width > 0, height > 0, maximum > 0 else { return .zero }
+        let scale = min(1, maximum / max(width, height))
+        return CGSize(width: max(1, (width * scale).rounded()), height: max(1, (height * scale).rounded()))
+    }
+    static func jpegSample(source: CIImage, context: CIContext, maximum: CGFloat = 256) -> (data: Data, width: Int, height: Int)? {
+        let size = sampleSize(width: source.extent.width, height: source.extent.height, maximum: maximum)
+        guard size.width > 0, size.height > 0 else { return nil }
+        let width = Int(size.width), height = Int(size.height)
+        let target = CGRect(x: 0, y: 0, width: width, height: height)
+        let extent = source.extent
+        let scaled = source.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: CGFloat(width) / extent.width, y: CGFloat(height) / extent.height))
+            .cropped(to: target)
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let image = context.createCGImage(scaled, from: target, format: .RGBA8, colorSpace: colorSpace) else { return nil }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output, "public.jpeg" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return (output as Data, width, height)
+    }
+    static func exifOrientation(fromPortraitAngle angle: CGFloat) -> Int32 {
+        switch Int(angle.rounded()) {
+        case 0: return 8
+        case 180: return 6
+        case 270: return 3
+        default: return 1
+        }
+    }
+}
+
 struct ClearWaterCameraOptions {
     let locale: String
     let strings: [String: String]
@@ -13,6 +57,8 @@ struct ClearWaterCameraOptions {
     let minutes: Int
     let microphoneEnabled: Bool
     let saveEnhancedPhotos: Bool
+    let embedded: Bool
+    let facing: AVCaptureDevice.Position
     init(locale: String, strings: [String: String], settings: [String: Any]) {
         self.locale = ["en", "zh-HK", "ja"].contains(locale) ? locale : "en"
         self.strings = strings
@@ -23,6 +69,8 @@ struct ClearWaterCameraOptions {
         self.minutes = [1, 3, 5].contains(minutes) ? minutes : 1
         microphoneEnabled = settings["microphoneEnabled"] as? Bool ?? false
         saveEnhancedPhotos = settings["saveEnhancedPhotos"] as? Bool ?? false
+        embedded = settings["embedded"] as? Bool ?? false
+        facing = (settings["facing"] as? String) == "user" ? .front : .back
     }
     func text(_ key: String, _ fallback: String) -> String { strings[key] ?? fallback }
 }
@@ -63,12 +111,20 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var hardwareWhiteBalanceLocked = false
     private let lifecycleLock = NSLock()
     private var closeFlag = false
+    private var closeFinishFlag = false
+    private(set) var embeddedSessionCloseReason: String?
     private var backgroundFlag = false
     private var audioEnabledFlag = false
     private var pickedNeutralFlag = false
     private var closeRequested: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return closeFlag }
         set { lifecycleLock.lock(); closeFlag = newValue; lifecycleLock.unlock() }
+    }
+    private func claimCloseFinish() -> Bool {
+        lifecycleLock.lock(); defer { lifecycleLock.unlock() }
+        guard !closeFinishFlag else { return false }
+        closeFinishFlag = true
+        return true
     }
     private var backgrounded: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return backgroundFlag }
@@ -100,6 +156,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var previewFailureReported = false
     private var pendingOrientationAngle: CGFloat?
     private var orientationLocked = false
+    private var captureOrientationAngle: CGFloat = 90
+    private var clipOrientationAngle: CGFloat = 90
     private var pickerArmed = false
     private var loupeView: UIImageView?
     private var pendingNeutralPatch: Data?
@@ -125,8 +183,11 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var acceptedVideoFrames = 0
     private var videoURL: URL?
     private var captureID: UUID?
+    private var embeddedCaptureDuration: Double?
+    private var embeddedCaptureBytes: Int64?
     private var lastAnalysisTime = 0.0
     private var videoByteLimit: Int64 {
+        if let embeddedCaptureBytes { return embeddedCaptureBytes }
         let standard: [Int64] = [64, 192, 320]
         let high: [Int64] = [128, 384, 500]
         let index = options.minutes == 1 ? 0 : options.minutes == 3 ? 1 : 2
@@ -136,6 +197,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     init(options: ClearWaterCameraOptions) throws {
         self.options = options
         audioEnabledFlag = options.microphoneEnabled
+        cameraPosition = options.facing
         processor = try ClearWaterBalancedProcessor()
         var initialRecipe = NativeBalancedMath.defaultCameraRecipe()
         initialRecipe.strength = options.strength
@@ -165,11 +227,14 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         view.insertSubview(metalView, at: 0)
         NSLayoutConstraint.activate([metalView.leadingAnchor.constraint(equalTo: view.leadingAnchor), metalView.trailingAnchor.constraint(equalTo: view.trailingAnchor), metalView.topAnchor.constraint(equalTo: view.topAnchor), metalView.bottomAnchor.constraint(equalTo: view.bottomAnchor)])
         installObservers()
+        if options.embedded {
+            view.subviews.filter { $0 !== metalView }.forEach { $0.isHidden = true }
+        }
         setState("starting")
         requestCamera()
     }
     override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); updateOrientation() }
-    deinit { observers.forEach(NotificationCenter.default.removeObserver); elapsedTimer?.invalidate() }
+    deinit { observers.forEach(NotificationCenter.default.removeObserver); UIDevice.current.endGeneratingDeviceOrientationNotifications(); elapsedTimer?.invalidate() }
 
     private func setupUI() {
         let top = UIStackView(); top.axis = .horizontal; top.alignment = .center; top.distribution = .equalSpacing; top.translatesAutoresizingMaskIntoConstraints = false
@@ -203,6 +268,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func installObservers() {
         let n = NotificationCenter.default
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        observers.append(n.addObserver(forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main) { [weak self] _ in self?.requestOrientationUpdate() })
         observers.append(n.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterBackground() })
         observers.append(n.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterForeground() })
         observers.append(n.addObserver(forName: .AVCaptureSessionWasInterrupted, object: session, queue: .main) { [weak self] _ in self?.interrupted() })
@@ -317,7 +384,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func sessionRuntimeError(_ notification: Notification) {
         let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
-        guard let error else { fail(text("The camera stopped unexpectedly.", "The camera stopped unexpectedly.")); return }
+        guard let error else {
+            fail(text("The camera stopped unexpectedly.", "The camera stopped unexpectedly."))
+            closeAfterRuntimeFailure(); return
+        }
         if error.code == .mediaServicesWereReset, state == "ready", runtimeRecoveryAttempts < 1, !closeRequested, !backgrounded {
             runtimeRecoveryAttempts += 1
             setState("starting")
@@ -331,15 +401,24 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 self.cameraInput = nil; self.audioInput = nil; self.configured = false
                 self.session.commitConfiguration()
                 do { try self.configureSession(); self.session.startRunning(); DispatchQueue.main.async { guard !self.closeRequested, !self.backgrounded, self.state == "starting" else { return }; self.setState("ready") } }
-                catch { DispatchQueue.main.async { self.fail(self.text("The camera could not restart.", "The camera could not restart.")) } }
+                catch { DispatchQueue.main.async { self.fail(self.text("The camera could not restart.", "The camera could not restart.")); self.closeAfterRuntimeFailure() } }
             }
         } else if state == "recording" {
+            if options.embedded { embeddedSessionCloseReason = "runtime-error"; closeRequested = true }
             stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted."))
         } else if ["capturing", "startingRecording", "finalising"].contains(state) {
+            if options.embedded { embeddedSessionCloseReason = "runtime-error"; closeRequested = true }
             statusLabel.text = text("Camera interrupted.", "Camera interrupted.")
         } else {
             fail(text("The camera stopped unexpectedly. Close and reopen the camera.", "The camera stopped unexpectedly. Close and reopen the camera."))
+            closeAfterRuntimeFailure()
         }
+    }
+    private func closeAfterRuntimeFailure() {
+        guard options.embedded else { return }
+        embeddedSessionCloseReason = "runtime-error"; closeRequested = true
+        if ["capturing", "startingRecording", "recording", "finalising"].contains(state) { return }
+        finishClose()
     }
     private func selectCamera() throws -> AVCaptureDevice {
         let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: cameraPosition)
@@ -357,15 +436,17 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func updateOrientation() { requestOrientationUpdate() }
     private func requestOrientationUpdate() {
         guard Thread.isMainThread else { DispatchQueue.main.async { [weak self] in self?.requestOrientationUpdate() }; return }
-        let interface = view.window?.windowScene?.interfaceOrientation ?? .portrait
-        let angle: CGFloat = interface == .landscapeLeft ? 180 : interface == .landscapeRight ? 0 : interface == .portraitUpsideDown ? 270 : 90
+        let angle = ClearWaterCameraOrientation.angleDegrees(for: UIDevice.current.orientation) ?? captureOrientationAngle
         sessionQueue.async { [weak self] in self?.configureOrientation(angle: angle) }
     }
     private func configureOrientation(angle: CGFloat) {
         guard !orientationLocked else { return }
-        for output in [photoOutput, videoOutput] as [AVCaptureOutput] {
-            guard let c = output.connection(with: .video) else { continue }
-            if c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        captureOrientationAngle = angle
+        if let c = photoOutput.connection(with: .video), c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        // Keep the source upright for the portrait preview. The writer applies
+        // the frozen physical device orientation when recording begins.
+        if let c = videoOutput.connection(with: .video), c.isVideoRotationAngleSupported(90) {
+            c.videoRotationAngle = 90
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
                 c.isVideoMirrored = cameraPosition == .front
@@ -391,6 +472,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard !closeRequested else { return }
         autoreleasepool { processCaptureOutput(output, sampleBuffer: sampleBuffer) }
     }
     private func processCaptureOutput(_ output: AVCaptureOutput, sampleBuffer: CMSampleBuffer) {
@@ -398,7 +480,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         guard output === videoOutput, let sourceBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let source = CIImage(cvPixelBuffer: sourceBuffer)
         let recording = movieWriter != nil && writerAcceptingFrames
-        if !recording { updateAnalysisIfDue(source) }
+        if !recording && !options.embedded { updateAnalysisIfDue(source) }
         let recipe = snapshotRecipe(forClip: recording)
         frameLock.lock(); latestSource = source; frameLock.unlock()
         let size = previewSize(width: CVPixelBufferGetWidth(sourceBuffer), height: CVPixelBufferGetHeight(sourceBuffer))
@@ -415,7 +497,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
         if recording, let movieWriter {
             do {
-                switch try movieWriter.appendVideo(source, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) {
+                let writerSource = source.oriented(forExifOrientation: ClearWaterCameraOrientation.exifOrientation(fromPortraitAngle: clipOrientationAngle))
+                switch try movieWriter.appendVideo(writerSource, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) {
                 case .appended, .droppedBackpressure: break
                 case .limitReached: DispatchQueue.main.async { self.stopRecording(reason: nil) }
                 }
@@ -511,6 +594,133 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if forClip, let clipRecipe { return clipRecipe }
         return currentRecipe
     }
+
+    // Shared React camera bridge. The controller remains the sole owner of the
+    // capture session, renderer and writer in both embedded and legacy UI modes.
+    func setEmbeddedRecipe(_ value: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: value)
+        let recipe = try JSONDecoder().decode(NativeBalancedRecipe.self, from: data)
+        guard recipe.version == 1, recipe.engine == "balanced", recipe.hasValidCameraColour() else { throw NativeBalancedMathError.invalidRecipe }
+        recipeLock.lock(); let previouslyPicked = currentRecipe.manual.neutral != [1, 1, 1]; currentRecipe = recipe; recipeLock.unlock()
+        let nowPicked = recipe.manual.neutral != [1, 1, 1]
+        pickedNeutral = nowPicked
+        if nowPicked && !previouslyPicked {
+            lockHardwareWhiteBalance { [weak self] locked in
+                guard let self, self.pickedNeutral else { return }
+                self.hardwareWhiteBalanceLocked = locked
+            }
+        } else if !nowPicked && previouslyPicked {
+            releaseHardwareWhiteBalance()
+        }
+    }
+    func setEmbeddedBounds(_ bounds: CGRect) { view.frame = bounds; view.setNeedsLayout(); view.layoutIfNeeded() }
+    func embeddedReady(_ completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        guard options.embedded else { completion(.failure(CameraError.unavailable)); return }
+        guard !closeRequested, !backgrounded else { completion(.failure(CameraError.cancelled)); return }
+        if state == "ready" { completion(.success(nativeInfo())); return }
+        if state == "error" { completion(.failure(CameraError.unavailable)); return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self else { completion(.failure(CameraError.unavailable)); return }
+            self.embeddedReady(completion)
+        }
+    }
+    func embeddedInfo() -> [String: Any] { nativeInfo() }
+    private func nativeInfo() -> [String: Any] {
+        let device = cameraInput?.device
+        let dimensions = photoOutput.maxPhotoDimensions
+        frameLock.lock(); let frameSize = latestSource?.extent.size; frameLock.unlock()
+        let formatSize = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+        var previewWidth = Int(frameSize?.width ?? CGFloat(formatSize?.width ?? 0))
+        var previewHeight = Int(frameSize?.height ?? CGFloat(formatSize?.height ?? 0))
+        if frameSize == nil && (captureOrientationAngle == 90 || captureOrientationAngle == 270) { swap(&previewWidth, &previewHeight) }
+        let zoom = device?.videoZoomFactor ?? 1
+        var photoWidth = Int(dimensions.width), photoHeight = Int(dimensions.height)
+        if captureOrientationAngle == 90 || captureOrientationAngle == 270 { swap(&photoWidth, &photoHeight) }
+        return ["width": max(1, previewWidth), "height": max(1, previewHeight),
+                "photoWidth": photoWidth, "photoHeight": photoHeight, "zoom": zoom,
+                "minZoom": device?.minAvailableVideoZoomFactor ?? 1, "maxZoom": device?.maxAvailableVideoZoomFactor ?? 1,
+                "lensId": device?.uniqueID ?? "", "lenses": availableLenses()]
+    }
+    private func availableLenses() -> [[String: Any]] {
+        let types: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera]
+        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .back).devices +
+            AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .front).devices
+        return devices.map { device in
+            let facingDevices = devices.filter { $0.position == device.position }
+            let wide = facingDevices.first(where: { $0.deviceType == .builtInWideAngleCamera })?.activeFormat.videoFieldOfView ?? 0
+            let field = device.activeFormat.videoFieldOfView
+            let radians = Double.pi / 360
+            let intrinsic = wide > 0 && field > 0 ? tan(Double(wide) * radians) / tan(Double(field) * radians) : 1.0
+            let label = String(format: "%.1fx", intrinsic)
+            return ["id": device.uniqueID, "label": label, "facing": device.position == .front ? "user" : "environment", "intrinsicZoom": intrinsic]
+        }
+    }
+    func embeddedSetZoom(_ ratio: CGFloat, completion: @escaping (Result<CGFloat, Error>) -> Void) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.cameraInput?.device else { completion(.failure(CameraError.unavailable)); return }
+            do {
+                try device.lockForConfiguration(); defer { device.unlockForConfiguration() }
+                let value = min(device.maxAvailableVideoZoomFactor, max(device.minAvailableVideoZoomFactor, ratio))
+                device.videoZoomFactor = value
+                completion(.success(value))
+            } catch { completion(.failure(error)) }
+        }
+    }
+    func embeddedSetLens(_ id: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        let types: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera]
+        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .back).devices +
+            AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .front).devices
+        guard state == "ready", let device = devices.first(where: { $0.uniqueID == id }) else { completion(.failure(CameraError.unavailable)); return }
+        setState("starting")
+        releaseHardwareWhiteBalance()
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            self.session.stopRunning(); self.session.beginConfiguration()
+            do {
+                if let old = self.cameraInput { self.session.removeInput(old) }
+                let input = try AVCaptureDeviceInput(device: device)
+                guard self.session.canAddInput(input) else { throw CameraError.unavailable }
+                self.session.addInput(input); self.cameraInput = input; self.cameraPosition = device.position
+                try self.configureDeviceFormat(device)
+                let hasPhoto = self.configurePhotoDimensions(for: device)
+                self.observeSystemPressure(device); self.session.commitConfiguration(); self.requestOrientationUpdate(); self.session.startRunning()
+                DispatchQueue.main.async { self.photoCaptureAvailable = hasPhoto; self.setState("ready"); completion(.success(self.nativeInfo())) }
+            } catch { self.session.commitConfiguration(); DispatchQueue.main.async { self.setState("ready"); completion(.failure(error)) } }
+        }
+    }
+    func embeddedSampleFrame() -> [String: Any]? {
+        frameLock.lock(); let source = latestSource; frameLock.unlock()
+        guard let source else { return nil }
+        guard let sample = ClearWaterCameraOrientation.jpegSample(source: source, context: ciContext) else { return nil }
+        return ["data": sample.data.base64EncodedString(), "width": sample.width, "height": sample.height]
+    }
+    func embeddedCapturePhoto() -> Bool {
+        guard state == "ready", photoCaptureAvailable, !captureInFlight, !closeRequested, !backgrounded else { return false }
+        photoTapped(); return state == "capturing"
+    }
+    func embeddedStartRecording(maxMs: Int, maxBytes: Int64, microphone: Bool, recipe: [String: Any]) throws {
+        guard state == "ready", !closeRequested, !backgrounded else { throw CameraError.unavailable }
+        if microphone && AVCaptureDevice.authorizationStatus(for: .audio) != .authorized { throw CameraError.unavailable }
+        try setEmbeddedRecipe(recipe)
+        audioEnabled = microphone; embeddedCaptureDuration = max(1, Double(maxMs) / 1000); embeddedCaptureBytes = max(1, maxBytes)
+        startRecording()
+    }
+    func embeddedStopRecording(discard: Bool) {
+        guard state == "recording" else { return }
+        if discard {
+            mediaQueue.async { [weak self] in
+                guard let self else { return }
+                self.writerAcceptingFrames = false
+                self.movieWriter?.cancel {
+                    if let id = self.captureID { ClearWaterCaptureStore.shared.discardStagedCapture(id: id) }
+                    if let url = self.videoURL { try? FileManager.default.removeItem(at: url) }
+                    self.mediaQueue.async { self.clearWriter() }
+                    DispatchQueue.main.async { self.setState("ready"); self.delegate?.cameraViewController(self, recordingState: "ready") }
+                }
+            }
+        } else { stopRecording(reason: nil) }
+    }
+    func embeddedStopSession() { closeTapped() }
 
     @objc private func photoTapped() {
         guard state == "ready", photoCaptureAvailable, !captureInFlight else { return }
@@ -628,6 +838,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.orientationLocked = true
+            self.clipOrientationAngle = self.captureOrientationAngle
             self.session.beginConfiguration()
             if self.audioEnabled, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
                 do { try self.addAudioIfGranted() } catch { self.audioEnabled = false }
@@ -641,7 +852,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     stagedCaptureID = id
                     let url = try ClearWaterCaptureStore.shared.makeVideoOutputURL(id: id)
                     let writer = try ClearWaterMovieWriter(outputURL: url, sourceSize: sourceSize, profile: profile, audioEnabled: withAudio,
-                        recipe: frozenRecipe, processor: self.processor, maximumDuration: Double(self.options.minutes * 60), maximumBytes: self.videoByteLimit)
+                        recipe: frozenRecipe, processor: self.processor, maximumDuration: self.embeddedCaptureDuration ?? Double(self.options.minutes * 60), maximumBytes: self.videoByteLimit)
                     try writer.start()
                     if self.closeRequested || self.backgrounded {
                         writer.cancel {
@@ -783,10 +994,37 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         durationLabel.text = String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
     private func finishClose() {
-        closeRequested = true; releaseHardwareWhiteBalance()
+        closeRequested = true
+        guard claimCloseFinish() else { return }
+        releaseHardwareWhiteBalance()
         sessionQueue.async { [weak self] in
-            self?.session.stopRunning()
-            DispatchQueue.main.async { guard let self else { return }; self.dismiss(animated: true) { self.delegate?.cameraViewControllerDidClose(self) } }
+            guard let self else { return }
+            self.session.stopRunning()
+            self.videoOutput.setSampleBufferDelegate(nil, queue: nil)
+            self.audioOutput.setSampleBufferDelegate(nil, queue: nil)
+            self.pressureObservation?.invalidate(); self.pressureObservation = nil
+            if self.configured {
+                self.session.beginConfiguration()
+                for output in self.session.outputs { self.session.removeOutput(output) }
+                for input in self.session.inputs { self.session.removeInput(input) }
+                self.cameraInput = nil; self.audioInput = nil; self.configured = false
+                self.session.commitConfiguration()
+            }
+            self.mediaQueue.async {
+                self.writerAcceptingFrames = false
+                self.latestSource = nil; self.latestRendered = nil
+                self.previewPool = nil; self.previewPoolSize = nil
+                self.recipeLock.lock(); self.photoRecipes.removeAll(); self.recipeLock.unlock()
+                DispatchQueue.main.async {
+                    self.metalView.isPaused = true; self.metalView.delegate = nil
+                    if self.options.embedded {
+                        self.willMove(toParent: nil); self.view.removeFromSuperview(); self.removeFromParent()
+                        self.delegate?.cameraViewControllerDidClose(self)
+                    } else {
+                        self.dismiss(animated: true) { self.delegate?.cameraViewControllerDidClose(self) }
+                    }
+                }
+            }
         }
     }
     @objc private func flipTapped() {
@@ -912,6 +1150,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func enterBackground() {
         backgrounded = true
+        if options.embedded { closeRequested = true; embeddedSessionCloseReason = "background" }
         if state == "recording" {
             backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ClearWaterFinalizeMovie") { [weak self] in
                 guard let self else { return }
@@ -926,6 +1165,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
         sessionQueue.async { [weak self] in self?.session.stopRunning() }
         releaseHardwareWhiteBalance()
+        if options.embedded && !["recording", "capturing", "startingRecording", "finalising"].contains(state) { finishClose() }
     }
     private func enterForeground() { backgrounded = false; restartIfActive() }
     private func endBackgroundTask() {
@@ -934,9 +1174,14 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func interrupted() {
         let message = text("Camera interrupted.", "Camera interrupted.")
+        if options.embedded { closeRequested = true; embeddedSessionCloseReason = "interrupted" }
         if state == "recording" { stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted.")); return }
         if state == "capturing" || state == "startingRecording" || state == "finalising" { statusLabel.text = message; return }
         setState("error"); statusLabel.text = message
+        if options.embedded {
+            delegate?.cameraViewController(self, didFail: message, captureID: nil)
+            finishClose()
+        }
     }
     private func restartIfActive() {
         guard !backgrounded, !closeRequested else { return }; releaseHardwareWhiteBalance(); requestCamera()
@@ -962,5 +1207,5 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if value != "recording" && value != "finalising" { recordButton.setImage(UIImage(systemName: "record.circle"), for: .normal); recordButton.accessibilityLabel = text("Start recording", "Start recording") }
     }
     private func fail(_ message: String) { setState("error"); statusLabel.text = message; delegate?.cameraViewController(self, didFail: message, captureID: nil) }
-    private enum CameraError: Error { case unavailable, processing, writer }
+    private enum CameraError: Error { case unavailable, processing, writer, cancelled }
 }

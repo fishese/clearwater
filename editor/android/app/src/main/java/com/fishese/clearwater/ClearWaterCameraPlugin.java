@@ -1,0 +1,670 @@
+package com.fishese.clearwater;
+
+import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.graphics.drawable.Drawable;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.Rect;
+import android.graphics.ImageFormat;
+import android.hardware.display.DisplayManager;
+import android.graphics.YuvImage;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.util.Base64;
+import android.util.Size;
+import android.util.Log;
+import android.view.Display;
+import android.view.OrientationEventListener;
+import android.view.Surface;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Gravity;
+import android.view.WindowManager;
+import android.webkit.WebView;
+import android.widget.FrameLayout;
+import androidx.activity.result.ActivityResult;
+import androidx.annotation.NonNull;
+import androidx.camera.camera2.interop.Camera2CameraInfo;
+import androidx.camera.core.Camera;
+import androidx.camera.core.CameraEffect;
+import androidx.camera.core.CameraInfo;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.ImageProxy;
+import androidx.camera.core.Preview;
+import androidx.camera.core.UseCaseGroup;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.media3.effect.Media3Effect;
+import androidx.camera.video.FileOutputOptions;
+import androidx.camera.video.FallbackStrategy;
+import androidx.camera.video.PendingRecording;
+import androidx.camera.video.Quality;
+import androidx.camera.video.QualitySelector;
+import androidx.camera.video.Recorder;
+import androidx.camera.video.Recording;
+import androidx.camera.video.VideoCapture;
+import androidx.camera.video.VideoRecordEvent;
+import androidx.camera.view.PreviewView;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.core.content.ContextCompat;
+import androidx.lifecycle.LifecycleOwner;
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+import com.google.common.util.concurrent.ListenableFuture;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+/** CameraX capture session used by the Android camera screen. */
+@CapacitorPlugin(name = "ClearWaterCamera", permissions = {
+    @Permission(alias = "camera", strings = {Manifest.permission.CAMERA}),
+    @Permission(alias = "microphone", strings = {Manifest.permission.RECORD_AUDIO})
+})
+public class ClearWaterCameraPlugin extends Plugin {
+    private Executor mainExecutor;
+    private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final Map<String, Lens> lenses = new HashMap<>();
+    private final Map<String, File> temporaryCaptures = new HashMap<>();
+    private ProcessCameraProvider provider;
+    private PreviewView previewView;
+    private ViewGroup previewParent;
+    private Drawable savedWebViewBackground;
+    private boolean hasSavedWebViewBackground;
+    private boolean keepScreenOnWasAlreadySet;
+    private boolean changedKeepScreenOn;
+    private Camera camera;
+    private Preview preview;
+    private ImageCapture imageCapture;
+    private ImageAnalysis imageAnalysis;
+    private VideoCapture<Recorder> videoCapture;
+    private Media3Effect media3Effect;
+    private long media3EffectGeneration;
+    private Recording recording;
+    private File recordingFile;
+    private boolean recordingDiscard;
+    private boolean recordingActive;
+    private long recordingMaxBytes;
+    private long recordingMaxAt;
+    private final Runnable recordingLimitCheck = new Runnable() {
+        @Override public void run() {
+            if (!recordingActive || recording == null) return;
+            if ((recordingMaxAt > 0 && SystemClock.elapsedRealtime() >= recordingMaxAt)
+                || (recordingMaxBytes > 0 && recordingFile != null && recordingFile.length() >= recordingMaxBytes)) {
+                recording.stop(); return;
+            }
+            main.postDelayed(this, 500);
+        }
+    };
+    private boolean sessionActive;
+    private long sessionGeneration;
+    private long bindGeneration;
+    private PluginCall pendingSessionCall;
+    private PluginCall pendingBindCall;
+    private PluginCall pendingRecordingPermissionCall;
+    private boolean microphoneRequested;
+    private String facing = "environment";
+    private String quality = "standard";
+    private String selectedLensId;
+    private JSONObject recipe = new JSONObject();
+    private String latestSampleData;
+    private int latestSampleWidth;
+    private int latestSampleHeight;
+    private long lastSampleAt;
+    private volatile long analysisGeneration;
+    private int minZoom = 1;
+    private int maxZoom = 1;
+    private float previewPixelRatio = 1f;
+    private String launchMode;
+    // CameraX rotation for captured media. Unlike Display.getRotation(), this
+    // follows the physical device while system auto-rotate is locked.
+    private int captureRotation = Surface.ROTATION_0;
+    private int previousRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+    private boolean savedRequestedOrientation;
+
+    @Override public void load() {
+        super.load();
+        consumeLaunchIntent(getActivity().getIntent(), false);
+    }
+
+    @Override protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        consumeLaunchIntent(intent, true);
+    }
+
+    private void consumeLaunchIntent(Intent intent, boolean notify) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) return;
+        Uri uri = intent.getData();
+        if (uri == null || !"clearwater".equalsIgnoreCase(uri.getScheme())) return;
+        String host = uri.getHost();
+        if (!"camera".equalsIgnoreCase(host) && !"edit".equalsIgnoreCase(host)) return;
+        String mode = host.toLowerCase(java.util.Locale.ROOT);
+        if (!notify) launchMode = mode;
+        // Keep this launch action in memory for getLaunchMode(), but prevent an activity
+        // recreation or WebView reload from replaying the original intent.
+        intent.setAction(null); intent.setData(null);
+        if (notify) { JSObject value = new JSObject(); value.put("mode", mode); notifyListeners("launchMode", value, true); }
+    }
+    private OrientationEventListener orientationListener;
+
+    private static final class Lens {
+        final String id, label, facing;
+        final String physicalCameraId;
+        final CameraInfo info;
+        final float intrinsicZoom;
+        Lens(String id, String label, String facing, String physicalCameraId, CameraInfo info, float intrinsicZoom) {
+            this.id=id; this.label=label; this.facing=facing; this.physicalCameraId=physicalCameraId; this.info=info; this.intrinsicZoom=intrinsicZoom;
+        }
+        boolean physical() { return physicalCameraId != null; }
+        CameraSelector selector() {
+            if (physical()) return new CameraSelector.Builder()
+                .requireLensFacing("user".equals(facing) ? CameraSelector.LENS_FACING_FRONT : CameraSelector.LENS_FACING_BACK)
+                .setPhysicalCameraId(physicalCameraId).build();
+            return info.getCameraSelector();
+        }
+    }
+
+    @PluginMethod public void startSession(PluginCall call) {
+        Log.i("ClearWaterCamera","startSession invoked");
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->startSession(call));return;}
+        PluginCall replacedStart=pendingSessionCall;
+        if(pendingBindCall!=null&&pendingBindCall!=replacedStart){pendingBindCall.reject("Camera operation was replaced by a new session.","CANCELLED");pendingBindCall=null;}
+        if(replacedStart!=null&&replacedStart!=call){pendingSessionCall=null;if(pendingBindCall==replacedStart)pendingBindCall=null;replacedStart.reject("Camera startup was replaced by a newer request.");}
+        pendingSessionCall=call;
+        long generation=++sessionGeneration;
+        if (getPermissionState("camera") != PermissionState.GRANTED) {
+            requestPermissionForAlias("camera", call, "cameraPermissionResult"); return;
+        }
+        startSessionAfterPermission(call,generation);
+    }
+
+    @PluginMethod public void getLaunchMode(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->getLaunchMode(call));return;}
+        JSObject value = new JSObject(); value.put("mode", launchMode == null ? JSONObject.NULL : launchMode); call.resolve(value);
+        launchMode = null;
+    }
+
+    @PermissionCallback private void cameraPermissionResult(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->cameraPermissionResult(call));return;}
+        if (call == null) return;
+        if (call != pendingSessionCall) return;
+        if (getPermissionState("camera") != PermissionState.GRANTED) { pendingSessionCall=null;call.reject("Camera permission was denied.", "PERMISSION_DENIED"); return; }
+        startSessionAfterPermission(call,sessionGeneration);
+    }
+
+    private void startSessionAfterPermission(PluginCall call,long generation) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->startSessionAfterPermission(call,generation));return;}
+        if(call!=pendingSessionCall||generation!=sessionGeneration)return;
+        if (recordingActive) { pendingSessionCall=null;call.reject("Stop the recording before restarting the camera."); return; }
+        Log.i("ClearWaterCamera","camera permission granted; preparing provider");
+        if(mainExecutor==null)mainExecutor=ContextCompat.getMainExecutor(getContext());
+        JSONObject bounds = call.getObject("bounds");
+        facing = "user".equals(call.getString("facing", "environment")) ? "user" : "environment";
+        quality = "high".equals(call.getString("quality", "standard")) ? "high" : "standard";
+        recipe = call.getObject("recipe") == null ? new JSONObject() : call.getObject("recipe");
+        String requestedLens = call.getString("lensId");
+        try{lockCameraPortrait();ensurePreviewView(bounds);}catch(Exception error){pendingSessionCall=null;sessionActive=false;cleanupSessionResources();fail(call,"Could not place the camera preview.",error);return;}
+        ListenableFuture<ProcessCameraProvider> future;
+        try{future=ProcessCameraProvider.getInstance(getContext());}
+        catch(Exception error){pendingSessionCall=null;sessionActive=false;cleanupSessionResources();fail(call,"Could not start the camera.",error);return;}
+        future.addListener(() -> {
+            Log.i("ClearWaterCamera","CameraX provider future completed");
+            if(generation!=sessionGeneration||call!=pendingSessionCall)return;
+            try {
+                provider = future.get();
+                enumerateLenses();
+                selectedLensId = lenses.containsKey(requestedLens) ? requestedLens : defaultLensId(facing);
+                if (selectedLensId == null) throw new IllegalStateException("No camera matching this direction is available.");
+                sessionActive = true;
+                ensureOrientationListener();orientationListener.enable();
+                bindIdle(call,generation);
+            } catch (Exception error) { pendingSessionCall=null;sessionActive=false;cleanupSessionResources();fail(call, "Could not start the camera.", error); }
+        }, mainExecutor);
+    }
+
+    @PluginMethod public void listLenses(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->listLenses(call));return;}
+        if(mainExecutor==null)mainExecutor=ContextCompat.getMainExecutor(getContext());
+        if (provider != null) { call.resolve(new JSObject().put("lenses", lensArray())); return; }
+        ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(getContext());
+        future.addListener(() -> {
+            try { provider=future.get(); enumerateLenses(); call.resolve(new JSObject().put("lenses", lensArray())); }
+            catch (Exception error) { fail(call, "Could not inspect available cameras.", error); }
+        }, mainExecutor);
+    }
+
+    private void enumerateLenses() {
+        lenses.clear();
+        for (CameraInfo info : provider.getAvailableCameraInfos()) {
+            try {
+                String id=Camera2CameraInfo.from(info).getCameraId();
+                String lensFacing=info.getLensFacing()==CameraSelector.LENS_FACING_FRONT ? "user" : "environment";
+                float reportedIntrinsic=info.getIntrinsicZoomRatio();
+                float intrinsic=validIntrinsicZoom(reportedIntrinsic)?reportedIntrinsic:1f;
+                String logicalId="logical:"+id;
+                lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, false),lensFacing,null,info,intrinsic));
+                if (info.isLogicalMultiCameraSupported()) {
+                    for (CameraInfo physical : info.getPhysicalCameraInfos()) {
+                        String physicalId=Camera2CameraInfo.from(physical).getCameraId();
+                        if (physicalId==null || physicalId.isEmpty()) continue;
+                        float reportedRatio=physical.getIntrinsicZoomRatio();
+                        float ratio=validIntrinsicZoom(reportedRatio)?reportedRatio:1f;
+                        String key="physical:"+id+":"+physicalId;
+                        lenses.put(key,new Lens(key,labelFor(reportedRatio, true),lensFacing,physicalId,info,ratio));
+                    }
+                }
+            } catch (Exception ignored) { /* Keep other cameras available when one OEM camera reports incomplete metadata. */ }
+        }
+    }
+
+    private String defaultLensId(String requestedFacing) {
+        String desired="user".equals(requestedFacing)?"user":"environment";
+        Lens best=null;
+        for (Lens item:lenses.values()) if (desired.equals(item.facing) && !item.physical()) {
+            if (best==null || Math.abs(item.intrinsicZoom-1f)<Math.abs(best.intrinsicZoom-1f)) best=item;
+        }
+        return best==null?null:best.id;
+    }
+
+    private String labelFor(float ratio, boolean physical) {
+        if(!validIntrinsicZoom(ratio))return physical?"Lens":"Camera";
+        if (ratio < .8f) return "Ultra-wide";
+        if (ratio > 1.35f) return "Telephoto";
+        return physical ? "Wide" : "Camera";
+    }
+
+    private static boolean validIntrinsicZoom(float ratio){return Float.isFinite(ratio)&&ratio>0f;}
+
+    private JSArray lensArray() {
+        JSArray values=new JSArray();
+        for (Lens lens:lenses.values()) {
+            JSObject value=new JSObject(); value.put("id",lens.id); value.put("label",lens.label); value.put("facing",lens.facing);
+            value.put("intrinsicZoom",lens.intrinsicZoom);
+            values.put(value);
+        }
+        return values;
+    }
+
+    @PluginMethod public void setPreviewBounds(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->setPreviewBounds(call));return;}
+        JSONObject bounds=call.getData();
+        if (previewView==null) { call.reject("The camera preview is not active."); return; }
+        updatePreviewBounds(bounds); call.resolve();
+    }
+
+    @PluginMethod public void setCorrection(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->setCorrection(call));return;}
+        if (!sessionActive) { call.reject("The camera is not active."); return; }
+        if (recordingActive) { call.resolve(); return; }
+        JSONObject next=call.getObject("recipe"); if(next==null){call.reject("Missing camera correction recipe.");return;}
+        recipe=next;
+        if(media3Effect!=null)media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+        call.resolve();
+    }
+
+    @PluginMethod public void setLens(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->setLens(call));return;}
+        String id=call.getString("lensId");
+        if (!sessionActive || id==null || !lenses.containsKey(id)) { call.reject("That camera lens is unavailable."); return; }
+        if (recordingActive) { call.reject("Stop recording before changing camera lenses."); return; }
+        selectedLensId=id; facing=lenses.get(id).facing;
+        bindIdle(call);
+    }
+
+    @PluginMethod public void setZoom(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->setZoom(call));return;}
+        if(camera==null || recordingActive){call.reject("The camera is not ready for zoom changes.");return;}
+        float ratio=call.getDouble("ratio",1d).floatValue();if(!Float.isFinite(ratio)){call.reject("Invalid zoom ratio.");return;}
+        final Camera zoomCamera=camera;final long generation=sessionGeneration;
+        com.google.common.util.concurrent.ListenableFuture<Void> change=zoomCamera.getCameraControl().setZoomRatio(ratio);
+        change.addListener(()->{
+            try { change.get();if(generation!=sessionGeneration||camera!=zoomCamera){call.reject("Zoom request was cancelled.","CANCELLED");return;}JSObject result=new JSObject(); result.put("zoom",zoomRatio());call.resolve(result); }
+            catch(Exception error){fail(call,"Could not change camera zoom.",error);}
+        },mainExecutor);
+    }
+
+    @PluginMethod public void sampleFrame(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->sampleFrame(call));return;}
+        if (!sessionActive || imageAnalysis==null) { call.reject("Camera frame sampling is unavailable while recording."); return; }
+        synchronized(this){
+            if(latestSampleData==null){call.reject("The camera is still preparing a frame.");return;}
+            JSObject result=new JSObject();result.put("data",latestSampleData);result.put("width",latestSampleWidth);result.put("height",latestSampleHeight);call.resolve(result);
+        }
+    }
+
+    @PluginMethod public void capturePhoto(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->capturePhoto(call));return;}
+        if(!sessionActive||imageCapture==null||recordingActive){call.reject("The camera is not ready for a photo.");return;}
+        File directory=new File(getContext().getCacheDir(),"camera-captures");
+        if(!directory.isDirectory()&&!directory.mkdirs()){call.reject("Temporary camera storage is unavailable.");return;}
+        String name="clearwater-camera-"+UUID.randomUUID()+".jpg";File output=new File(directory,name);
+        ImageCapture activeCapture=imageCapture;
+        String captureLensId=selectedLensId;
+        long captureGeneration=sessionGeneration;
+        ImageCapture.OutputFileOptions options=new ImageCapture.OutputFileOptions.Builder(output).build();
+        try{activeCapture.setTargetRotation(captureRotation);}catch(Exception ignored){}
+        final int captureWidth=photoWidth(activeCapture),captureHeight=photoHeight(activeCapture);
+        activeCapture.takePicture(options,mainExecutor,new ImageCapture.OnImageSavedCallback(){
+            @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults result){
+                if(captureGeneration!=sessionGeneration){if(output.exists())output.delete();call.reject("Photo capture was cancelled.","CANCELLED");return;}
+                if(!output.isFile()||output.length()<=0){if(output.exists())output.delete();call.reject("The camera returned an empty photo.");return;}
+                BitmapFactory.Options jpegBounds=new BitmapFactory.Options();jpegBounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(output.getAbsolutePath(),jpegBounds);
+                Log.i("ClearWaterCamera","photo saved JPEG="+jpegBounds.outWidth+"x"+jpegBounds.outHeight+" bytes="+output.length()+" lens="+captureLensId+" rotation="+captureRotation);
+                temporaryCaptures.put(Uri.fromFile(output).toString(),output);
+                JSObject value=new JSObject();value.put("uri",Uri.fromFile(output).toString());value.put("name",name);value.put("type","image/jpeg");value.put("width",captureWidth);value.put("height",captureHeight);value.put("lensId",captureLensId);call.resolve(value);
+            }
+            @Override public void onError(@NonNull ImageCaptureException error){if(output.exists())output.delete();fail(call,"Could not capture the photo.",error);}
+        });
+    }
+
+    @PluginMethod public void releaseCapture(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->releaseCapture(call));return;}
+        String uri=call.getString("uri");File file=temporaryCaptures.remove(uri);
+        if(file==null){call.reject("That temporary camera capture is not owned by the app.");return;}
+        if(file.exists()&&!file.delete()){temporaryCaptures.put(uri,file);call.reject("Could not release the temporary camera capture.");return;}
+        call.resolve();
+    }
+
+    @PluginMethod public void startRecording(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->startRecording(call));return;}
+        if(!sessionActive||recordingActive){call.reject("The camera is not ready to record.");return;}
+        if(pendingRecordingPermissionCall!=null){pendingRecordingPermissionCall.reject("A newer video request replaced this one.");pendingRecordingPermissionCall=null;}
+        JSONObject recordingRecipe=call.getObject("recipe");if(recordingRecipe!=null)recipe=recordingRecipe;
+        if(media3Effect!=null)media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+        microphoneRequested=call.getBoolean("microphone",false);
+        if(microphoneRequested&&getPermissionState("microphone")!=PermissionState.GRANTED){pendingRecordingPermissionCall=call;requestPermissionForAlias("microphone",call,"recordingPermissionResult");return;}
+        beginRecording(call);
+    }
+
+    @PermissionCallback private void recordingPermissionResult(PluginCall call){
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->recordingPermissionResult(call));return;}
+        if(call==null)return;
+        if(call!=pendingRecordingPermissionCall)return;
+        pendingRecordingPermissionCall=null;
+        microphoneRequested=call.getBoolean("microphone",false)&&getPermissionState("microphone")==PermissionState.GRANTED;
+        if(call.getBoolean("microphone",false)&&!microphoneRequested){call.reject("Microphone permission was denied.","PERMISSION_DENIED");return;}
+        beginRecording(call);
+    }
+
+    private void beginRecording(PluginCall call) {
+        File outputFile=null;
+        try {
+            final int recordingRotation=captureRotation;
+            rebindForVideo();
+            if(videoCapture!=null)videoCapture.setTargetRotation(recordingRotation);
+            File directory=new File(getContext().getCacheDir(),"camera-captures");if(!directory.isDirectory()&&!directory.mkdirs())throw new IllegalStateException("Temporary camera storage is unavailable.");
+            recordingFile=new File(directory,"clearwater-camera-"+UUID.randomUUID()+".mp4");outputFile=recordingFile;recordingDiscard=false;
+            long maxMs=call.getLong("maxMs",180000L);long maxBytes=call.getLong("maxBytes",192L*1024*1024);
+            long boundedMaxBytes=maxBytes>0?Math.max(1024*1024,Math.min(maxBytes,512L*1024*1024)):Long.MAX_VALUE;
+            FileOutputOptions output=new FileOutputOptions.Builder(recordingFile).setFileSizeLimit(boundedMaxBytes).build();
+            PendingRecording pending=videoCapture.getOutput().prepareRecording(getContext(),output);
+            if(microphoneRequested&&ContextCompat.checkSelfPermission(getContext(),Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED)pending=pending.withAudioEnabled(true);
+            recordingMaxAt=maxMs>0?SystemClock.elapsedRealtime()+Math.max(1000,Math.min(maxMs,600000)):0;
+            recordingMaxBytes=boundedMaxBytes;
+            recordingActive=true;
+            recording=pending.start(mainExecutor,event->{
+                if(event instanceof VideoRecordEvent.Finalize)finishRecording((VideoRecordEvent.Finalize)event);
+            });
+            main.postDelayed(recordingLimitCheck,500);
+            call.resolve();
+        } catch(Exception error){recordingActive=false;recording=null;recordingFile=null;if(outputFile!=null&&outputFile.exists())outputFile.delete();fail(call,"Could not start video recording.",error);try{if(sessionActive)bindIdle(null);else cleanupSessionResources();}catch(Exception ignored){}}
+    }
+
+    @PluginMethod public void stopRecording(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->stopRecording(call));return;}
+        if(recording==null){call.resolve();return;}
+        recordingDiscard=recordingDiscard||call.getBoolean("discard",false);recording.stop();call.resolve();
+    }
+
+    private void finishRecording(VideoRecordEvent.Finalize event) {
+        main.removeCallbacks(recordingLimitCheck);
+        boolean reachedFileLimit=event.getError()==VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED;
+        File file=recordingFile;boolean discard=recordingDiscard||(event.hasError()&&!reachedFileLimit);
+        recording=null;recordingFile=null;recordingActive=false;
+        if(discard){if(file!=null&&file.exists())file.delete();}
+        JSObject result=new JSObject();result.put("discarded",discard);result.put("width",videoWidth());result.put("height",videoHeight());
+        if(!discard&&file!=null&&file.isFile()&&file.length()>0){String uri=Uri.fromFile(file).toString();temporaryCaptures.put(uri,file);result.put("uri",uri);result.put("name",file.getName());result.put("type","video/mp4");}
+        else if(event.hasError()&&!reachedFileLimit)result.put("error","Video recording failed (CameraX error "+event.getError()+").");
+        notifyListeners("recordingFinished",result);
+        if(sessionActive)try{bindIdle(null);}catch(Exception error){notifyCameraError("Could not restore the camera preview.",error);}
+        else cleanupSessionResources();
+    }
+
+    @PluginMethod public void stopSession(PluginCall call) {
+        if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->stopSession(call));return;}
+        sessionGeneration++;
+        bindGeneration++;
+        PluginCall startup=pendingSessionCall;pendingSessionCall=null;
+        if(startup!=null)startup.reject("Camera startup was cancelled.","CANCELLED");
+        PluginCall binding=pendingBindCall;pendingBindCall=null;
+        if(binding!=null&&binding!=startup)binding.reject("Camera operation was cancelled.","CANCELLED");
+        if(pendingRecordingPermissionCall!=null){pendingRecordingPermissionCall.reject("Video recording was cancelled.","CANCELLED");pendingRecordingPermissionCall=null;}
+        boolean finishingRecording=recording!=null;
+        if(finishingRecording)recording.stop();
+        sessionActive=false;if(orientationListener!=null)orientationListener.disable();
+        if(!finishingRecording)cleanupSessionResources();
+        call.resolve();
+    }
+
+    private void bindIdle(PluginCall call) { bindIdle(call,sessionGeneration); }
+
+    private void bindIdle(PluginCall call,long generation) {
+        if(pendingBindCall!=null&&pendingBindCall!=call){pendingBindCall.reject("Camera operation was replaced by a newer request.","CANCELLED");pendingBindCall=null;}
+        if(call!=null)pendingBindCall=call;
+        long bindId=++bindGeneration;
+        Runnable task=()->{
+            Log.i("ClearWaterCamera","binding idle camera use cases");
+            if(bindId!=bindGeneration)return;
+            if(call!=null&&call!=pendingBindCall)return;
+            if(!sessionActive||generation!=sessionGeneration){if(call!=null&&call==pendingBindCall){pendingBindCall=null;call.reject("Camera startup was cancelled.","CANCELLED");}return;}
+            try {
+                float zoomToRestore=camera==null?1f:zoomRatio();
+                synchronized(this){latestSampleData=null;}long frameGeneration=++analysisGeneration;
+                if(provider!=null)provider.unbindAll();closeEffect();
+                preview=new Preview.Builder().setTargetRotation(displayRotation()).build();
+                imageCapture=new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).setJpegQuality(98).setTargetRotation(displayRotation()).build();
+                imageAnalysis=new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).setTargetResolution(new Size(640,480)).setTargetRotation(displayRotation()).build();
+                imageAnalysis.setAnalyzer(analysisExecutor,image->analyzeFrame(image,frameGeneration));
+                long effectGeneration=++media3EffectGeneration;
+                media3Effect=new Media3Effect(getContext(),CameraEffect.PREVIEW|CameraEffect.VIDEO_CAPTURE,mainExecutor,error->{if(effectGeneration==media3EffectGeneration&&sessionActive)notifyCameraError("Live camera correction stopped.",error);});
+                media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+                preview.setSurfaceProvider(previewView.getSurfaceProvider());
+                previewView.post(()->{
+                    if(bindId!=bindGeneration)return;
+                    if(call!=null&&call!=pendingBindCall)return;
+                    if(!sessionActive||generation!=sessionGeneration){if(call!=null&&call==pendingBindCall){pendingBindCall=null;call.reject("Camera operation was cancelled.","CANCELLED");}return;}
+                    try{
+                        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture).addUseCase(imageAnalysis).addEffect(media3Effect).setViewPort(previewView.getViewPort()).build();
+                        camera=provider.bindToLifecycle((LifecycleOwner)getActivity(),lensSelector(),group);
+                        Log.i("ClearWaterCamera","camera use cases bound");
+                        restoreZoom(zoomToRestore);
+                        if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;call.resolve(sessionInfo());}
+                    }catch(Exception error){closeEffect();sessionActive=false;cleanupSessionResources();if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not open the selected camera lens.",error);}else notifyCameraError("Could not open the selected camera lens.",error);}
+                });
+            }catch(Exception error){sessionActive=false;cleanupSessionResources();if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not configure the camera.",error);}else notifyCameraError("Could not configure the camera.",error);}
+        };
+        if(Looper.myLooper()==Looper.getMainLooper())task.run();else main.post(task);
+    }
+
+    private void rebindForVideo() {
+        float zoomToRestore=camera==null?1f:zoomRatio();
+        synchronized(this){latestSampleData=null;}analysisGeneration++;
+        if(provider!=null)provider.unbindAll();
+        if(imageAnalysis!=null){imageAnalysis.clearAnalyzer();imageAnalysis=null;}
+        closeEffect();
+        preview=new Preview.Builder().setTargetRotation(displayRotation()).build();
+        Recorder.Builder recorderBuilder=new Recorder.Builder();
+        if("high".equals(quality))recorderBuilder.setQualitySelector(QualitySelector.from(Quality.FHD,FallbackStrategy.lowerQualityOrHigherThan(Quality.HD)));
+        else recorderBuilder.setQualitySelector(QualitySelector.from(Quality.HD,FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)));
+        Recorder recorder=recorderBuilder.build();videoCapture=VideoCapture.withOutput(recorder);videoCapture.setTargetRotation(displayRotation());
+        long effectGeneration=++media3EffectGeneration;
+        media3Effect=new Media3Effect(getContext(),CameraEffect.PREVIEW|CameraEffect.VIDEO_CAPTURE,mainExecutor,error->{if(effectGeneration==media3EffectGeneration&&sessionActive)notifyCameraError("Live camera correction stopped.",error);});
+        media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+        preview.setSurfaceProvider(previewView.getSurfaceProvider());
+        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(videoCapture).addEffect(media3Effect).setViewPort(previewView.getViewPort()).build();
+        camera=provider.bindToLifecycle((LifecycleOwner)getActivity(),lensSelector(),group);
+        restoreZoom(zoomToRestore);
+    }
+
+    private CameraSelector lensSelector() {
+        Lens lens=lenses.get(selectedLensId);if(lens==null)throw new IllegalStateException("Selected camera lens is no longer available.");return lens.selector();
+    }
+
+    private void analyzeFrame(ImageProxy image,long frameGeneration) {
+        try {
+            long now=SystemClock.elapsedRealtime();if(now-lastSampleAt<400)return;lastSampleAt=now;
+            byte[] jpeg=toJpeg(image);if(jpeg==null)return;
+            Bitmap decoded=BitmapFactory.decodeByteArray(jpeg,0,jpeg.length);if(decoded==null)return;
+            int rotation=image.getImageInfo().getRotationDegrees();
+            if(rotation%360!=0){Matrix matrix=new Matrix();matrix.postRotate(rotation);Bitmap rotated=Bitmap.createBitmap(decoded,0,0,decoded.getWidth(),decoded.getHeight(),matrix,true);if(decoded!=rotated)decoded.recycle();decoded=rotated;}
+            if("user".equals(facing)){Matrix mirror=new Matrix();mirror.setScale(-1f,1f);Bitmap mirrored=Bitmap.createBitmap(decoded,0,0,decoded.getWidth(),decoded.getHeight(),mirror,true);if(decoded!=mirrored)decoded.recycle();decoded=mirrored;}
+            float scale=Math.min(1f,256f/Math.max(decoded.getWidth(),decoded.getHeight()));
+            Bitmap small=scale<1?Bitmap.createScaledBitmap(decoded,Math.max(1,Math.round(decoded.getWidth()*scale)),Math.max(1,Math.round(decoded.getHeight()*scale)),true):decoded;
+            ByteArrayOutputStream output=new ByteArrayOutputStream();small.compress(Bitmap.CompressFormat.JPEG,78,output);
+            String base64=Base64.encodeToString(output.toByteArray(),Base64.NO_WRAP);
+            synchronized(this){if(frameGeneration==analysisGeneration){latestSampleData=base64;latestSampleWidth=small.getWidth();latestSampleHeight=small.getHeight();}}
+            if(small!=decoded)small.recycle();decoded.recycle();
+        }catch(Exception ignored){}finally{image.close();}
+    }
+
+    private byte[] toJpeg(ImageProxy image) {
+        if(image.getFormat()!=ImageFormat.YUV_420_888||image.getPlanes().length<3)return null;
+        Rect crop=image.getCropRect();int left=(crop.left+1)&~1,top=(crop.top+1)&~1;int right=crop.right&~1,bottom=crop.bottom&~1;int width=right-left,height=bottom-top;
+        if(width<=0||height<=0)return null;
+        byte[] nv21=new byte[width*height*3/2];
+        ImageProxy.PlaneProxy[] planes=image.getPlanes();
+        copyPlane(planes[0],left,top,width,height,nv21,0,1);
+        int chromaOffset=width*height;
+        for(int y=0;y<height/2;y++)for(int x=0;x<width/2;x++){
+            int sourceX=(left/2)+x,sourceY=(top/2)+y;
+            nv21[chromaOffset+y*width+x*2]=sample(planes[2],sourceX,sourceY);
+            nv21[chromaOffset+y*width+x*2+1]=sample(planes[1],sourceX,sourceY);
+        }
+        ByteArrayOutputStream output=new ByteArrayOutputStream();
+        new YuvImage(nv21,ImageFormat.NV21,width,height,null).compressToJpeg(new Rect(0,0,width,height),85,output);
+        return output.toByteArray();
+    }
+
+    private void copyPlane(ImageProxy.PlaneProxy plane,int left,int top,int width,int height,byte[] out,int offset,int stride) {
+        for(int y=0;y<height;y++)for(int x=0;x<width;x++)out[offset+(y*width+x)*stride]=sample(plane,left+x,top+y);
+    }
+    private byte sample(ImageProxy.PlaneProxy plane,int x,int y) {
+        ByteBuffer buffer=plane.getBuffer();int index=y*plane.getRowStride()+x*plane.getPixelStride();return buffer.get(index);
+    }
+
+    private void ensurePreviewView(JSONObject bounds) {
+        WebView webView=getBridge().getWebView();
+        if(previewView==null){
+            if(webView==null||!(webView.getParent() instanceof ViewGroup))throw new IllegalStateException("Could not place the native camera preview.");
+            int windowFlags=getActivity().getWindow().getAttributes().flags;
+            keepScreenOnWasAlreadySet=(windowFlags&WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0;
+            if(!keepScreenOnWasAlreadySet){getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);changedKeepScreenOn=true;}
+            savedWebViewBackground=webView.getBackground();hasSavedWebViewBackground=true;webView.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            previewParent=(ViewGroup)webView.getParent();previewView=new PreviewView(getContext());previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);previewView.setClickable(false);previewView.setFocusable(false);
+            int index=previewParent.indexOfChild(webView);previewParent.addView(previewView,index,previewLayoutParams(1,1,0,0));
+        }
+        updatePreviewBounds(bounds);
+    }
+
+    private void updatePreviewBounds(JSONObject bounds) {
+        if(previewView==null||previewParent==null||bounds==null)return;
+        WebView webView=getBridge().getWebView();if(webView==null)return;
+        float fallback=getContext().getResources().getDisplayMetrics().density*webView.getScale();
+        float scale=(float)bounds.optDouble("pixelRatio",fallback);if(!Float.isFinite(scale)||scale<=0)scale=fallback;
+        previewPixelRatio=scale;
+        int[] web=new int[2],parent=new int[2];webView.getLocationOnScreen(web);previewParent.getLocationOnScreen(parent);
+        int left=web[0]-parent[0]+Math.round((float)bounds.optDouble("x",0)*scale);
+        int top=web[1]-parent[1]+Math.round((float)bounds.optDouble("y",0)*scale);
+        int width=Math.max(1,Math.round((float)bounds.optDouble("width",1)*scale));int height=Math.max(1,Math.round((float)bounds.optDouble("height",1)*scale));
+        ViewGroup.LayoutParams params=previewLayoutParams(width,height,left,top);
+        previewView.setLayoutParams(params);previewView.setVisibility(View.VISIBLE);
+        webView.bringToFront();
+        // PreviewView resizes independently. Keep the bound use-case group stable for
+        // this session: rebinding on bounds changes can close ImageCapture mid-capture.
+    }
+
+    private ViewGroup.LayoutParams previewLayoutParams(int width,int height,int left,int top){
+        if(previewParent instanceof CoordinatorLayout){CoordinatorLayout.LayoutParams params=new CoordinatorLayout.LayoutParams(width,height);params.gravity=Gravity.TOP|Gravity.LEFT;params.leftMargin=left;params.topMargin=top;return params;}
+        if(previewParent instanceof FrameLayout){FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(width,height,Gravity.TOP|Gravity.LEFT);params.leftMargin=left;params.topMargin=top;return params;}
+        ViewGroup.MarginLayoutParams params=new ViewGroup.MarginLayoutParams(width,height);params.leftMargin=left;params.topMargin=top;return params;
+    }
+
+    private void removePreviewView(){if(previewView!=null&&previewParent!=null)previewParent.removeView(previewView);previewView=null;previewParent=null;if(hasSavedWebViewBackground){WebView webView=getBridge()==null?null:getBridge().getWebView();if(webView!=null)webView.setBackground(savedWebViewBackground);savedWebViewBackground=null;hasSavedWebViewBackground=false;}if(changedKeepScreenOn){getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);changedKeepScreenOn=false;}keepScreenOnWasAlreadySet=false;}
+    private void lockCameraPortrait(){android.app.Activity activity=getActivity();if(activity==null)return;if(!savedRequestedOrientation){previousRequestedOrientation=activity.getRequestedOrientation();savedRequestedOrientation=true;}if(activity.getRequestedOrientation()!=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);}
+    private void restoreRequestedOrientation(){if(!savedRequestedOrientation)return;android.app.Activity activity=getActivity();int restore=previousRequestedOrientation;savedRequestedOrientation=false;previousRequestedOrientation=ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;if(activity!=null&&activity.getRequestedOrientation()!=restore)try{activity.setRequestedOrientation(restore);}catch(RuntimeException error){Log.w("ClearWaterCamera","Could not restore the prior screen orientation.",error);}}
+    private void cleanupSessionResources(){analysisGeneration++;if(provider!=null)provider.unbindAll();closeEffect();camera=null;preview=null;imageCapture=null;if(imageAnalysis!=null)imageAnalysis.clearAnalyzer();imageAnalysis=null;videoCapture=null;removePreviewView();synchronized(this){latestSampleData=null;}restoreRequestedOrientation();}
+    private void restoreZoom(float ratio){if(camera==null||!Float.isFinite(ratio)||ratio<=0)return;try{camera.getCameraControl().setZoomRatio(ratio);}catch(Exception ignored){}}
+    private void closeEffect(){
+        Media3Effect retired=media3Effect;
+        if(retired==null)return;
+        media3Effect=null;
+        media3EffectGeneration++;
+        // CameraX requires close() on the main thread, but its GL release may wait
+        // for the renderer. Let unbind and the current lifecycle callback finish first.
+        main.post(()->{try{retired.close();}catch(Exception error){Log.w("ClearWaterCamera","Could not release the retired camera effect.",error);}});
+    }
+    private void ensureOrientationListener(){if(orientationListener==null){captureRotation=displayRotation();orientationListener=new OrientationEventListener(getContext()){@Override public void onOrientationChanged(int orientation){if(orientation==ORIENTATION_UNKNOWN)return;final int rotation=rotationForOrientation(orientation);main.post(()->{if(captureRotation==rotation)return;captureRotation=rotation;updateTargetRotation();});}};}}
+    private static int rotationForOrientation(int orientation){
+        if(orientation>=45&&orientation<135)return Surface.ROTATION_270;
+        if(orientation>=135&&orientation<225)return Surface.ROTATION_180;
+        if(orientation>=225&&orientation<315)return Surface.ROTATION_90;
+        return Surface.ROTATION_0;
+    }
+    private int displayRotation(){Display display=getActivity().getWindowManager().getDefaultDisplay();return display.getRotation();}
+    private void updateTargetRotation(){int display=displayRotation();if(imageCapture!=null)imageCapture.setTargetRotation(captureRotation);if(imageAnalysis!=null)imageAnalysis.setTargetRotation(display);if(!recordingActive){if(preview!=null)preview.setTargetRotation(display);if(videoCapture!=null)videoCapture.setTargetRotation(captureRotation);}}
+    private float zoomRatio(){if(camera==null||camera.getCameraInfo().getZoomState().getValue()==null)return 1f;return camera.getCameraInfo().getZoomState().getValue().getZoomRatio();}
+    private int photoWidth(){return photoWidth(imageCapture);}
+    private int photoHeight(){return photoHeight(imageCapture);}
+    private int photoWidth(ImageCapture capture){if(capture==null||capture.getResolutionInfo()==null)return 0;androidx.camera.core.ResolutionInfo info=capture.getResolutionInfo();return info.getRotationDegrees()%180==0?info.getResolution().getWidth():info.getResolution().getHeight();}
+    private int photoHeight(ImageCapture capture){if(capture==null||capture.getResolutionInfo()==null)return 0;androidx.camera.core.ResolutionInfo info=capture.getResolutionInfo();return info.getRotationDegrees()%180==0?info.getResolution().getHeight():info.getResolution().getWidth();}
+    private int videoWidth(){if(videoCapture==null||videoCapture.getResolutionInfo()==null)return 0;androidx.camera.core.ResolutionInfo info=videoCapture.getResolutionInfo();return info.getRotationDegrees()%180==0?info.getResolution().getWidth():info.getResolution().getHeight();}
+    private int videoHeight(){if(videoCapture==null||videoCapture.getResolutionInfo()==null)return 0;androidx.camera.core.ResolutionInfo info=videoCapture.getResolutionInfo();return info.getRotationDegrees()%180==0?info.getResolution().getHeight():info.getResolution().getWidth();}
+
+    private JSObject sessionInfo(){
+        JSObject result=new JSObject();float ratio=zoomRatio();
+        if(camera!=null&&camera.getCameraInfo().getZoomState().getValue()!=null){minZoom=(int)Math.ceil(camera.getCameraInfo().getZoomState().getValue().getMinZoomRatio());maxZoom=(int)Math.floor(camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio());}
+        result.put("width",previewView==null?0:Math.round(previewView.getWidth()/Math.max(.1f,previewPixelRatio)));
+        result.put("height",previewView==null?0:Math.round(previewView.getHeight()/Math.max(.1f,previewPixelRatio)));
+        result.put("photoWidth",photoWidth());result.put("photoHeight",photoHeight());result.put("lenses",lensArray());result.put("lensId",selectedLensId);result.put("zoom",ratio);
+        result.put("minZoom",camera==null||camera.getCameraInfo().getZoomState().getValue()==null?1:camera.getCameraInfo().getZoomState().getValue().getMinZoomRatio());
+        result.put("maxZoom",camera==null||camera.getCameraInfo().getZoomState().getValue()==null?1:camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio());
+        return result;
+    }
+
+    private void fail(PluginCall call,String message,Throwable error){if(error!=null)Log.e("ClearWaterCamera",message,error);if(call!=null)call.reject(message,error instanceof Exception?(Exception)error:new Exception(error));else notifyCameraError(message,error);}
+    private void notifyCameraError(String message,Throwable error){if(error!=null)Log.e("ClearWaterCamera",message,error);JSObject value=new JSObject();value.put("message",message);if(error!=null)value.put("cause",error.getClass().getSimpleName());notifyListeners("cameraError",value);}
+
+    @Override protected void handleOnPause(){super.handleOnPause();if(provider!=null&&!recordingActive)provider.unbindAll();}
+    @Override protected void handleOnResume(){super.handleOnResume();if(sessionActive&&provider!=null&&!recordingActive)bindIdle(null);}
+    @Override protected void handleOnDestroy(){sessionGeneration++;bindGeneration++;sessionActive=false;if(recording!=null){recordingDiscard=true;recording.stop();}if(orientationListener!=null)orientationListener.disable();cleanupSessionResources();for(File file:temporaryCaptures.values())if(file!=null&&file.exists())file.delete();temporaryCaptures.clear();analysisExecutor.shutdownNow();super.handleOnDestroy();}
+}

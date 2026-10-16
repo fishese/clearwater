@@ -1,5 +1,11 @@
 # Maintenance
 
+## Active iOS catch-up checkpoint (16 October 2026)
+
+The prior IPA/native test results below are historical. The user confirmed the iPhone editor and camera work, then reported missing automatic Photos copies and a private MP4 read failure. The catch-up integrates origin/main `3298d69` in the iOS feature worktree only. Run the shared suite/production browser regressions and full hosted native tests plus unsigned physical-device packaging after Swift changes. Keep Android physical tests paused and Android files identical to current origin/main.
+
+Capacitor 8.5.3 serves media extensions through `URLResponse` without a range header, unlike JPEGs. Explicit `Range: bytes=0-` selects its HTTP 206 path for private MP4 reads. Verify bytes and size; do not accept arbitrary failed/empty responses. `NativeSceneBridgeTests` exercises the real WKWebView transport rather than inferring iOS behavior from a browser mock. Photos copies use add-only permission and never store asset IDs; private-save and Photos-save status remain independent.
+
 ## Development and checks
 
 Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` and `npm run build`. Production testing: `npm run preview -- --port 4176`, then `$env:CHECK_URL='http://127.0.0.1:4176/'`. PWA needs HTTPS or localhost. Integration scripts use Playwright and installed Edge. Avoid concurrent memory-heavy checks.
@@ -174,3 +180,38 @@ The quality preview APK is version 1.0.3-quality.1 (code 14), debug-signed for m
 Current-main merge validation (15 October): shared suite is now 142 tests / 25 files, with current model/export/metadata fixes. Native suite passed 17 tests with 0 failures/no skips in run 38731452603 at ee22678; all native sources/fixtures remain identical after merging main 233331d. Package validation now derives all required ONNX files from the shipping manifest and verifies size/SHA-256, excluding retired/unlisted weights. A packaging-only final run is valid for this unchanged tested native code.
 
 Final delivery: unsigned arm64 iOS 26 camera IPA at 17d45e9, run 38733242340, artifact 11971123853; local editor/ios/App/output/native-camera/ClearWater-unsigned.ipa. SHA-256 bd30bcbe8948e941b9a10459f1d7d9e3913d4efee3e7f2df93b165f8dc099252 verified against CI. Final packaging ran 142 shared tests and current manifest checks; identical native code already passed 17 hosted tests at ee22678. Hardware acceptance is outstanding in IOS_PLAN.md. Preserve the worktree for follow-up; no main/stable/signing changes.
+## Native camera and editor preview follow-up
+
+The current prepared experimental debug build is 1.0.3-camera.5 (code 19). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
+
+After the normal unit/build checks, run `camera-check.mjs`, `camera-controls-check.mjs`, `editor-preview-check.mjs` and `layered-controls-check.mjs` against a production preview (`CHECK_URL`). Camera browser checks use synthetic media; native camera tests must separately verify transparent preview placement, full still dimensions, upright portrait/landscape output, front mirroring, lens/zoom choices, visible correction in saved video, replacement white balance and background finalisation. Never remove an installed app to bypass a signing mismatch: preserve its private originals and edits.
+
+Editor processed-preview playback is silent and single-flight. Completed frames advance a wall-clock playhead; slow devices skip preview frames instead of accumulating work. Source switches, exports, navigation and backgrounding stop it. Comparison input is restricted to the arrow-height band, leaving the rest of a zoomed image available for panning. Slider controls retain their touch area while reducing label gaps.
+
+Export destinations are output folders, with no original-file membership check. The top Export action chooses an output folder if necessary, then reuses it for the session. A selected folder keeps the original filename stem; app-managed collisions get numbers. File save/download/share actions belong beside format controls. Edit presets have their own JSON save/load section and must never look like photo saving. Android shares stage bounded chunks in app-private cache and grant read-only access through FileProvider; expire staged files without removing originals or gallery files. Browser file sharing needs a fresh user gesture after rendering.
+
+Focused follow-up scripts: `export-destination-check.mjs` and `browsing-check.mjs` cover output destinations/collisions/cancellation; `preview-queue-cancel-check.mjs` drops an in-flight worker result before switching clips to verify queue recovery. Generation changes must clear both queue slots because cancelled workers can return without a result. `native-camera-check.mjs` and `native-share-check.mjs` exercise mocked bridge contracts (the latter imports source modules from a Vite dev server); these do not replace physical camera/share tests. A real WebView preview also needs its native background made transparent and parent-compatible CoordinatorLayout layout parameters, which browser mocks cannot verify.
+
+The user-supplied custom-model contract lives at `editor/public/models/CUSTOM_MODELS.md`, with links in the loader and guide. Edit that source file, never only `editor/dist/models/`: Vite replaces dist on each build. Keep bundled-model sizes/parity references aligned with `public/models/manifest.json`.
+
+Native startup regression: `native-camera-check.mjs` also defers stop/start responses, emits duplicate resume events and tests a withheld-stop timeout. Preserve serialized teardown and generation ownership: a stale start completion must not stop the newer session. The 20-second watchdog includes teardown, not only CameraX startup. `preview-queue-cancel-check.mjs` must not wait for the export button while deliberately withholding its enabling render; wait for source tiles and switch to the actual unselected item.
+
+The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. Native startup was confirmed after the R8 permission metadata fix; saved-file and broader physical acceptance checks remain paused while the phone is off ADB.
+
+Earlier debug builds were installed and native preview was confirmed. The current non-device follow-up prepares code 19 without installing it. Physical saved-file checks are paused by the user; stable APK v1.0.2 remains unchanged.
+
+
+### Minified Capacitor permission metadata
+
+Keep `com.getcapacitor.PluginHandle` and the Capacitor permission annotation interfaces in `android/app/proguard-rules.pro`. The camera startup investigation found that R8 removed `PluginHandle.pluginAnnotation` and its constructor assignment, then folded `Plugin.getPermissionStates()` into an empty map. The camera class still had a valid runtime annotation in DEX, so checking that annotation alone did not detect the regression. Android could grant CAMERA while Capacitor returned null and silently skipped requesting its missing alias.
+
+After changing R8/AGP/Capacitor or these keep rules, inspect the minified APK to confirm the stored annotation field/getter and permission iteration survive, and test both already-granted startup and a fresh permission prompt on a physical device. Preserve normal OS permission checks and callbacks; a runtime-grant-only workaround leaves first-time permission requests broken. Debug builds intentionally exercise the same minification path as release builds.
+
+
+### Layout and capture stability follow-up
+
+On short landscape screens (651–900px wide, at most 540px high), the editor occupies the viewport and the collection follows in normal page scrolling. The previous fixed 136px collection row reduced usable editor space. The existing mobile-readability check covers the page-scroll behavior in all three languages and existing portrait/wide/expanded layouts.
+
+Never rebuild CameraX use cases for ordinary preview DOM bounds changes: this interrupted captures and caused release-timeout errors. Keep the shared viewport stable and map the native picker using cover fit after resizes. Both picker modes reject off-preview releases. Every Media3Effect error callback, including the video rebind path, must check its effect generation and active session. The installed alpha adapter requires close() on the main thread and can synchronously wait up to 500ms; invalidate the retired effect and defer its close until after the current unbind/lifecycle callback. Do not move close to a worker thread or suppress failures from the active effect.
+
+Code 19 non-device validation passed: 140 unit tests; production build/Android sync; multilingual mobile-readability (including landscape collection scrolling); native-camera mock; minified assembleDebug; APK signature and version checks. Artifact: `android/build/clearwater-1.0.3-camera.5-debug.apk`, with adjacent SHA-256 sidecar. No ADB connection or installation was attempted during the user-requested device pause.

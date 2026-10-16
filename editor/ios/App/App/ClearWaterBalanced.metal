@@ -3,6 +3,10 @@ using namespace metal;
 
 struct Uniforms {
     float4 autoGains;
+    float4 cameraColourR;
+    float4 cameraColourG;
+    float4 cameraColourB;
+    float4 cameraColourEnabled;
     float4 manualGains;
     float4 controls; // strength, redMix, exposure multiplier, haze
     float4 tonal;    // highlights, shadows, contrast, vibrance
@@ -29,9 +33,16 @@ kernel void clearWaterBalanced(texture2d<float, access::read> source [[texture(0
     float4 pixel = source.read(p);
     float3 c = pixel.rgb;
     float3 originalLinear = float3(transfer(lut,c.r),transfer(lut,c.g),transfer(lut,c.b));
-    float mx=max(c.r,max(c.g,c.b));
-    float restored=clamp01(c.r*u.autoGains.x+u.controls.y*max(0.0f,c.g-0.3f*c.b)*(1.0f-0.45f*smooth(0.65f,1.0f,mx)));
-    float3 autoLinear=float3(transfer(lut,restored),transfer(lut,c.g*u.autoGains.y),transfer(lut,c.b*u.autoGains.z));
+    float3 restored;
+    if (u.cameraColourEnabled.x > 0.5f) {
+        float4 affineInput = float4(c, 1.0f);
+        restored = clamp(float3(dot(u.cameraColourR, affineInput), dot(u.cameraColourG, affineInput), dot(u.cameraColourB, affineInput)), 0.0f, 1.0f);
+    } else {
+        float mx=max(c.r,max(c.g,c.b));
+        float red=clamp01(c.r*u.autoGains.x+u.controls.y*max(0.0f,c.g-0.3f*c.b)*(1.0f-0.45f*smooth(0.65f,1.0f,mx)));
+        restored = float3(red, c.g*u.autoGains.y, c.b*u.autoGains.z);
+    }
+    float3 autoLinear=float3(transfer(lut,restored.r),transfer(lut,restored.g),transfer(lut,restored.b));
     float3 blended=mix(originalLinear,autoLinear,u.controls.x);
     c=float3(srgb(lut,blended.x),srgb(lut,blended.y),srgb(lut,blended.z));
     c=clamp(c*u.manualGains.xyz,0.0f,1.0f);

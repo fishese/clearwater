@@ -1,6 +1,11 @@
 # Add project specific ProGuard rules here.
 # Capacitor discovers plugins and activity callbacks by reflection.
 -keepattributes RuntimeVisibleAnnotations,RuntimeInvisibleAnnotations,AnnotationDefault
+# Keep the plugin metadata holder: R8 otherwise folds its annotation field to null,
+# causing permission aliases to be compiled as an always-empty map.
+-keep class com.getcapacitor.PluginHandle { *; }
+-keep @interface com.getcapacitor.annotation.CapacitorPlugin { *; }
+-keep @interface com.getcapacitor.annotation.Permission { *; }
 -keep public class * extends com.getcapacitor.Plugin { *; }
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;

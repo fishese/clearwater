@@ -37,7 +37,7 @@ export const isIOSCameraAvailable=()=>Capacitor.getPlatform()==='ios'&&Capacitor
 const preferencesKey='clearwater-ios-camera-preferences';
 const preferenceListeners=new Set<()=>void>();
 function loadPreferences():IOSCameraPreferences {
- try{const saved=JSON.parse(localStorage.getItem(preferencesKey)??'null');return {saveEnhancedPhotos:saved?.saveEnhancedPhotos===true,microphoneEnabled:saved?.microphoneEnabled===true};}catch{return {saveEnhancedPhotos:false,microphoneEnabled:false};}
+ try{const saved=JSON.parse(localStorage.getItem(preferencesKey)??'null');return {saveEnhancedPhotos:typeof saved?.saveEnhancedPhotos==='boolean'?saved.saveEnhancedPhotos:true,microphoneEnabled:saved?.microphoneEnabled===true};}catch{return {saveEnhancedPhotos:true,microphoneEnabled:false};}
 }
 let preferences=loadPreferences();
 export const getIOSCameraPreferences=()=>preferences;
@@ -114,12 +114,15 @@ export async function readIOSCaptureFile(descriptor:IOSCaptureDescriptor,variant
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
  if(!validDescriptor(current)||current.id!==descriptor.id||!current.visible)throw new Error('This private camera source is no longer available.');
  const uri=variant==='enhanced'?(current.enhancedUrl??current.sourceUrl):current.sourceUrl;
- const response=await fetch(Capacitor.convertFileSrc(uri),{signal});
+ const isVideo=current.kind==='video';
+ const response=await fetch(Capacitor.convertFileSrc(uri),{signal,...(isVideo?{headers:{Range:'bytes=0-'}}:{})});
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
- if(!response.ok)throw new Error('Could not read this private camera source.');
+ if(isVideo?response.status!==206:!response.ok)throw new Error('Could not read this private camera source.');
+ if(isVideo){const contentRange=response.headers.get('Content-Range');if(!contentRange||!/^bytes 0-\d+\/(\d+|\*)$/.test(contentRange))throw new Error('Could not read this private camera source.');}
  const blob=await response.blob();
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
  if(blob.size<=0||blob.size>512*1024*1024)throw new Error('This camera source is empty or exceeds the 512 MB safety ceiling.');
+ if(isVideo&&(blob.size!==current.bytes||response.headers.get('Content-Range')?.match(/\/(\d+)$/)?.[1]!==String(current.bytes)))throw new Error('This private camera source is incomplete.');
  return new File([blob],current.name,{type:current.type,lastModified:current.addedAt});
 }
 

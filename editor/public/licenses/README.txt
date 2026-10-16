@@ -25,6 +25,9 @@ ClearWater does not modify the distributed decoder binary or its sources.
 Typed-cstruct 0.10.2 supports the bindings (MIT); see LICENSE-typed-cstruct.txt.
 
 AndroidX Media3 Transformer: Android-only HDR-to-SDR working-copy conversion.
+AndroidX CameraX and CameraX Media3 effect adapter: native Android still/video
+capture and live correction. Apache License 2.0; the same licence text below applies.
+CameraX source: https://android.googlesource.com/platform/frameworks/support/+/androidx-main/camera/
 Unmodified AndroidX Media3 libraries, Apache License 2.0.
 Source: https://github.com/androidx/media
 Licence: LICENSE-AndroidX-Media3.txt
