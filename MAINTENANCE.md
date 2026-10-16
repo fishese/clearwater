@@ -2,6 +2,8 @@
 
 ## Active iOS catch-up checkpoint (16 October 2026)
 
+Verified phone-test build: `a2f3da42e8509147d3502770d3f2dada8c8e9550`, [Actions run 38848226344](https://github.com/fishese/clearwater/actions/runs/38848226344), unsigned artifact `12023937879`. Local IPA: `editor/ios/App/output/camera-ui/ClearWater-unsigned.ipa` (8,560,973 bytes). SHA-256 `fa41a702db0eb232171ca2380ec3d1cdda33daa09a16ec36129d7ea43215b6e2` matches CI. Xcode 26.6 / 17F113, physical arm64 iPhoneOS, minimum iOS 26.0, bundle `com.fishese.clearwater`. All 161 shared tests and 22 native tests pass, with no native failures/skips. The native suite includes CPU/Metal affine parity, raw JPEG sample colours/aspect, physical-orientation helpers, landscape/front video transforms, capture-store recovery, actual H.264/AAC writer timing, real scene/plugin registration and WKWebView MP4 range reads. CI verified root assets, model bytes/hashes, permissions and archive architecture. This does not establish iPhone hardware acceptance.
+
 The prior IPA/native test results below are historical. The user confirmed the iPhone editor and camera work, then reported missing automatic Photos copies and a private MP4 read failure. The catch-up integrates origin/main `3298d69` in the iOS feature worktree only. Run the shared suite/production browser regressions and full hosted native tests plus unsigned physical-device packaging after Swift changes. Keep Android physical tests paused and Android files identical to current origin/main.
 
 Capacitor 8.5.3 serves media extensions through `URLResponse` without a range header, unlike JPEGs. Explicit `Range: bytes=0-` selects its HTTP 206 path for private MP4 reads. Verify bytes and size; do not accept arbitrary failed/empty responses. `NativeSceneBridgeTests` exercises the real WKWebView transport rather than inferring iOS behavior from a browser mock. Photos copies use add-only permission and never store asset IDs; private-save and Photos-save status remain independent.
@@ -31,7 +33,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; current baseline is 113 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; the current iOS feature baseline is 161 tests.
 
 ## Languages
 
