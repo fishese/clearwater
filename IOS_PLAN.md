@@ -1,5 +1,10 @@
 # iOS native camera and sideloading plan
 
+## iPhone acceptance and merge approval (17 October 2026)
+
+The user confirms the iPhone tests passed for the final `ba03e3b` IPA and authorizes merging PR #2 with a merge commit, preserving its existing history. This is user-confirmed device acceptance; the agent did not perform new physical-device tests. The earlier pending-phone/pre-merge notes below are historical. Main-branch checks and Pages deployment must be verified after merging. Release publication and enabling `IOS_IPA_URL` remain explicitly unauthorized: keep the latest release and public IPA download unchanged.
+
+
 ## About and translation integration (17 October 2026)
 
 [Integration PR #2](https://github.com/fishese/clearwater/pull/2) is open into main and remains unmerged. Final unsigned IPA: source `ba03e3b4bdb201b6924b59b08616bddc62dd3963`, [successful run 38927901262](https://github.com/fishese/clearwater/actions/runs/38927901262), [download artifact 12058206553](https://github.com/fishese/clearwater/actions/runs/38927901262/artifacts/12058206553). Local file: `editor/ios/App/output/about-integration/ClearWater-unsigned.ipa` (8,610,080 bytes). SHA-256 `a573b04d1eda973fd15939e2324c52a840abe41823af71724419299d327480d1` matches CI. Provenance: Xcode 26.6 / 17F113, arm64 physical iPhoneOS, minimum iOS 26.0, bundle `com.fishese.clearwater`; no signature/provisioning profile. CI package checks passed; downloaded ZIP integrity, shipping model hashes, commit and exact final web assets were independently checked. Subsequent branch changes record documentation only; no release assets, public link or main merge were performed.
