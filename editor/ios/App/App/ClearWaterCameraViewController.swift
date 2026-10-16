@@ -47,6 +47,14 @@ enum ClearWaterCameraOrientation {
         default: return 1
         }
     }
+    static func orientedVideoSize(_ portraitSourceSize: CGSize, angle: CGFloat) -> CGSize {
+        if angle == 0 || angle == 180 { return CGSize(width: portraitSourceSize.height, height: portraitSourceSize.width) }
+        return portraitSourceSize
+    }
+    static func orientedCaptureImage(_ source: CIImage, angle: CGFloat, mirrored: Bool) -> CIImage {
+        let unmirrored = mirrored ? source.oriented(forExifOrientation: 2) : source
+        return unmirrored.oriented(forExifOrientation: exifOrientation(fromPortraitAngle: angle))
+    }
 }
 
 struct ClearWaterCameraOptions {
@@ -158,6 +166,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var orientationLocked = false
     private var captureOrientationAngle: CGFloat = 90
     private var clipOrientationAngle: CGFloat = 90
+    private var clipWasFrontCamera = false
     private var pickerArmed = false
     private var loupeView: UIImageView?
     private var pendingNeutralPatch: Data?
@@ -497,7 +506,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
         if recording, let movieWriter {
             do {
-                let writerSource = source.oriented(forExifOrientation: ClearWaterCameraOrientation.exifOrientation(fromPortraitAngle: clipOrientationAngle))
+                let writerSource = ClearWaterCameraOrientation.orientedCaptureImage(source, angle: clipOrientationAngle, mirrored: clipWasFrontCamera)
                 switch try movieWriter.appendVideo(writerSource, presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) {
                 case .appended, .droppedBackpressure: break
                 case .limitReached: DispatchQueue.main.async { self.stopRecording(reason: nil) }
@@ -832,19 +841,29 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         setState("startingRecording")
         recipeLock.lock(); let frozenRecipe = currentRecipe; clipRecipe = frozenRecipe; recipeLock.unlock()
         let profile: ClearWaterMovieWriter.QualityProfile = options.quality == "high" ? .high : .standard
-        frameLock.lock(); let sourceSize = latestSource?.extent.size ?? CGSize(width: 1280, height: 720); frameLock.unlock()
         // Session inputs are only changed on sessionQueue. Wait for optional microphone
         // authorization/input setup before constructing the writer on mediaQueue.
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.orientationLocked = true
             self.clipOrientationAngle = self.captureOrientationAngle
+            self.clipWasFrontCamera = self.cameraPosition == .front
             self.session.beginConfiguration()
             if self.audioEnabled, AVCaptureDevice.authorizationStatus(for: .audio) == .authorized {
                 do { try self.addAudioIfGranted() } catch { self.audioEnabled = false }
             }
             let withAudio = self.audioEnabled && self.audioInput != nil
             self.session.commitConfiguration()
+            self.frameLock.lock()
+            let frameSize = self.latestSource?.extent.size
+            self.frameLock.unlock()
+            let portraitSourceSize: CGSize
+            if let frameSize { portraitSourceSize = frameSize }
+            else if let device = self.cameraInput?.device {
+                let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                portraitSourceSize = CGSize(width: CGFloat(dimensions.height), height: CGFloat(dimensions.width))
+            } else { portraitSourceSize = .zero }
+            let sourceSize = ClearWaterCameraOrientation.orientedVideoSize(portraitSourceSize, angle: self.clipOrientationAngle)
             self.mediaQueue.async {
                 var stagedCaptureID: UUID?
                 do {

@@ -31,6 +31,28 @@ final class NativeSceneBridgeTests: XCTestCase {
         XCTAssertEqual(ClearWaterCameraOrientation.sampleSize(width: 80, height: 120), CGSize(width: 80, height: 120))
     }
 
+    func testLandscapeMovieDimensionsAndFrontUnmirroring() throws {
+        let sourceSize = CGSize(width: 720, height: 1280)
+        for angle: CGFloat in [0, 180] {
+            XCTAssertEqual(ClearWaterCameraOrientation.orientedVideoSize(sourceSize, angle: angle), CGSize(width: 1280, height: 720))
+        }
+        for angle: CGFloat in [90, 270] {
+            XCTAssertEqual(ClearWaterCameraOrientation.orientedVideoSize(sourceSize, angle: angle), sourceSize)
+        }
+        let red = CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: 30, height: 120))
+        let blue = CIImage(color: CIColor(red: 0, green: 0, blue: 1)).cropped(to: CGRect(x: 30, y: 0, width: 30, height: 120))
+        let source = red.composited(over: blue)
+        let unmirrored = ClearWaterCameraOrientation.orientedCaptureImage(source, angle: 90, mirrored: true)
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = CIContext(options: [.workingColorSpace: space, .outputColorSpace: space])
+        var left = [UInt8](repeating: 0, count: 4)
+        left.withUnsafeMutableBytes { context.render(unmirrored, toBitmap: $0.baseAddress!, rowBytes: 4,
+            bounds: CGRect(x: 15, y: 60, width: 1, height: 1), format: .RGBA8, colorSpace: space) }
+        XCTAssertGreaterThan(left[2], 240)
+        XCTAssertLessThan(left[0], 15)
+        XCTAssertEqual(ClearWaterCameraOrientation.orientedCaptureImage(source, angle: 0, mirrored: false).extent.size, CGSize(width: 120, height: 60))
+    }
+
     func testPhysicalOrientationMappingIsIndependentOfPortraitControls() {
         XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .portrait), 90)
         XCTAssertEqual(ClearWaterCameraOrientation.angleDegrees(for: .portraitUpsideDown), 270)
