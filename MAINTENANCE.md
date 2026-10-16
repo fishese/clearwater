@@ -147,7 +147,7 @@ The quality preview APK is version 1.0.3-quality.1 (code 14), debug-signed for m
 
 ## Native camera and editor preview follow-up
 
-The current installed experimental debug build is 1.0.3-camera.7 (code 21). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
+The current installed experimental debug build is 1.0.3 (code 22); the corresponding signed release is prepared but not yet promoted to the canonical download. Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
 
 After the normal unit/build checks, run `camera-check.mjs`, `camera-controls-check.mjs`, `editor-preview-check.mjs` and `layered-controls-check.mjs` against a production preview (`CHECK_URL`). Camera browser checks use synthetic media; native camera tests must separately verify transparent preview placement, full still dimensions, upright portrait/landscape output, front mirroring, lens/zoom choices, visible correction in saved video, replacement white balance and background finalisation. Never remove an installed app to bypass a signing mismatch: preserve its private originals and edits.
 
@@ -188,3 +188,13 @@ Code 21 (1.0.3-camera.7) is installed. Portrait/landscape stills retain the sele
 Photo capture returns actual JPEG bounds after EXIF orientation. Idle ImageCapture starts with physical captureRotation. Session info and cameraInfoChanged include sessionGeneration; the shared UI rejects old-session dimension updates and removes its listener on cleanup. Rebinding idle also refreshes the resolution chip. Preview dimensions must never substitute for saved-file dimensions.
 
 Pause must retire/null Media3Effect before provider.unbindAll(), invalidating queued binds as well. Leaving the old effect in the field let queued setCorrection calls reach its released processor and crash. Resume reuses pendingBindCall; normal first-use microphone permission transitions must continue working. Active setEffects failures reject the plugin call with an error. Keep rendering failures visible in diagnostics, and do not move Media3Effect.close() off the main thread.
+
+### About downloads and attribution
+
+About keeps app downloads near the top, with iOS IPA marked Coming soon. The APK URL is releases/latest/download/clearwater-release.apk; each release promoted to latest must include that asset and checksum. Do not promote an iOS-only release to latest while that shared Android URL is used. The expanded introduction describes the supplied paired-reference enhancement models and local processing without promising true-colour recovery or treating Android native capture as browser-only.
+
+The icon credit links Fish3 (Darius Dan) and Coral (author unknown) on SVG Repo, both CC0/public domain. Existing model/media credits remain. LICENSE-Runtime.txt consolidates installed runtime/helper notices; NOTICE-ONNX-Runtime.txt preserves the pinned ONNX 1.30.0 upstream inventory, which includes components beyond this web build. Update these alongside runtime upgrades and retain corresponding decoder sources already bundled under licenses.
+
+The Report a bug button creates its mailto only on activation. Numeric runtime decoding must survive minification: direct String.fromCharCode constants were folded into plaintext by the bundler. Check both public source and generated assets for the literal address, including test assertions; keep the email absent from initial DOM. This is basic obfuscation, not a guarantee against bots executing the handler. about-check.mjs covers download links, disabled IPA, model/licence/icon URLs and multilingual fit at 320-1280px.
+
+Final code 22 unit/build/About/signature checks pass. Debug was updated in place and its installed checksum matches the final artifact. The signed release uses the same certificate as v1.0.2; its camera DEX retains the required Capacitor permission metadata and iteration. v1.0.2 remains the published latest until release promotion is approved.

@@ -450,6 +450,19 @@ body.native-camera .camera-close-button{background:#101c20e8}
  .camera-page .camera-record{width:58px;min-width:58px;height:58px;min-height:58px}
 }
 
+.about-downloads{margin:18px 0!important;padding:15px 16px;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+.about-content .about-downloads h2{font-size:17px;margin:0 0 8px}
+.about-download-links{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.about-download-links>.button{min-height:40px}
+.about-download-links>a:not(.button){display:inline-flex;align-items:center;min-height:40px}
+.about-ios{display:inline-flex;align-items:center;min-height:32px;padding:3px 9px;border:1px solid #34494d;border-radius:5px;color:#8fa3a2;font-size:12px}
+.about-content .about-download-differences{grid-template-columns:90px minmax(0,1fr);gap:6px 12px;margin:10px 0;font-size:12px;line-height:1.5}
+.about-download-differences dt{color:#c1d9d3}.about-download-differences dd{color:#9bb2b4}
+.about-content .about-experimental{margin:10px 0 0;font-size:12px;color:#c5bfa9}
+.about-content .about-report-bug{display:inline-flex;align-items:center;min-height:34px;padding:4px 9px;margin:0 0 0 8px;border:1px solid #35534b;border-radius:5px;color:#abd3c3;font-size:12px}
+.about-content .about-process-summary{max-width:800px;margin:12px 0!important;color:#a6bcbd;font-size:14px;line-height:1.65}
+@media(max-width:600px){.about-content .about-download-differences{grid-template-columns:1fr;gap:3px}.about-download-differences dd{margin-bottom:5px}}
+
 /* On short phone landscape screens, let the collection follow the page below the editor. */
 @media (orientation:landscape) and (min-width:651px) and (max-width:900px) and (max-height:540px){
  .studio{height:auto;grid-template-rows:calc(100dvh - 56px) auto}

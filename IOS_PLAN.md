@@ -175,3 +175,5 @@ Zoom tap cycles supported choices; long press opens actual lens/zoom options. La
 
 Include the shared landscape editor change that lets the collection scroll off screen. Preserve English, Hong Kong written Traditional Chinese and Japanese. Run shared checks and the isolated iOS build, then report what still needs a real iPhone. Android device checks are currently paused; preserve that boundary and do not claim iPhone validation from browser or Android results.
 ```
+
+About now shows iOS (IPA) as Coming soon. Replace that state with an actual platform-specific download URL only after an IPA exists. Avoid promoting an iOS-only GitHub release to latest while Android uses releases/latest/download/clearwater-release.apk; use an iOS-specific release link or coordinate assets across platforms.
