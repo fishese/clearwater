@@ -1,5 +1,12 @@
 # Handoff
 
+## Current coordinated release (17 October 2026)
+
+PR #2 is merged as 966660b and the user reports the iPhone tests passed. The user has now explicitly authorized building Android and publishing the coordinated APK/IPA release. This supersedes the older pending-merge/publication notes below. Release version is 1.0.4: Android code 23, iOS bundle version 2. Native behavior and signing identities are unchanged. Main passed 164 shared tests and 22 hosted native tests before the release version/label changes.
+
+Release builds use the committed release revision; iOS packaging can reuse the previously verified native regression because only version metadata and the web-only iOS requirement label changed. Publish versioned and canonical APK/unsigned-IPA assets plus checksums, retaining the canonical Android alias. Enable IOS_IPA_URL only after public IPA publication, then rerun Pages and verify both download links. Remaining broad hardware gates (long recordings, thermal/storage stress and interruptions) remain limitations, not blockers to the user-authorized experimental release.
+
+
 ## iPhone acceptance and merge approval (17 October 2026)
 
 The user confirms the iPhone tests passed for the final `ba03e3b` IPA and authorizes merging PR #2 with a merge commit, preserving its existing history. This is user-confirmed device acceptance; the agent did not perform new physical-device tests. The earlier pending-phone/pre-merge notes below are historical. Main-branch checks and Pages deployment must be verified after merging. Release publication and enabling `IOS_IPA_URL` remain explicitly unauthorized: keep the latest release and public IPA download unchanged.

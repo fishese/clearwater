@@ -1,5 +1,10 @@
 # Maintenance
 
+## Current release status (17 October 2026)
+
+The working iOS implementation is merged into main (PR #2 / 966660b), and the user confirmed iPhone acceptance before authorizing coordinated v1.0.4 publication. Older feature-branch/pending-approval passages are historical checkpoints. Android v1.0.4 uses versionCode 23; iOS v1.0.4 uses CFBundleVersion 2 and requires iOS 26.0+. Both native platforms keep their existing identity and offline models. Preserve the signed Android certificate; iOS is distributed unsigned for local sideload signing. The web-only download section states the iOS requirement.
+
+
 ## iPhone acceptance and merge approval (17 October 2026)
 
 The user confirms the iPhone tests passed for the final `ba03e3b` IPA and authorizes merging PR #2 with a merge commit, preserving its existing history. This is user-confirmed device acceptance; the agent did not perform new physical-device tests. The earlier pending-phone/pre-merge notes below are historical. Main-branch checks and Pages deployment must be verified after merging. Release publication and enabling `IOS_IPA_URL` remain explicitly unauthorized: keep the latest release and public IPA download unchanged.

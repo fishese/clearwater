@@ -804,5 +804,6 @@
   "Choose whether to keep this capture in ClearWater. Hiding it keeps the files for recovery; deletion permanently removes them.": "選擇如何在 ClearWater 處理此拍攝項目。隱藏會保留檔案以供還原；刪除則會永久移除檔案。",
   "Clear collection hides all iOS camera captures but keeps their private files in ClearWater. In Settings, restore hidden captures or delete all private camera files. For one capture, choose Hide capture to keep its files recoverable, or Delete permanently to remove its private files and saved edits. Separately saved Photos copies are unchanged. Uninstalling ClearWater removes its private files.": "「清空相片庫」只會隱藏所有 iOS 相機拍攝項目，私人檔案仍保留在 ClearWater 內。你可在「設定」還原已隱藏的拍攝項目，或刪除所有私人相機檔案。個別拍攝項目可選「隱藏拍攝項目」以保留檔案供日後還原，或選「永久刪除」以移除私人檔案及已儲存的編輯內容。另存至「相片」的副本不受影響。解除安裝 ClearWater 會移除私人檔案。",
   "Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.": "在此刪除私人拍攝檔會從 ClearWater 永久移除私人來源檔案及已儲存的編輯內容。「相片」中的副本不受影響。",
-  "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.": "這會從此裝置永久移除此拍攝項目的私人來源檔案及已儲存的編輯內容，且無法復原。「相片」中的副本不受影響。"
+  "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.": "這會從此裝置永久移除此拍攝項目的私人來源檔案及已儲存的編輯內容，且無法復原。「相片」中的副本不受影響。",
+  "iOS 26+ · Requires sideloading": "iOS 26 或以上 · 須側載安裝"
 }
