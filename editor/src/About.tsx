@@ -1,9 +1,12 @@
 import {t,useLanguage} from './i18n';
 import {useEffect,useRef} from 'react';
 import {ArrowLeft,Settings as SettingsIcon} from 'lucide-react';
+import {Capacitor} from '@capacitor/core';
 import type {CustomModel} from './core/types';
 
 const local=(path:string)=>import.meta.env.BASE_URL+path;
+const iosDownload=import.meta.env.VITE_IOS_IPA_URL?.trim();
+function PlatformIcon({platform}:{platform:'android'|'iphone'}){return platform==='android'?<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m7 4-2-3m12 3 2-3M3 11a9 9 0 0 1 18 0v8H3zM7 19v4m10-4v4M1 12v6m22-6v6"/><path d="M7 8h.01M17 8h.01" strokeWidth="3" strokeLinecap="round"/></svg>:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="6" y="1" width="12" height="22" rx="3"/><path d="M10 4h4m-4 16h4" strokeLinecap="round"/></svg>;}
 function Source({href,children}:{href:string;children:React.ReactNode}){return <a href={href} target="_blank" rel="noreferrer">{children}</a>;}
 export default function About({onClose,customModel,onOpenSettings}:{onClose:()=>void;customModel:CustomModel|null;onOpenSettings:()=>void}){
  useLanguage();
@@ -15,9 +18,15 @@ export default function About({onClose,customModel,onOpenSettings}:{onClose:()=>
   <article className="about-content">
    <h1 id="about-title" ref={heading} tabIndex={-1}>{t("About & guide")}</h1>
    <p className="about-intro">{t("ClearWater helps correct colour and contrast lost in underwater photos and videos.")}</p>
-   <section className="about-downloads" aria-labelledby="about-download-title"><h2 id="about-download-title">{t("Get ClearWater")}</h2><div className="about-download-links"><a className="button primary" href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk">{t("Download Android APK")}</a><Source href="https://github.com/fishese/clearwater/releases/latest">{t("Release notes")}</Source><span className="about-ios" aria-disabled="true">iOS (IPA) · {t("Coming soon")}</span></div><dl className="about-download-differences"><dt>{t("Android")}</dt><dd>{t("Native camera capture with higher-quality stills; supplied models are bundled for fully offline use.")}</dd><dt>{t("Web")}</dt><dd>{t("Camera uses the browser stream. Download offline assets once; restoration tools are shared with the app.")}</dd></dl><p className="about-experimental">{t("Experimental. Tested by one person. Sorry if you encounter bugs.")} <button className="text-button about-report-bug" type="button" onClick={reportBug}>{t("Report a bug")}</button></p></section>
    <p className="about-process-summary">{t("The supplied AI models are image-enhancement networks, rather than generative AI. They were trained on pairs of underwater photos and corrected reference images, learning how water typically shifts colour and reduces contrast. For your photo, they estimate a correction and adjust the colour and contrast of the pixels already there.")}</p>
-   <p className="about-process-summary">{t("All processing stays on your device. The web version runs in your browser; Android also supports native camera processing. Photos and videos are not uploaded for processing.")}</p>
+   <p className="about-process-summary">{t("All processing stays on your device. The web version runs in your browser; the Android and iPhone apps also support native camera capture. Photos and videos are not uploaded for processing.")}</p>
+   {!Capacitor.isNativePlatform()&&<section className="about-downloads" aria-labelledby="about-download-title">
+    <h2 id="about-download-title">{t("App versions")}</h2>
+    <p>{t("The installable Android and iPhone apps use native camera capture with higher-quality stills; supplied models are bundled for fully offline use.")}</p>
+    <div className="about-download-links"><a className="button primary" href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk"><PlatformIcon platform="android"/>{t("Download Android APK")}</a>{iosDownload?<a className="button secondary about-ios" href={iosDownload}><PlatformIcon platform="iphone"/>{t("Download iPhone IPA")}</a>:<span className="about-ios" aria-disabled="true"><PlatformIcon platform="iphone"/>iPhone IPA · {t("Not published yet")}</span>}<Source href="https://github.com/fishese/clearwater/releases/latest">{t("Release notes")}</Source></div>
+    <p className="about-experimental">{t("These apps are experimental and tested only on my personal devices. Apologies in advance for bugs.")} <button className="text-button about-report-bug" type="button" onClick={reportBug}>{t("Report any you find")}</button> {t("I'll try to fix them.")}</p>
+    <p className="about-sideload">{t("The iPhone app is supplied as an unsigned IPA. Use")} <Source href="https://sideloadly.io/">Sideloadly</Source> {t("or a similar tool to sign and install it with your Apple Account. Free signing lasts 7 days, so refresh it before it expires. I cannot currently afford a paid Apple Developer membership.")}</p>
+   </section>}
    <nav className="about-index" aria-label={t("About sections")}>{[['engines',t("Correction engines")],['controls',t("Editing controls")],['video',t("Video")],['files',t("Files & privacy")],['credits',t("Attribution")]].map(([id,label])=><a key={id} href={'#about-'+id}>{label}</a>)}</nav>
 
    <section id="about-engines"><h2>{t("Correction engines")}</h2><p>{t("Choose one engine at a time. AI models work from the original; Balanced restoration is not applied underneath them. Strength and manual adjustments work with every engine. No engine is best for every dive.")}</p>

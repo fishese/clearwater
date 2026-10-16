@@ -225,6 +225,7 @@
   "Processing video frames locally. Keep this app open.": "Processing video frames locally. Keep this app open.",
   "Rendering your photo at the selected resolution.": "Rendering your photo at the selected resolution.",
   "Cancel export": "Cancel export",
+  "Language": "Language",
   "Back to editor": "Back to editor",
   "Underwater photo and video colour correction, processed on your device. Start with a suggestion, compare it with the original, then adjust the result to suit the scene.": "Underwater photo and video colour correction, processed on your device. Start with a suggestion, compare it with the original, then adjust the result to suit the scene.",
   "About sections": "About sections",
@@ -325,7 +326,6 @@
   "hosts the Android app, and": "hosts the Android app, and",
   "supplies icons.": "supplies icons.",
   "Underwater enhancement estimates a useful appearance. It cannot recover physically missing light, guarantee true colours or undo camera clipping. Compare the original, especially for red subjects, strobes, sunsets and surface shots.": "Underwater enhancement estimates a useful appearance. It cannot recover physically missing light, guarantee true colours or undo camera clipping. Compare the original, especially for red subjects, strobes, sunsets and surface shots.",
-  "Language": "Language",
   "photo": "photo",
   "video": "video",
   "Loading and running {0}…": "Loading and running {0}…",
@@ -675,5 +675,15 @@
   "ClearWater bug report": "ClearWater bug report",
   "ClearWater helps correct colour and contrast lost in underwater photos and videos.": "ClearWater helps correct colour and contrast lost in underwater photos and videos.",
   "The supplied AI models are image-enhancement networks, rather than generative AI. They were trained on pairs of underwater photos and corrected reference images, learning how water typically shifts colour and reduces contrast. For your photo, they estimate a correction and adjust the colour and contrast of the pixels already there.": "The supplied AI models are image-enhancement networks, rather than generative AI. They were trained on pairs of underwater photos and corrected reference images, learning how water typically shifts colour and reduces contrast. For your photo, they estimate a correction and adjust the colour and contrast of the pixels already there.",
-  "All processing stays on your device. The web version runs in your browser; Android also supports native camera processing. Photos and videos are not uploaded for processing.": "All processing stays on your device. The web version runs in your browser; Android also supports native camera processing. Photos and videos are not uploaded for processing."
+  "All processing stays on your device. The web version runs in your browser; Android also supports native camera processing. Photos and videos are not uploaded for processing.": "All processing stays on your device. The web version runs in your browser; Android also supports native camera processing. Photos and videos are not uploaded for processing.",
+  "App versions": "App versions",
+  "Download iPhone IPA": "Download iPhone IPA",
+  "Not published yet": "Not published yet",
+  "The installable Android and iPhone apps use native camera capture with higher-quality stills; supplied models are bundled for fully offline use.": "The installable Android and iPhone apps use native camera capture with higher-quality stills; supplied models are bundled for fully offline use.",
+  "These apps are experimental and tested only on my personal devices. Apologies in advance for bugs.": "These apps are experimental and tested only on my personal devices. Apologies in advance for bugs.",
+  "Report any you find": "Report any you find",
+  "I'll try to fix them.": "I'll try to fix them.",
+  "The iPhone app is supplied as an unsigned IPA. Use": "The iPhone app is supplied as an unsigned IPA. Use",
+  "or a similar tool to sign and install it with your Apple Account. Free signing lasts 7 days, so refresh it before it expires. I cannot currently afford a paid Apple Developer membership.": "or a similar tool to sign and install it with your Apple Account. Free signing lasts 7 days, so refresh it before it expires. I cannot currently afford a paid Apple Developer membership.",
+  "All processing stays on your device. The web version runs in your browser; the Android and iPhone apps also support native camera capture. Photos and videos are not uploaded for processing.": "All processing stays on your device. The web version runs in your browser; the Android and iPhone apps also support native camera capture. Photos and videos are not uploaded for processing."
 }

@@ -1,5 +1,7 @@
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const catalogs=Object.fromEntries(['en','zh-HK','ja'].map(language=>[language,JSON.parse(readFileSync(new URL(`../src/locales/${language}.json`,import.meta.url),'utf8'))]));
 const browser=await chromium.launch({channel:'msedge',headless:true});
 try{
  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
@@ -14,8 +16,11 @@ try{
  assert.equal(await page.locator('.app-shell').isVisible(),false);
  const iconCredit=page.locator('.about-icon-credit');assert.ok((await iconCredit.innerText()).includes('Fish3'));assert.ok((await iconCredit.innerText()).includes('Coral'));assert.deepEqual(await iconCredit.locator('a').evaluateAll(links=>links.map(a=>a.href)),['https://www.svgrepo.com/svg/317012/fish3','https://www.svgrepo.com/svg/2942/coral','https://www.svgrepo.com/']);
  const contact=[48,63,54,50,33,36,50,39,54,33,19,53,58,32,59,54,32,54,125,48,48].map(code=>String.fromCharCode(code^83)).join('');
- assert.equal(await page.locator('.about-downloads a[href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk"]').count(),1);assert.equal(await page.locator('.about-downloads a[href="https://github.com/fishese/clearwater/releases/latest"]').count(),1);assert.equal(await page.locator('.about-ios[aria-disabled="true"]').count(),1);assert.equal(await page.locator('a[href^="mailto:"]').count(),0);assert.ok(!(await page.locator('body').innerText()).includes(contact));
- for(const [language,marker] of [['zh-HK','應用程式圖示：'],['ja','アプリアイコン：'],['en','App icon:']]){await page.locator('.about-header .settings-launch').click();await page.locator('.settings-page .language-select').selectOption(language);await page.locator('.settings-close').click();assert.ok((await page.locator('.about-icon-credit').innerText()).includes(marker),`${language} icon credit`);assert.ok(await page.getByRole('heading',{name:language==='zh-HK'?'下載 ClearWater':language==='ja'?'ClearWater を入手':'Get ClearWater',exact:true}).isVisible(),`${language} download block`);for(const width of [320,360,390,650,844,1280]){await page.setViewportSize({width,height:800});const layout=await page.evaluate(()=>({page:document.documentElement.scrollWidth,viewport:innerWidth,block:document.querySelector('.about-downloads').getBoundingClientRect().toJSON()}));assert.ok(layout.page<=layout.viewport,`${language}/${width}: About page overflow`);assert.ok(layout.block.left>=0&&layout.block.right<=width,`${language}/${width}: download block overflow`);}}
+ assert.equal(await page.locator('.about-downloads a[href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk"]').count(),1);assert.equal(await page.locator('.about-downloads a[href="https://github.com/fishese/clearwater/releases/latest"]').count(),1);assert.equal(await page.locator('.about-ios').count(),1);assert.equal(await page.locator('a[href^="mailto:"]').count(),0);assert.ok(!(await page.locator('body').innerText()).includes(contact));
+ assert.equal(await page.locator('.about-intro + .about-process-summary + .about-process-summary + .about-downloads').count(),1,'Keep description paragraphs together before downloads');
+ assert.equal(await page.locator('.about-download-links svg').count(),2);
+ assert.equal(await page.locator('.about-downloads a[href="https://sideloadly.io/"]').count(),1);
+ for(const language of ['zh-HK','ja','en']){await page.locator('.about-header .settings-launch').click();await page.locator('.settings-page .language-select').selectOption(language);await page.locator('.settings-close').click();assert.ok((await page.locator('.about-icon-credit').innerText()).includes(catalogs[language]['App icon:']),`${language} icon credit`);assert.ok(await page.getByRole('heading',{name:catalogs[language]['App versions'],exact:true}).isVisible(),`${language} download block`);for(const width of [320,360,390,650,844,1280]){await page.setViewportSize({width,height:800});const layout=await page.evaluate(()=>({page:document.documentElement.scrollWidth,viewport:innerWidth,block:document.querySelector('.about-downloads').getBoundingClientRect().toJSON()}));assert.ok(layout.page<=layout.viewport,`${language}/${width}: About page overflow`);assert.ok(layout.block.left>=0&&layout.block.right<=width,`${language}/${width}: download block overflow`);}}
  assert.equal(await page.locator('#about-camera dt').count(),9);const cameraGuide=await page.locator('#about-camera').innerText();for(const description of ['12 Mbps','5 Mbps','zero restoration strength','No raw video is kept','1, 3 or 5 minutes','Each pick replaces'])assert.ok(cameraGuide.includes(description),description);
  assert.equal(await page.evaluate(()=>document.activeElement.id),'about-title');
  await page.getByRole('link',{name:'Editing controls',exact:true}).click();
@@ -50,5 +55,13 @@ try{
  await page.goto(url+'#about-video');await page.getByRole('heading',{name:'About & guide',exact:true}).waitFor();
  await page.getByRole('button',{name:'Back to editor'}).click();await page.locator('.app-shell').waitFor();
  assert.deepEqual(errors,[]);
+ for(const platform of ['android','ios']){
+  const native=await browser.newContext();
+  await native.addInitScript(platform=>{window.CapacitorCustomPlatform={name:platform};},platform);
+  const nativePage=await native.newPage();await nativePage.goto(url+'#about');await nativePage.locator('#about-title').waitFor();
+  assert.equal(await nativePage.locator('.about-downloads').count(),0,`${platform}: hide app downloads`);
+  assert.equal(await nativePage.locator('.about-process-summary').count(),2,`${platform}: retain description`);
+  await native.close();
+ }
  console.log('PASS About links, licences, hash routes, Escape, mobile layout and edit preservation');
 }finally{await browser.close();}
