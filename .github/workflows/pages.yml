@@ -45,6 +45,7 @@ jobs:
         working-directory: editor
         env:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          VITE_IOS_IPA_URL: ${{ vars.IOS_IPA_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: editor/dist

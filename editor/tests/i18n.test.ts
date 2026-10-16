@@ -3,7 +3,62 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 import {catalogs,detectLanguage,translate,translateMessage} from '../src/i18n-core';
 
+function parseJsonWithoutDuplicateKeys(source:string):unknown{
+ JSON.parse(source);
+ let index=0;
+ const whitespace=()=>{while(/\s/.test(source[index]??''))index++;};
+ const string=()=>{
+  const start=index++;
+  while(index<source.length){
+   if(source[index]==='\\'){index+=2;continue;}
+   if(source[index++]==='"')return JSON.parse(source.slice(start,index)) as string;
+  }
+  throw new Error('Unterminated JSON string');
+ };
+ const value=():void=>{
+  whitespace();
+  if(source[index]==='{'){
+   index++;
+   const keys=new Set<string>();
+   whitespace();
+   if(source[index]==='}'){index++;return;}
+   while(true){
+    whitespace();
+    const key=string();
+    if(keys.has(key))throw new Error(`Duplicate JSON object key: ${key}`);
+    keys.add(key);
+    whitespace();index++;
+    value();
+    whitespace();
+    if(source[index]==='}'){index++;return;}
+    index++;
+   }
+  }
+  if(source[index]==='['){
+   index++;
+   whitespace();
+   if(source[index]===']'){index++;return;}
+   while(true){
+    value();whitespace();
+    if(source[index]===']'){index++;return;}
+    index++;
+   }
+  }
+  if(source[index]==='"'){string();return;}
+  while(index<source.length&&!/[\s,}\]]/.test(source[index]))index++;
+ };
+ value();
+ return JSON.parse(source) as unknown;
+}
+
 describe('localisation',()=>{
+ it('rejects duplicate keys in locale JSON files',()=>{
+  expect(()=>parseJsonWithoutDuplicateKeys('{"outer":{"label":"first","label":"second"}}')).toThrow('Duplicate JSON object key: label');
+  for(const language of ['en','zh-HK','ja'] as const){
+   const source=readFileSync(new URL(`../src/locales/${language}.json`,import.meta.url),'utf8');
+   expect(()=>parseJsonWithoutDuplicateKeys(source)).not.toThrow();
+  }
+ });
  it('covers every source key and preserves interpolation placeholders',()=>{
   const keys=Object.keys(catalogs.en).sort();
   for(const language of ['zh-HK','ja'] as const){
