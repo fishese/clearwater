@@ -75,7 +75,9 @@ export async function toIOSStoredPhotos(descriptors:readonly IOSCaptureDescripto
  for(const descriptor of descriptors){
   if(!descriptor.visible||!validDescriptor(descriptor))continue;
   const {blob,dataUrl}=await readIOSCaptureThumbnail(descriptor);
-  const previewFile=new File([blob],descriptor.name,{type:descriptor.type,lastModified:descriptor.addedAt});
+  // The placeholder is thumbnail content, never a media source. The descriptor
+  // retains the real capture MIME type until a selected source is hydrated.
+  const previewFile=new File([blob],descriptor.name,{type:'image/jpeg',lastModified:descriptor.addedAt});
   let recipe;
   try{recipe=parseRecipe(descriptor.recipe);}catch{recipe=undefined;}
   results.push({id:descriptor.id,file:previewFile,previewFile,recipe,thumbnail:dataUrl,addedAt:descriptor.addedAt,
@@ -122,7 +124,7 @@ export async function readIOSCaptureFile(descriptor:IOSCaptureDescriptor,variant
  const blob=await response.blob();
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
  if(blob.size<=0||blob.size>512*1024*1024)throw new Error('This camera source is empty or exceeds the 512 MB safety ceiling.');
- if(isVideo&&(blob.size!==current.bytes||response.headers.get('Content-Range')?.match(/\/(\d+)$/)?.[1]!==String(current.bytes)))throw new Error('This private camera source is incomplete.');
+ if(blob.size!==current.bytes||(isVideo&&response.headers.get('Content-Range')?.match(/\/(\d+)$/)?.[1]!==String(current.bytes)))throw new Error('This private camera source is incomplete.');
  return new File([blob],current.name,{type:current.type,lastModified:current.addedAt});
 }
 

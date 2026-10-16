@@ -43,6 +43,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
     private var pendingRecordingStartCall: CAPPluginCall?
     private var pendingStopSessionCalls: [CAPPluginCall] = []
     private var embeddedRecordingActive = false
+    private var nextEmbeddedSessionGeneration = 0
     private var previousIdleTimerDisabled: Bool?
     private var previousWebViewOpaque: Bool?
     private var previousWebViewBackground: UIColor?
@@ -69,21 +70,23 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
         DispatchQueue.main.async { self.startSessionOnMain(call) }
     }
     private func startSessionOnMain(_ call: CAPPluginCall) {
-        guard call.getObject("recipe") != nil, let bounds = cameraBounds(call.getObject("bounds")),
+        guard call.getObject("recipe") != nil, let webBounds = cameraBounds(call.getObject("bounds")),
               embeddedController == nil, cameraController == nil, let presenter = bridge?.viewController else {
             call.reject("Camera session options are invalid or a session is already active.", "CAMERA_BUSY"); return
         }
+        let host = presenter as? ClearWaterBridgeViewController
+        let bounds = host?.nativeFrame(forWebViewBounds: webBounds) ?? webBounds
         var settings = call.getObject("settings") ?? [:]
         settings["embedded"] = true
         settings["facing"] = call.getString("facing") ?? "environment"
         settings["quality"] = call.getString("quality") ?? "standard"
         let options = ClearWaterCameraOptions(locale: "en", strings: [:], settings: settings)
         do {
-            let controller = try ClearWaterCameraViewController(options: options)
+            nextEmbeddedSessionGeneration &+= 1
+            let controller = try ClearWaterCameraViewController(options: options, sessionGeneration: nextEmbeddedSessionGeneration)
             controller.delegate = self
             try controller.setEmbeddedRecipe(call.getObject("recipe") ?? [:])
-            let host = presenter as? CAPBridgeViewController
-            let webView = host?.webView
+            let webView = (presenter as? CAPBridgeViewController)?.webView
             previousIdleTimerDisabled = UIApplication.shared.isIdleTimerDisabled
             UIApplication.shared.isIdleTimerDisabled = true
             if let webView {
@@ -115,8 +118,9 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
         DispatchQueue.main.async {
             let flatBounds: [String: Any] = ["x": call.getDouble("x") ?? 0, "y": call.getDouble("y") ?? 0,
                 "width": call.getDouble("width") ?? 0, "height": call.getDouble("height") ?? 0]
-            guard let bounds = self.cameraBounds(flatBounds), let controller = self.embeddedController else { call.reject("No camera session is active.", "CAMERA_CLOSED"); return }
-            controller.setEmbeddedBounds(bounds); call.resolve()
+            guard let webBounds = self.cameraBounds(flatBounds), let controller = self.embeddedController else { call.reject("No camera session is active.", "CAMERA_CLOSED"); return }
+            let host = self.bridge?.viewController as? ClearWaterBridgeViewController
+            controller.setEmbeddedBounds(host?.nativeFrame(forWebViewBounds: webBounds) ?? webBounds); call.resolve()
         }
     }
     @objc func setCorrection(_ call: CAPPluginCall) {
@@ -382,6 +386,14 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
             }
         }
         cameraController = nil; openCall?.resolve(); openCall = nil
+    }
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didResumeWith info: [String: Any]) {
+        guard controller === embeddedController else { return }
+        notifyListeners("cameraInfoChanged", data: info)
+    }
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didInterrupt message: String) {
+        guard controller === embeddedController else { return }
+        notifyListeners("cameraError", data: ["message": message, "recoverable": true])
     }
     private enum PluginError: Error { case invalidArgument, shareBusy, captureMissing }
 }

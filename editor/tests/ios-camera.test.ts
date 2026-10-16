@@ -80,6 +80,14 @@ describe('iOS private capture adapter',()=>{
   expect(fetchMock).toHaveBeenCalledWith('capacitor:file:///private/captures/thumbnail.jpg');
   expect(photo.nativeCapture?.loaded).toBe(false);
   expect(photo.file.size).toBe(5);
+  expect(photo.file.type).toBe('image/jpeg');
+  vi.unstubAllGlobals();
+ });
+
+ it('rejects a truncated camera photo instead of returning it as a source',async()=>{
+  const current=descriptor({bytes:16});state.camera.getCapture.mockResolvedValue({capture:current});
+  vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,blob:async()=>new Blob(['thumb'])}));
+  await expect(readIOSCaptureFile(current)).rejects.toThrow('incomplete');
   vi.unstubAllGlobals();
  });
 

@@ -88,6 +88,36 @@ final class NativeSceneBridgeTests: XCTestCase {
         }
         let controller = try XCTUnwrap(bridgeController, "The active scene must use ClearWaterBridgeViewController.")
         let webView = try XCTUnwrap(controller.bridge?.webView, "The Capacitor WebView must be connected.")
+        XCTAssertFalse(controller.view === webView, "Native preview views need a UIKit host around the Capacitor WebView.")
+        XCTAssertTrue(webView.superview === controller.view, "The connected WebView must be a child of the native host.")
+
+        // Exercise the real scene's geometry conversion with an inset WebView,
+        // as happens when the viewport begins below the status/safe-area region.
+        controller.view.layoutIfNeeded()
+        let topConstraint = try XCTUnwrap(controller.view.constraints.first {
+            ($0.firstItem as? UIView) === webView && $0.firstAttribute == .top
+        }, "The host must constrain the WebView to its own coordinate space.")
+        let bottomConstraint = try XCTUnwrap(controller.view.constraints.first {
+            ($0.firstItem as? UIView) === webView && $0.firstAttribute == .bottom
+        })
+        let originalTop = topConstraint.constant, originalBottom = bottomConstraint.constant
+        defer {
+            topConstraint.constant = originalTop
+            bottomConstraint.constant = originalBottom
+            controller.view.layoutIfNeeded()
+        }
+        topConstraint.constant = 31
+        bottomConstraint.constant = -19
+        controller.view.layoutIfNeeded()
+        let cssBounds = CGRect(x: 17, y: 23, width: 101, height: 79)
+        let nativeBounds = try XCTUnwrap(controller.nativeFrame(forWebViewBounds: cssBounds))
+        XCTAssertEqual(nativeBounds.origin.x, cssBounds.origin.x, accuracy: 0.5)
+        XCTAssertEqual(nativeBounds.origin.y, cssBounds.origin.y + 31, accuracy: 0.5)
+        let preview = UIView(frame: nativeBounds)
+        controller.view.insertSubview(preview, belowSubview: webView)
+        XCTAssertLessThan(controller.view.subviews.firstIndex(of: preview)!, controller.view.subviews.firstIndex(of: webView)!,
+            "The native preview must sit behind, not above, the actual WebView layer.")
+        preview.removeFromSuperview()
 
         var available = false
         let readyDeadline = Date().addingTimeInterval(30)

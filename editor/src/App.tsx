@@ -13,6 +13,7 @@ import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
 import About from './About';
 import Settings from './Settings';
+import CaptureRemovalDialog from './CaptureRemovalDialog';
 import Camera,{type CameraHandle,type CameraSaveResult,type CameraCaptureDetails} from './Camera';
 import {isVideo,isRaw,supportedMedia,mediaLimit,videoTime,videoExportPlan,type VideoExportMode,type VideoInfo} from './core/media';
 import {useStableTabScroll} from './use-stable-tab-scroll';
@@ -57,7 +58,7 @@ export default function App() {
   const [cameraOpen,setCameraOpen]=useState(false),cameraRef=useRef<CameraHandle>(null),cameraLastCapture=useRef<string|null>(null),cameraSession=useRef(0);
   const [updating,setUpdating]=useState(false);
   const [keepMetadata,setKeepMetadata]=useState(true);
-  const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0);
+  const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0),[processorEpoch,setProcessorEpoch]=useState(0);
   const [resolutions,setResolutions]=useState<Map<string,PhotoResolution>>(()=>new Map());
   const [expanded,setExpanded]=useState(false),[adjustmentsOpen,setAdjustmentsOpen]=useState(false);
   const [controlTab,setControlTab]=useState<'correction'|'enhancement'|'export'>('correction');
@@ -67,6 +68,7 @@ export default function App() {
   useEffect(()=>{const media=window.matchMedia('(max-width: 650px)'),change=()=>setNarrowControls(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[]);
   useEffect(()=>{if(!expanded||cameraOpen||settingsOpen)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[expanded,cameraOpen,settingsOpen]);
   const [photos,setPhotos]=useState<Photo[]>([]),[active,setActive]=useState<string|null>(null);
+  const [pendingCaptureRemoval,setPendingCaptureRemoval]=useState<Photo|null>(null),[captureRemovalError,setCaptureRemovalError]=useState('');
   const [clearCollectionOpen,setClearCollectionOpen]=useState(false),[clearingCollection,setClearingCollection]=useState(false);
   const collectionEpoch=useRef(0),clearingCollectionRef=useRef(false),pendingPhotoWrites=useRef<Set<string>>(new Set()),removedPhotoIds=useRef<Set<string>>(new Set()),clearDialogRef=useRef<HTMLDivElement>(null),clearCancelRef=useRef<HTMLButtonElement>(null),clearOpenerRef=useRef<HTMLButtonElement>(null),deferredShareIds=useRef<Set<string>>(new Set()),deferredFiles=useRef<File[][]>([]);
   useEffect(()=>{if(!clearCollectionOpen)return;clearCancelRef.current?.focus();const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();closeClearCollection();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[clearCollectionOpen]);
@@ -100,13 +102,15 @@ export default function App() {
   const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
   const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
+  const workerRecovery=useRef<{photoId:string|null;attempts:number}>({photoId:null,attempts:0});
+  const deferredWorkerFailure=useRef(false);
   const previewRenderQueue=useRef<{inFlight:number|null;pending:{type:'render';gen:number;request:number;recipe:Recipe;time:number}|null}>({inFlight:null,pending:null});
   const hdrWorkingCopies=useRef(new Map<string,{id:string;file:File}>()),hdrJobId=useRef<string|null>(null),hdrActive=useRef<{generation:number;photoId:string}|null>(null);
   const photoProcessor=useRef<Worker|null>(null),videoProcessor=useRef<Worker|null>(null);
   const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
   const iosSyncPromise=useRef<Promise<void>|null>(null),iosSyncSelectLatest=useRef(false),iosSyncAgain=useRef(false);
   const iosPhotosSaveAttempts=useRef(new Map<string,Promise<boolean>>());
-  photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||saving||customOpen||customLoading||hdrConverting;
+  photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||saving||!!pendingCaptureRemoval||customOpen||customLoading||hdrConverting;
   const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
   const video=!!photo&&isVideo(photo.file),exportFormat=video?'mp4':format;
   const pauseVideoPreview=useCallback(()=>{
@@ -161,10 +165,10 @@ export default function App() {
       const [descriptors,pending]=await Promise.all([listIOSCaptures(),drainIOSCaptures()]);
       if(epoch!==collectionEpoch.current)return;
       if(clearingCollectionRef.current){for(const item of pending)await setIOSCaptureVisible(item.id,false).catch(()=>{});return;}
-      const visible=descriptors.filter(item=>item.visible),loaded=await toIOSStoredPhotos(visible);
+      const visible=descriptors.filter(item=>item.visible&&!removedPhotoIds.current.has(item.id)),loaded=await toIOSStoredPhotos(visible);
       if(epoch!==collectionEpoch.current||clearingCollectionRef.current)return;
       const currentById=new Map(photoRef.current.filter(item=>item.nativeCapture).map(item=>[item.id,item]));
-      const entries=loaded.map(item=>{
+      const entries=loaded.filter(item=>!removedPhotoIds.current.has(item.id)).map(item=>{
         const current=currentById.get(item.id);if(!current)return {...item,url:URL.createObjectURL(item.previewFile!),past:[],future:[]} as Photo;
         return {...item,file:current.file,previewFile:current.previewFile,url:current.url,recipe:current.recipe??item.recipe,past:current.past,future:current.future,nativeCapture:{descriptor:item.nativeCapture!.descriptor,loaded:current.nativeCapture!.loaded}} as Photo;
       });
@@ -364,7 +368,9 @@ export default function App() {
     navigator.serviceWorker?.addEventListener('message',receive);
     return ()=>navigator.serviceWorker?.removeEventListener('message',receive);
   },[]);
+  const suspendWorkers=capabilities.nativeCamera&&cameraOpen;
   useEffect(()=>{
+    if(suspendWorkers){worker.current=null;photoProcessor.current=null;videoProcessor.current=null;return;}
     let w=new Worker(new URL('./processor.worker.ts',import.meta.url),{type:'module'});const v=new Worker(new URL('./video.worker.ts',import.meta.url),{type:'module'});worker.current=w;photoProcessor.current=w;videoProcessor.current=v;
     const receive=({data}:MessageEvent)=>{
       if(data.type==='custom-ready') {
@@ -426,7 +432,7 @@ export default function App() {
         if(!data.neutral){notify(t("Choose a midtone white or grey area, away from deep shadows and bright highlights."));}
         else {update(r=>({...r,manual:{...r.manual,neutral:data.neutral}}));notify(t("Neutral point applied. Undo if the selected area was not white or grey."));}
       } else if(data.type==='rendered') {
-        if(data.request===latest.current){if(data.analysis&&!previewPlayback.current.playing)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');
+        if(data.request===latest.current){workerRecovery.current={photoId:activeRef.current,attempts:0};if(data.analysis&&!previewPlayback.current.playing)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');
           if(previewPlayback.current.playing){const next=videoPreviewPlayhead(previewPlayback.current.startTime,previewPlayback.current.startedAt,performance.now(),videoDurationRef.current);if(next.ended){pauseVideoPreview();setPreviewTime(next.time);}else if(next.time>previewTimeRef.current+.001)setPreviewTime(next.time);}}
         data.original?.close();
         data.bitmap.close();
@@ -436,6 +442,11 @@ export default function App() {
         void finishExport(data.blob,data.metadataWarning);
       } else if(data.type==='error') {
         if(data.operation==='render'&&data.request!==latest.current)return;
+        if(data.operation==='load'||data.operation==='render'){
+          const id=activeRef.current;
+          if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+          if(id&&workerRecovery.current.attempts<1){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();setBusy(t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);return;}
+        }
         setModelStatus('');
         setBusy('');setExporting(false);setRendering(false);
         if(data.operation==='load')setReady(false);
@@ -444,9 +455,31 @@ export default function App() {
       }
     };
     w.onmessage=receive;v.onmessage=receive;
-    const fail=()=>{clearPreviewRenderQueue();pauseVideoPreview();setBusy('');setExporting(false);setReady(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));};const recoverPhotoWorker=()=>{w.terminate();w=new Worker(new URL('./processor.worker.ts',import.meta.url),{type:'module'});w.onmessage=receive;w.onerror=recoverPhotoWorker;photoProcessor.current=w;if(worker.current!==v)worker.current=w;fail();};w.onerror=recoverPhotoWorker;v.onerror=fail;
-    return ()=>{clearPreviewRenderQueue();w.terminate();v.terminate();worker.current=null;photoProcessor.current=null;videoProcessor.current=null;pendingBitmap.current?.close();};
-  },[]);
+    const fail=()=>{clearPreviewRenderQueue();pauseVideoPreview();setBusy('');setExporting(false);setReady(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));};
+    const recover=(failed:Worker)=>{
+      if(failed!==photoProcessor.current&&failed!==videoProcessor.current)return;
+      if(document.visibilityState==='hidden'){deferredWorkerFailure.current=true;return;}
+      const id=activeRef.current;
+      if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+      if(workerRecovery.current.attempts<1&&id){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();if(exporting){exportTarget.current=null;setExporting(false);notify(t("Export cancelled."));}const current=photoRef.current.find(item=>item.id===id);setBusy(current&&isVideo(current.file)?t("Opening video…"):t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);return;}
+      fail();
+    };
+    w.onerror=()=>recover(w);v.onerror=()=>recover(v);w.onmessageerror=()=>recover(w);v.onmessageerror=()=>recover(v);
+    return ()=>{clearPreviewRenderQueue();w.terminate();v.terminate();if(worker.current===w||worker.current===v)worker.current=null;if(photoProcessor.current===w)photoProcessor.current=null;if(videoProcessor.current===v)videoProcessor.current=null;pendingBitmap.current?.close();};
+  },[processorEpoch,suspendWorkers]);
+  useEffect(()=>{
+    const recoverOnForeground=()=>{
+      if(document.visibilityState!=='visible'||!deferredWorkerFailure.current||cameraOpen||saving||hdrConverting)return;
+      deferredWorkerFailure.current=false;const id=activeRef.current;if(!id)return;
+      if(exporting){exportTarget.current=null;setExporting(false);notify(t("Export cancelled."));}
+      if(customLoading){pendingModelBlob.current=null;pendingModelRestore.current=false;applyCustomModel.current=false;setCustomLoading(false);setCustomError(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));}
+      if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+      if(workerRecovery.current.attempts<1){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();const current=photoRef.current.find(item=>item.id===id);setBusy(current&&isVideo(current.file)?t("Opening video…"):t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);}
+      else{setBusy('');setReady(false);setRendering(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));}
+    };
+    document.addEventListener('visibilitychange',recoverOnForeground);window.addEventListener('pageshow',recoverOnForeground);window.addEventListener('focus',recoverOnForeground);recoverOnForeground();
+    return()=>{document.removeEventListener('visibilitychange',recoverOnForeground);window.removeEventListener('pageshow',recoverOnForeground);window.removeEventListener('focus',recoverOnForeground);};
+  },[cameraOpen,exporting,saving,customLoading,hdrConverting]);
   useEffect(()=>{
     if(modelRestoreStarted.current)return;modelRestoreStarted.current=true;let cancelled=false;
     loadRememberedCustomModel().then(saved=>{
@@ -462,7 +495,12 @@ export default function App() {
     videoProcessor.current.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,name:customModel.name,inputRange:customModel.inputRange,outputRange:customModel.outputRange,silent:true,expectedConfig:customModel});
   },[video,customFile,customModel]);
   useEffect(()=>{
-    if(capabilities.nativeCamera&&cameraOpen)return;
+    if(capabilities.nativeCamera&&cameraOpen){
+      pauseVideoPreview();clearPreviewRenderQueue();pendingBitmap.current?.close();pendingBitmap.current=null;
+      for(const canvas of [originalCanvas.current,editedCanvas.current])if(canvas){canvas.width=1;canvas.height=1;delete canvas.dataset.generation;delete canvas.dataset.request;}
+      setReady(false);setRendering(false);setBusy('');setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setModelStatus('');setAnalysis(null);setDimensions([1,1]);
+      return;
+    }
     pauseVideoPreview();
     clearPreviewRenderQueue();    if(!active){
       const converting=hdrActive.current;if(converting){hdrActive.current=null;void cancelHdrWorkingCopy();}disposeHdrWorkingCopies();setHdrConverting(false);hdrJobId.current=null;
@@ -473,6 +511,7 @@ export default function App() {
       return;
     }
     const p=photoRef.current.find(p=>p.id===active);if(!p)return;
+    if(workerRecovery.current.photoId!==p.id)workerRecovery.current={photoId:p.id,attempts:0};
     if(p.nativeCapture&&!p.nativeCapture.loaded){
       const token=++generation.current,epoch=collectionEpoch.current,controller=new AbortController();
       const clip=p.nativeCapture.descriptor.kind==='video';
@@ -497,7 +536,7 @@ export default function App() {
     const hdrCopy=hdrWorkingCopies.current.get(p.id);
     worker.current?.postMessage({type:'load',gen:loadGeneration,blob:hdrCopy?.file??p.file,photoResolution,photoDevice});
     return ()=>{const conversion=hdrActive.current;if(conversion?.generation===loadGeneration){hdrActive.current=null;void cancelHdrWorkingCopy();}const previous=photoRef.current.find(item=>item.id===active);if(previous?.recipe)persist(previous);if(previous?.nativeCapture?.loaded&&previous.previewFile&&!clearingCollectionRef.current)setPhotos(all=>all.map(item=>item.id===previous.id?{...item,file:previous.previewFile!,nativeCapture:{...item.nativeCapture!,loaded:false}}:item));};
-  },[active,photoResolution,photoReload,cameraOpen]);
+  },[active,photoResolution,photoReload,cameraOpen,processorEpoch]);
   useEffect(()=>{
     if(ready&&pendingBitmap.current&&originalCanvas.current){const b=pendingBitmap.current,c=originalCanvas.current;c.width=b.width;c.height=b.height;c.getContext('2d')!.drawImage(b,0,0);b.close();pendingBitmap.current=null;}
   },[ready]);
@@ -667,12 +706,32 @@ export default function App() {
   }
   async function removePhoto(p:Photo){
     if(exporting||saving||folderLoading||clearingCollectionRef.current)return;
-    if(p.nativeCapture&&!window.confirm(t('Remove this camera item from the collection? Its private original will be kept on this device.')))return;
+    if(p.nativeCapture){setCaptureRemovalError('');setPendingCaptureRemoval(p);return;}
     if(p.cameraCapture&&!window.confirm(t(p.cameraCapture.uri?'Delete this camera photo from the gallery and ClearWater? Its original and edits will also be deleted.':'Delete this camera original and its edits?')))return;
     setSaving(true);
     try{if(p.nativeCapture){await setIOSCaptureVisible(p.id,false);removedPhotoIds.current.add(p.id);detachPhotos(new Set([p.id]));}else{if(p.cameraCapture?.uri)await deleteAndroidCameraCapture(p.cameraCapture.uri);removedPhotoIds.current.add(p.id);await deletePhoto(p.id);detachPhotos(new Set([p.id]));}}
     catch{removedPhotoIds.current.delete(p.id);notify(t(p.nativeCapture?'Could not remove this camera item. Its private source is kept.':p.cameraCapture?'Could not delete the camera photo. Your original and edits are kept.':'Could not remove this collection item.'));}
     finally{setSaving(false);}
+  }
+  async function finishCaptureRemoval(permanent:boolean){
+    const target=pendingCaptureRemoval;
+    if(!target||saving||exporting)return;
+    setSaving(true);setCaptureRemovalError('');
+    // Block queued inventory reads and metadata writes from resurrecting this item.
+    removedPhotoIds.current.add(target.id);
+    try{
+      const current=photoRef.current.find(item=>item.id===target.id)??target;
+      if(permanent)await deleteIOSCapture(target.id);
+      else{
+        if(current.recipe)await setIOSCaptureRecipe(target.id,current.recipe as unknown as Record<string,unknown>);
+        await setIOSCaptureVisible(target.id,false);
+      }
+      detachPhotos(new Set([target.id]));setPendingCaptureRemoval(null);
+    }catch{
+      removedPhotoIds.current.delete(target.id);
+      setCaptureRemovalError(t('Could not remove this camera item. Its private source is kept.'));
+      await syncIOSCaptureRecords(false).catch(()=>{});
+    }finally{setSaving(false);}
   }
   sourceCleanup.current=async()=>{
     if(!isAndroid()||sourceCheckBusy.current||cameraOpen||cameraArchiveBusy||exporting||saving||busy||folderLoading||clearingCollectionRef.current)return;
@@ -709,7 +768,7 @@ export default function App() {
     setCameraArchiveBusy(true);
     try{
       const hidden=(await listIOSCaptures()).filter(capture=>!capture.visible);
-      for(const capture of hidden)await setIOSCaptureVisible(capture.id,true);
+      for(const capture of hidden){await setIOSCaptureVisible(capture.id,true);removedPhotoIds.current.delete(capture.id);}
       await syncIOSCaptureRecords(false);
       notify(t('Restored {0} private camera captures to the collection.',[hidden.length]));
     }catch{
@@ -721,9 +780,17 @@ export default function App() {
     if(!isIOSCameraAvailable()||cameraArchiveBusy||cameraOpen||saving||exporting||clearingCollectionRef.current)return;
     if(!window.confirm(t('Delete all private camera captures from this app? Independent copies already saved to Photos are not affected.')))return;
     setCameraArchiveBusy(true);
-    try{const captures=await listIOSCaptures(),deleted=new Set<string>();for(const capture of captures){await deleteIOSCapture(capture.id);deleted.add(capture.id);}detachPhotos(new Set(photoRef.current.filter(item=>deleted.has(item.id)).map(item=>item.id)));notify(t('Private camera captures deleted. Photos copies are unchanged.'));}
-    catch{await syncIOSCaptureRecords(false).catch(()=>{});notify(t('Could not delete all private camera captures. Remaining captures are kept.'));}
-    finally{setCameraArchiveBusy(false);}
+    const guarded=new Set<string>(),deleted=new Set<string>();
+    try{
+      const captures=await listIOSCaptures();
+      for(const capture of captures){guarded.add(capture.id);removedPhotoIds.current.add(capture.id);}
+      for(const capture of captures){await deleteIOSCapture(capture.id);deleted.add(capture.id);}
+      detachPhotos(deleted);notify(t('Private camera captures deleted. Photos copies are unchanged.'));
+    }catch{
+      for(const id of guarded)if(!deleted.has(id))removedPhotoIds.current.delete(id);
+      detachPhotos(deleted);await syncIOSCaptureRecords(false).catch(()=>{});
+      notify(t('Could not delete all private camera captures. Remaining captures are kept.'));
+    }finally{setCameraArchiveBusy(false);}
   }
   const clearBlocked=cameraArchiveBusy||exporting||saving||!!busy||folderLoading||customOpen||customLoading||sampleBusy||rendering||updating||saveDialog||hdrConverting;
   function openClearCollection(event:React.MouseEvent<HTMLButtonElement>){if(clearBlocked||clearingCollectionRef.current)return;clearOpenerRef.current=event.currentTarget;setClearError('');setClearCollectionOpen(true);}
@@ -889,6 +956,7 @@ export default function App() {
         <a className="about-footer" href="#about">{t("About & guide")}</a>
       </aside>
     </main>
+    {pendingCaptureRemoval&&<CaptureRemovalDialog filename={pendingCaptureRemoval.file.name} busy={saving} error={captureRemovalError} onCancel={()=>{if(!saving)setPendingCaptureRemoval(null);}} onHide={()=>void finishCaptureRemoval(false)} onDelete={()=>void finishCaptureRemoval(true)}/>}
     {clearCollectionOpen&&<div className="modal-shade"><div ref={clearDialogRef} className="export-dialog clear-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-collection-title" aria-describedby="clear-collection-description" onKeyDown={e=>{if(e.key!=='Tab')return;const items=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]'));if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}><h2 id="clear-collection-title">{t("Clear collection?")}</h2><p id="clear-collection-description">{capabilities.nativeCamera?t("On iOS, clearing hides camera captures and removes imported app copies and edits. Private camera originals stay in the app; exported files and Photos copies stay untouched. Restore hidden captures in Settings."):t("Removes thumbnails, app copies and saved edits. Original and exported files stay untouched.")}</p>{clearError&&<p className="clear-error" role="alert">{message(clearError)}</p>}<div className="clear-actions"><button ref={clearCancelRef} className="button secondary" disabled={clearingCollection} onClick={closeClearCollection}>{t("Cancel")}</button><button className="button primary" disabled={clearBlocked||clearingCollection} onClick={()=>void clearCollection()}>{clearingCollection?t("Clearing…"):t("Clear collection")}</button></div></div></div>}
     {saveDialog&&<div className="modal-shade"><div className="export-dialog save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><h2 id="save-title">{t("Save as")}</h2><label>{t("Filename")}<input aria-label={t("Export filename")} value={saveName} onChange={e=>setSaveName(e.target.value)}/></label><p>{outputFolder?t("Folder: {0}",[outputFolder.name]):t("Choose a folder to save your restored file.")} {t("Existing names get a number.")}</p><button className="button primary" disabled={!saveName.trim()||exporting} onClick={()=>exportPhoto(true)}>{outputFolder?t("Save copy"):t("Choose folder and save")}</button>{outputFolder&&<button className="button secondary" disabled={exporting} onClick={()=>exportPhoto(true,true)}>{t("Choose another folder…")}</button>}<button className="button secondary" disabled={exporting} onClick={()=>setSaveDialog(false)}>{t("Cancel")}</button></div></div>}
     {customOpen&&<div className="modal-shade"><div className="export-dialog research-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-title"><h2 id="custom-title">{t("Load other ONNX model")}</h2><p>{t("Choose a self-contained RGB image-to-image model (up to 64 MB). This adapter supports one float32 NCHW input and output at 256 × 256. Other layouts, sizes, extra inputs and super-resolution models need a different adapter.")}</p><p>{t("Use the model’s documented colour ranges below. After validation, the model and ranges are kept on this device for later launches.")}</p>{recipe?.customModel&&<p>{t("Recipe model:")} {recipe.customModel.name}</p>}<label>{t("ONNX file")}<input aria-label={t("ONNX model file")} type="file" accept=".onnx" disabled={customLoading} onChange={e=>{const file=e.target.files?.[0]??null;if(file)modelSelectionStarted.current=true;setCustomCandidate(file);setCustomError('');}}/></label><div className="context-grid"><label>{t("Input range")}<select aria-label={t("Model input range")} value={inputRange} disabled={customLoading} onChange={e=>setInputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label><label>{t("Output range")}<select aria-label={t("Model output range")} value={outputRange} disabled={customLoading} onChange={e=>setOutputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label></div><label className="research-consent"><input type="checkbox" checked={customAccepted} disabled={customLoading} onChange={e=>setCustomAccepted(e.target.checked)}/> {t("I have permission to use this model and will follow its licence.")}</label>{customError&&<p className="model-error" role="alert">{message(customError)}</p>}<button className="button primary" disabled={!customAccepted||!customCandidate||customLoading} onClick={()=>{if(!customCandidate)return;setCustomError('');setCustomLoading(true);pendingModelBlob.current=customCandidate;pendingModelRestore.current=false;applyCustomModel.current=true;worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customCandidate,name:customCandidate.name,inputRange,outputRange});}}>{customLoading?t("Validating model…"):t("Load model")}</button><button className="button secondary" disabled={customLoading} onClick={cancelCustom}>{t("Cancel")}</button></div></div>}

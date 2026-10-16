@@ -1,5 +1,18 @@
 # iOS native camera and sideloading plan
 
+## Phone regression follow-up (16 October 2026)
+
+The user’s iPhone test of `a2f3da4` exposed native preview placement/z-order, camera interruption, editor recovery and confusing private-capture removal. Its earlier automated pass did not establish hardware acceptance. The current follow-up integrates reviewed origin/main `fedb5d5`, including the About introduction/downloads/artwork credits and shared Android camera fixes. Android files remain identical to that main revision; Android physical testing stays paused. Unrelated main-checkout changes are preserved.
+
+The Capacitor controller used WKWebView itself as its root view, so the native preview was incorrectly inserted inside the web view hierarchy. The bridge now wraps the existing WKWebView in a UIView host and places the preview as a sibling beneath it; UIKit converts React bounds into host coordinates. A hosted XCTest exercises the actual scene/WebView, inset coordinates and sibling order. Layout changes do not restart capture. Temporary AVFoundation interruption keeps the session/controller available for interruption-ended recovery; permanent/background closure still releases resources and restores scoped policies. The picker retains a bounded owned uncorrected image rather than pinning a camera sample buffer.
+
+Opening native capture retires editor workers/canvases; closing creates fresh workers and reloads the selected source. Worker errors receive one bounded restart/reload. Imported originals are retained through later recipe/thumbnail writes, and native source reads reject incomplete bytes. These changes prevent known stale-worker/placeholder paths; they cannot reconstruct an already missing or damaged imported original. Keep originals and edits available for retry and do not require uninstalling the app.
+
+Individual iOS capture removal offers Hide (recover via Settings > Restore hidden captures) or permanent deletion of the capture’s private files and saved edits. Photos copies are independent and untouched by either choice. Private files live in the app’s Application Support capture store, not the Photos library; camera videos retain enhanced media only. Clearing the collection keeps its existing recoverable behavior.
+
+Validation is in progress. A new unsigned IPA and full hosted native test run are required before delivery. Real iPhone gates: preview stays inside its box beneath close/zoom/depth controls; screenshot/notification interruption resumes or offers recovery; returning to editor and switching models work without killing the app; imported and native sources reopen after a cold launch; Hide/Restore and permanent deletion behave as described. Also retain the outstanding Photos, orientation, video/audio, long recording, low-storage and memory/thermal checks. Browser mocks and simulator tests do not establish iPhone hardware acceptance.
+
+
 Status: camera UI catch-up phone-test IPA ready, 16 October 2026. Current main 3298d69 is merged into codex/ios-native-camera. Build a2f3da4 / run 38848226344 passes 161 shared tests and 22 native tests. The new Photos, captured-video editor and camera UI behavior still need the iPhone retest below.
 
 
@@ -254,6 +267,10 @@ Camera layout follow-up (16 October): the Android native camera keeps its contro
 
 ## Camera UI catch-up prompt
 
+Capture-resolution follow-up: preview bounds must crop only the display, not the saved native photo/video frame. Android no longer attaches the preview ViewPort to its capture group; retain the selected still resolution and video quality independently on iOS too. Photo results report actual JPEG dimensions after EXIF orientation. The shared bridge now includes `sessionGeneration` in session info and a `cameraInfoChanged` event carrying that generation plus `photoWidth`/`photoHeight`, so sensor rotation updates the resolution chip without moving controls or rebinding capture. Ignore old-session events and freeze video orientation at recording start.
+
+Lifecycle follow-up: retire the native renderer before stopping/unbinding a preview session. Queued correction updates must retain the next recipe without reaching a released renderer. Resume with a fresh renderer, preserve pending startup ownership, and report active rendering failures rather than crashing. Verify background/return with AI enabled and the first microphone-permission transition on a real iPhone.
+
 Use this for an iOS agent that has already started work:
 
 ```text
@@ -267,3 +284,5 @@ Zoom tap cycles supported choices; long press opens actual lens/zoom options. La
 
 Include the shared landscape editor change that lets the collection scroll off screen. Preserve English, Hong Kong written Traditional Chinese and Japanese. Run shared checks and the isolated iOS build, then report what still needs a real iPhone. Android device checks are currently paused; preserve that boundary and do not claim iPhone validation from browser or Android results.
 ```
+
+About now shows iOS (IPA) as Coming soon. Replace that state with an actual platform-specific download URL only after an IPA exists. Avoid promoting an iOS-only GitHub release to latest while Android uses releases/latest/download/clearwater-release.apk; use an iOS-specific release link or coordinate assets across platforms.

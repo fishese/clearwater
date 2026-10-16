@@ -53,3 +53,17 @@ Package: https://registry.npmjs.org/heic-to/-/heic-to-1.6.6.tgz
 Wrapper source and decoder build instructions: https://github.com/hoppergee/heic-to
 Decoder source: https://github.com/strukturag/libheif/tree/v1.23.6
 The wrapper repository README documents the Emscripten decoder build changes.
+
+React/React DOM, Capacitor core/Android, Lucide React and ONNX Runtime Web/Common:
+runtime MIT/ISC notices and helper Apache/BSD notices are combined in LICENSE-Runtime.txt. React/React DOM and
+Capacitor core/Android share their respective package copyright and licence text.
+ONNX Runtime's pinned v1.30.0 upstream inventory is preserved in NOTICE-ONNX-Runtime.txt;
+it includes upstream components beyond those used by the browser/WASM build.
+Source: https://github.com/microsoft/onnxruntime/tree/v1.30.0
+
+App icon artwork: Fish3 by Darius Dan and Coral (author unknown), from SVG Repo.
+Both supplied source pages label the vectors CC0/public domain:
+https://www.svgrepo.com/svg/317012/fish3
+https://www.svgrepo.com/svg/2942/coral
+
+LICENSE-Runtime.txt also retains notices for Scheduler and the bundled ONNX JavaScript helpers: FlatBuffers, Long, Platform.js, Protobuf.js and its @protobufjs helper packages.

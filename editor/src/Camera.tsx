@@ -93,6 +93,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const nativeSessionActiveRef = useRef(false);
+  const recoverableNativeErrorRef = useRef(false);
   const nativeRecordingRef = useRef(false);
   const nativeFrameBusyRef = useRef(false);
   const nativeLastFrameAtRef = useRef(0);
@@ -124,6 +125,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [ready, setReady] = useState(false);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState('');
+  const [nativeInterrupted,setNativeInterrupted]=useState(false);
   const [pickingBalance,setPickingBalance]=useState(false);
   const [balanceLocked,setBalanceLocked]=useState(false);
   const [savePending,setSavePending]=useState(false);
@@ -555,6 +557,16 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         else handles.push(handle);
       }).catch(() => {});
     };
+    attach(nativeCamera.addListener('cameraInfoChanged', event => {
+      if (!aliveRef.current || !nativeSessionActiveRef.current) return;
+      const current = nativeInfoRef.current;
+      if (!current || current.sessionGeneration !== event.sessionGeneration) return;
+      const updated = { ...current, photoWidth: event.photoWidth, photoHeight: event.photoHeight };
+      nativeInfoRef.current = updated;
+      setNativeInfo(updated);
+      setDepthChooserOpen(false);setZoomChooserOpen(false);
+      if(recoverableNativeErrorRef.current){recoverableNativeErrorRef.current=false;setNativeInterrupted(false);setError('');setStarting(false);setReady(true);}
+    }));
     attach(nativeCamera.addListener('recordingFinished', result => {
       nativeRecordingRef.current = false;
       recordingRef.current = false;
@@ -573,8 +585,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     }));
     attach(nativeCamera.addListener('cameraError', event => {
       if (!aliveRef.current) return;
-      setError(event.message || 'Could not start the camera.');
-      if(event.sessionClosed){whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);setLoupeVisible(false);void releaseCamera();}
+      setError(event.recoverable&&!event.sessionClosed?'Camera interrupted.':event.message || 'Could not start the camera.');
+      recoverableNativeErrorRef.current=event.recoverable===true&&!event.sessionClosed;
+      setNativeInterrupted(recoverableNativeErrorRef.current);
+      if(event.sessionClosed){recoverableNativeErrorRef.current=false;whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);setLoupeVisible(false);setDepthChooserOpen(false);setZoomChooserOpen(false);void releaseCamera();setNativeInterrupted(false);}
+      else if(recoverableNativeErrorRef.current){setReady(false);setStarting(false);setDepthChooserOpen(false);setZoomChooserOpen(false);setPickingBalance(false);setLoupeVisible(false);}
     }));
     return () => {
       disposed = true;

@@ -38,6 +38,9 @@ function finishTransaction<T>(db:IDBDatabase,tx:IDBTransaction,value:()=>T):Prom
 function hasFile(value:unknown):value is File {
   return !!value&&typeof value==='object'&&typeof (value as File).name==='string'&&typeof (value as File).slice==='function';
 }
+function hasSourceBytes(value:unknown):value is File {
+  return hasFile(value)&&(value as File).size>0;
+}
 function namedCameraFile(original:StoredPhoto,metadata?:PhotoMetadata):File {
   const name=metadata?.cameraCapture?.name??original.cameraCapture?.name;
   if(!name||name===original.file.name)return original.file;
@@ -86,7 +89,7 @@ export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
     const originals=tx.objectStore(CAMERA_ORIGINALS),existing=originals.get(photo.id);
     existing.onsuccess=()=>{
       const archived=existing.result as StoredPhoto|undefined;
-      if(!archived||!hasFile(archived.file))originals.put(photo);
+      if(!archived||!hasSourceBytes(archived.file)){if(hasSourceBytes(photo.file))originals.put(photo);}
       else {
         const {file,...metadata}=photo;
         const name=photo.cameraCapture?.name??archived.file.name;
@@ -96,7 +99,14 @@ export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
     };
     const {file:_,...metadata}=photo;
     tx.objectStore(PHOTOS).put(metadata);
-  }else tx.objectStore(PHOTOS).put(photo);
+  }else{
+    const store=tx.objectStore(PHOTOS),existing=store.get(photo.id);
+    existing.onsuccess=()=>{
+      const current=existing.result as StoredPhoto|undefined;
+      if(current&&hasSourceBytes(current.file))store.put({...photo,file:current.file});
+      else if(hasSourceBytes(photo.file))store.put(photo);
+    };
+  }
   return finishTransaction(db,tx,()=>undefined);
 });
 export const deletePhoto=(id:string)=>enqueueWrite(async()=>{

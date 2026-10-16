@@ -88,6 +88,8 @@ protocol ClearWaterCameraViewControllerDelegate: AnyObject {
     func cameraViewController(_ controller: ClearWaterCameraViewController, didFail message: String, captureID: UUID?)
     func cameraViewController(_ controller: ClearWaterCameraViewController, recordingState: String)
     func cameraViewControllerDidClose(_ controller: ClearWaterCameraViewController)
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didResumeWith info: [String: Any])
+    func cameraViewController(_ controller: ClearWaterCameraViewController, didInterrupt message: String)
     func cameraViewController(_ controller: ClearWaterCameraViewController, saveCaptureToPhotos id: UUID, completion: @escaping (Bool, String?) -> Void)
 }
 
@@ -122,6 +124,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var closeFinishFlag = false
     private(set) var embeddedSessionCloseReason: String?
     private var backgroundFlag = false
+    private var interruptedFlag = false
     private var audioEnabledFlag = false
     private var pickedNeutralFlag = false
     private var closeRequested: Bool {
@@ -138,6 +141,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return backgroundFlag }
         set { lifecycleLock.lock(); backgroundFlag = newValue; lifecycleLock.unlock() }
     }
+    private var sessionInterrupted: Bool {
+        get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return interruptedFlag }
+        set { lifecycleLock.lock(); interruptedFlag = newValue; lifecycleLock.unlock() }
+    }
     private var audioEnabled: Bool {
         get { lifecycleLock.lock(); defer { lifecycleLock.unlock() }; return audioEnabledFlag }
         set { lifecycleLock.lock(); audioEnabledFlag = newValue; lifecycleLock.unlock() }
@@ -147,6 +154,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         set { lifecycleLock.lock(); pickedNeutralFlag = newValue; lifecycleLock.unlock() }
     }
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    private var restartPending = false
     private var configured = false
     private var runtimeRecoveryAttempts = 0
     private var captureInFlight = false
@@ -157,6 +165,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var pendingRecordingMessage: String?
     private var latestRendered: CIImage?
     private var latestSource: CIImage?
+    private var latestSourceSize: CGSize?
+    // Owned, bounded picker pixels are refreshed twice a second. Keeping a CIImage
+    // made directly from every sample buffer pins the camera's full IOSurface.
+    private var lastPickerFrameTime: TimeInterval = 0
     // Preview buffers are reused with a hard allocation threshold; resolution changes
     // on camera flip drop the prior pool rather than retaining full-frame IOSurfaces.
     private var previewPool: CVPixelBufferPool?
@@ -202,9 +214,11 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let index = options.minutes == 1 ? 0 : options.minutes == 3 ? 1 : 2
         return (options.quality == "high" ? high[index] : standard[index]) * 1024 * 1024
     }
+    private var sessionGeneration: Int
 
-    init(options: ClearWaterCameraOptions) throws {
+    init(options: ClearWaterCameraOptions, sessionGeneration: Int = 0) throws {
         self.options = options
+        self.sessionGeneration = sessionGeneration
         audioEnabledFlag = options.microphoneEnabled
         cameraPosition = options.facing
         processor = try ClearWaterBalancedProcessor()
@@ -304,12 +318,18 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 DispatchQueue.main.async {
                     guard !self.backgrounded, !self.closeRequested,
                           !["capturing", "startingRecording", "recording", "finalising"].contains(self.state) else { return }
+                    let resumed = self.sessionInterrupted
+                    if resumed {
+                        self.sessionInterrupted = false
+                    }
                     self.setState("ready")
+                    if resumed { self.delegate?.cameraViewController(self, didResumeWith: self.nativeInfo()) }
                 }
             } catch {
                 DispatchQueue.main.async {
                     guard !self.backgrounded, !self.closeRequested else { return }
                     self.fail(self.text("The camera could not start.", "The camera could not start."))
+                    if self.sessionInterrupted { self.closeAfterRuntimeFailure() }
                 }
             }
         }
@@ -481,7 +501,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard !closeRequested else { return }
+        guard !closeRequested, !sessionInterrupted else { return }
         autoreleasepool { processCaptureOutput(output, sampleBuffer: sampleBuffer) }
     }
     private func processCaptureOutput(_ output: AVCaptureOutput, sampleBuffer: CMSampleBuffer) {
@@ -491,7 +511,15 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let recording = movieWriter != nil && writerAcceptingFrames
         if !recording && !options.embedded { updateAnalysisIfDue(source) }
         let recipe = snapshotRecipe(forClip: recording)
-        frameLock.lock(); latestSource = source; frameLock.unlock()
+        let sourceSize = source.extent.size
+        frameLock.lock()
+        latestSourceSize = sourceSize
+        frameLock.unlock()
+        let frameTime = ProcessInfo.processInfo.systemUptime
+        if frameTime - lastPickerFrameTime >= 0.5, let ownedPickerImage = makeOwnedPickerImage(from: source) {
+            lastPickerFrameTime = frameTime
+            frameLock.lock(); latestSource = ownedPickerImage; frameLock.unlock()
+        }
         let size = previewSize(width: CVPixelBufferGetWidth(sourceBuffer), height: CVPixelBufferGetHeight(sourceBuffer))
         if let pool = previewBufferPool(size: size) {
             switch renderPreview(source, recipe: recipe, size: size, pool: pool) {
@@ -515,6 +543,17 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
     }
     private enum PreviewRenderResult { case frame(CVPixelBuffer), backpressure, failure }
+    private func makeOwnedPickerImage(from source: CIImage) -> CIImage? {
+        let size = ClearWaterCameraOrientation.sampleSize(width: source.extent.width, height: source.extent.height, maximum: 640)
+        guard size.width > 0, size.height > 0, let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else { return nil }
+        let target = CGRect(origin: .zero, size: size)
+        let extent = source.extent
+        let scaled = source.transformed(by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY))
+            .transformed(by: CGAffineTransform(scaleX: size.width / extent.width, y: size.height / extent.height))
+            .cropped(to: target)
+        guard let image = ciContext.createCGImage(scaled, from: target, format: .RGBA8, colorSpace: colorSpace) else { return nil }
+        return CIImage(cgImage: image)
+    }
     private func renderPreview(_ source: CIImage, recipe: NativeBalancedRecipe, size: CGSize, pool: CVPixelBufferPool) -> PreviewRenderResult {
         var destination: CVPixelBuffer?
         let attributes = [kCVPixelBufferPoolAllocationThresholdKey as String: 3] as CFDictionary
@@ -637,7 +676,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func nativeInfo() -> [String: Any] {
         let device = cameraInput?.device
         let dimensions = photoOutput.maxPhotoDimensions
-        frameLock.lock(); let frameSize = latestSource?.extent.size; frameLock.unlock()
+        frameLock.lock(); let frameSize = latestSourceSize; frameLock.unlock()
         let formatSize = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         var previewWidth = Int(frameSize?.width ?? CGFloat(formatSize?.width ?? 0))
         var previewHeight = Int(frameSize?.height ?? CGFloat(formatSize?.height ?? 0))
@@ -647,6 +686,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if captureOrientationAngle == 90 || captureOrientationAngle == 270 { swap(&photoWidth, &photoHeight) }
         return ["width": max(1, previewWidth), "height": max(1, previewHeight),
                 "photoWidth": photoWidth, "photoHeight": photoHeight, "zoom": zoom,
+                "sessionGeneration": sessionGeneration,
                 "minZoom": device?.minAvailableVideoZoomFactor ?? 1, "maxZoom": device?.maxAvailableVideoZoomFactor ?? 1,
                 "lensId": device?.uniqueID ?? "", "lenses": availableLenses()]
     }
@@ -855,7 +895,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             let withAudio = self.audioEnabled && self.audioInput != nil
             self.session.commitConfiguration()
             self.frameLock.lock()
-            let frameSize = self.latestSource?.extent.size
+            let frameSize = self.latestSourceSize
             self.frameLock.unlock()
             let portraitSourceSize: CGSize
             if let frameSize { portraitSourceSize = frameSize }
@@ -883,6 +923,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     self.movieWriter = writer; self.writerIncludesAudio = withAudio; self.captureID = id; self.videoURL = url; self.writerAcceptingFrames = true
                     DispatchQueue.main.async {
                         self.setState("recording"); self.recordButton.setImage(UIImage(systemName: "stop.circle.fill"), for: .normal)
+                        if self.sessionInterrupted {
+                            self.stopRecordingWithError(self.text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted."))
+                            return
+                        }
                         self.recordingStartedAt = ProcessInfo.processInfo.systemUptime
                         self.updateElapsedTime()
                         self.elapsedTimer?.invalidate()
@@ -1031,8 +1075,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             }
             self.mediaQueue.async {
                 self.writerAcceptingFrames = false
-                self.frameLock.lock(); self.latestSource = nil; self.latestRendered = nil; self.frameLock.unlock()
-                self.previewPool = nil; self.previewPoolSize = nil
+                self.frameLock.lock(); self.latestSource = nil; self.latestSourceSize = nil; self.latestRendered = nil; self.frameLock.unlock()
+                self.previewPool = nil; self.previewPoolSize = nil; self.lastPickerFrameTime = 0
                 self.recipeLock.lock(); self.photoRecipes.removeAll(); self.recipeLock.unlock()
                 DispatchQueue.main.async {
                     self.metalView.isPaused = true; self.metalView.delegate = nil
@@ -1161,7 +1205,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func releaseHardwareWhiteBalance() {
         pickedNeutral = false; hardwareWhiteBalanceLocked = false
         recipeLock.lock(); currentRecipe.manual.neutral = [1, 1, 1]; recipeLock.unlock()
-        frameLock.lock(); latestSource = nil; latestRendered = nil; frameLock.unlock()
+        frameLock.lock(); latestSource = nil; latestSourceSize = nil; latestRendered = nil; frameLock.unlock()
         sessionQueue.async { [weak self] in
             guard let device = self?.cameraInput?.device else { return }
             do { try device.lockForConfiguration(); if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }; device.unlockForConfiguration() } catch {}
@@ -1192,18 +1236,31 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         UIApplication.shared.endBackgroundTask(backgroundTask); backgroundTask = .invalid
     }
     private func interrupted() {
-        let message = text("Camera interrupted.", "Camera interrupted.")
-        if options.embedded { closeRequested = true; embeddedSessionCloseReason = "interrupted" }
-        if state == "recording" { stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted.")); return }
-        if state == "capturing" || state == "startingRecording" || state == "finalising" { statusLabel.text = message; return }
-        setState("error"); statusLabel.text = message
-        if options.embedded {
-            delegate?.cameraViewController(self, didFail: message, captureID: nil)
-            finishClose()
+        guard !closeRequested else { return }
+        sessionInterrupted = true
+        let message = text("Camera interrupted. Waiting to resume.", "Camera interrupted. Waiting to resume.")
+        delegate?.cameraViewController(self, didInterrupt: message)
+        mediaQueue.async { [weak self] in
+            guard let self else { return }
+            self.frameLock.lock(); self.latestSource = nil; self.latestSourceSize = nil; self.latestRendered = nil; self.frameLock.unlock()
+            self.previewPool = nil; self.previewPoolSize = nil; self.lastPickerFrameTime = 0
+        }
+        if state == "recording" {
+            stopRecordingWithError(text("Recording stopped because the camera was interrupted.", "Recording stopped because the camera was interrupted."))
+        } else if state == "ready" || state == "starting" {
+            setState("starting")
+            statusLabel.text = message
+        } else if state == "capturing" || state == "startingRecording" || state == "finalising" {
+            statusLabel.text = message
         }
     }
     private func restartIfActive() {
-        guard !backgrounded, !closeRequested else { return }; releaseHardwareWhiteBalance(); requestCamera()
+        guard !backgrounded, !closeRequested else { return }
+        if ["capturing", "startingRecording", "recording", "finalising"].contains(state) { restartPending = true; return }
+        restartPending = false
+        releaseHardwareWhiteBalance()
+        setState("starting")
+        requestCamera()
     }
     private func checkThermalState() {
         if ProcessInfo.processInfo.thermalState == .critical && state == "recording" { stopRecordingWithError(text("Recording stopped because the device is too hot.", "Recording stopped because the device is too hot.")) }
@@ -1224,6 +1281,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         recordButton.isEnabled = value == "ready" || value == "recording"
         pickerButton.isEnabled = value == "ready"; strengthSlider.isEnabled = value == "ready"; resetButton.isEnabled = value == "ready"
         if value != "recording" && value != "finalising" { recordButton.setImage(UIImage(systemName: "record.circle"), for: .normal); recordButton.accessibilityLabel = text("Start recording", "Start recording") }
+        if value == "ready", restartPending, sessionInterrupted, !backgrounded, !closeRequested {
+            restartPending = false
+            DispatchQueue.main.async { [weak self] in self?.restartIfActive() }
+        }
     }
     private func fail(_ message: String) { setState("error"); statusLabel.text = message; delegate?.cameraViewController(self, didFail: message, captureID: nil) }
     private enum CameraError: Error { case unavailable, processing, writer, cancelled }
