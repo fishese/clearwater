@@ -449,3 +449,9 @@ body.native-camera .camera-close-button{background:#101c20e8}
  .camera-page .camera-photo{width:76px;min-width:76px;height:76px;min-height:76px}
  .camera-page .camera-record{width:58px;min-width:58px;height:58px;min-height:58px}
 }
+
+/* On short phone landscape screens, let the collection follow the page below the editor. */
+@media (orientation:landscape) and (min-width:651px) and (max-width:900px) and (max-height:540px){
+ .studio{height:auto;grid-template-rows:calc(100dvh - 56px) auto}
+ .library{overflow:visible}
+}

@@ -17,6 +17,29 @@ export const CAMERA_AUDIO_VIDEO_MIME_TYPES = [
 export const CAMERA_MAX_RECORDING_MS = 60_000;
 export const CAMERA_MAX_RECORDING_BYTES = 64 * 1024 * 1024;
 
+export interface CameraFrameRect { left:number;top:number;width:number;height:number }
+
+/** Map a screen point to a source pixel using the preview's contain or cover fit. */
+export function cameraFramePoint(
+  clientX:number,
+  clientY:number,
+  rect:CameraFrameRect,
+  width:number,
+  height:number,
+  fit:'contain'|'cover'='contain',
+):{x:number;y:number}|null {
+  if(!width||!height||!rect.width||!rect.height)return null;
+  if(clientX<rect.left||clientX>rect.left+rect.width||clientY<rect.top||clientY>rect.top+rect.height)return null;
+  const scale=fit==='cover'?Math.max(rect.width/width,rect.height/height):Math.min(rect.width/width,rect.height/height);
+  const displayWidth=width*scale,displayHeight=height*scale;
+  const left=rect.left+(rect.width-displayWidth)/2,top=rect.top+(rect.height-displayHeight)/2;
+  if(fit==='contain'&&(clientX<left||clientX>left+displayWidth||clientY<top||clientY>top+displayHeight))return null;
+  return {
+    x:Math.max(0,Math.min(width-1,(clientX-left)/scale)),
+    y:Math.max(0,Math.min(height-1,(clientY-top)/scale)),
+  };
+}
+
 /** Pick an MP4 type supported by MediaRecorder; never fall back to WebM. */
 export function chooseCameraVideoMimeType(isSupported: (mimeType: string) => boolean, withAudio = false): string | null {
   return (withAudio ? CAMERA_AUDIO_VIDEO_MIME_TYPES : CAMERA_VIDEO_MIME_TYPES).find(isSupported) ?? null;

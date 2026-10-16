@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from 'react';
 import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff, ZoomIn, Camera as CameraIcon, SlidersHorizontal, Sparkles, LoaderCircle } from 'lucide-react';
-import { makeCameraRecipe, pickCameraNeutral, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
+import { makeCameraRecipe, pickCameraNeutral, cameraFramePoint, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
 import { cameraQualityProfile } from './core/camera-quality';
 import { cameraNextZoomPreset, cameraZoomPresets, cameraZoomValue, labeledRearCameras, type ZoomRange } from './core/camera-zoom';
@@ -43,16 +43,6 @@ function formatElapsed(milliseconds: number): string {
 function currentCameraBounds(stage: HTMLElement): NativeCameraBounds {
   const rect = stage.getBoundingClientRect();
   return { x: rect.left, y: rect.top, width: rect.width, height: rect.height, pixelRatio: window.devicePixelRatio || 1 };
-}
-
-function cameraFramePoint(clientX: number, clientY: number, rect: DOMRect, width: number, height: number): { x: number; y: number } | null {
-  if (!width || !height || !rect.width || !rect.height) return null;
-  const scale = Math.min(rect.width / width, rect.height / height);
-  const displayWidth = width * scale, displayHeight = height * scale;
-  const left = rect.left + (rect.width - displayWidth) / 2;
-  const top = rect.top + (rect.height - displayHeight) / 2;
-  if (clientX < left || clientX > left + displayWidth || clientY < top || clientY > top + displayHeight) return null;
-  return { x: Math.max(0, Math.min(width - 1, (clientX - left) / displayWidth * width)), y: Math.max(0, Math.min(height - 1, (clientY - top) / displayHeight * height)) };
 }
 
 type CameraAiRecipe = Recipe & { cameraColour?: { matrix: number[]; source: 'fivea' } };
@@ -660,7 +650,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     if(!source||!loupe||!source.width||!source.height)return;
     const rect=previewCanvasRef.current?.getBoundingClientRect();
     if(!rect)return;
-    const point=cameraFramePoint(event.clientX,event.clientY,rect,source.width,source.height);
+    const point=cameraFramePoint(event.clientX,event.clientY,rect,source.width,source.height,nativeSessionActiveRef.current?'cover':'contain');
     if(!point)return;
     const {x,y}=point;
     const ctx=loupe.getContext('2d');if(!ctx)return;
@@ -679,7 +669,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     const height=source instanceof HTMLCanvasElement?source.height:source?.videoHeight;
     if(!source||!current||!width||!height)return;
     const rect=event.currentTarget.getBoundingClientRect();
-    const point=cameraFramePoint(event.clientX,event.clientY,rect,width,height);
+    const point=cameraFramePoint(event.clientX,event.clientY,rect,width,height,nativeSessionActiveRef.current?'cover':'contain');
     if(!point){setError('Tap inside the camera image.');return;}
     const {x,y}=point;
     const patch=document.createElement('canvas');patch.width=9;patch.height=9;
@@ -1074,7 +1064,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
             <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
           </label>}
           {hasCameraChoices && <div className="camera-lens-choices" role="group" aria-label={t(nativeActive ? 'Camera lenses' : 'Rear cameras')}>
-            {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
+            {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
           </div>}
         </div>}
       </div>}

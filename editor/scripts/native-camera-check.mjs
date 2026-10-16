@@ -123,7 +123,18 @@ try {
   await page.mouse.move((await zoom.boundingBox()).x + 20, (await zoom.boundingBox()).y + 20);
   await page.mouse.down(); await page.waitForTimeout(600); await page.mouse.up();
   await page.locator('#camera-zoom-chooser').waitFor();
-  assert.deepEqual(await page.locator('.camera-lens-choice span').allTextContents(), ['Rear ultra wide · 0.5×', 'Rear wide · 1×', 'Front camera · 1×']);
+  for (const [language, frontLabel] of [['en', 'Front camera'], ['zh-HK', '前置鏡頭'], ['ja', '前面カメラ']]) {
+    await page.evaluate(language => {
+      localStorage.setItem('clearwater-language', language);
+      window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
+    }, language);
+    const lensLabels = await page.locator('.camera-lens-choice span').allTextContents();
+    assert.deepEqual(lensLabels, ['Rear ultra wide · 0.5×', 'Rear wide · 1×', `${frontLabel} · 1×`], `${language} front camera label`);
+  }
+  await page.evaluate(() => {
+    localStorage.setItem('clearwater-language', 'en');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
+  });
   await page.getByRole('button', { name: /Rear ultra wide/ }).click();
   assert.equal(await zoom.innerText(), '0.5×', 'displayed magnification uses the reported native lens factor');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setLens')));

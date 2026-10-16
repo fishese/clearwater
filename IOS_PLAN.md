@@ -151,3 +151,23 @@ Camera-specific device behaviour: keep the screen awake only while capture mode 
 Android now exposes static Edit/Camera shortcuts and consumes 'clearwater://edit' / 'clearwater://camera' on cold and warm launches. The shared 'use-launch-mode.ts' hook consumes web '?mode=camera|edit' and native 'getLaunchMode()' / 'launchMode' events; active saves/exports are left alone. For iOS, register the same scheme in CFBundleURLTypes, forward URL opens through the native plugin once, and support Shortcuts' Open URLs action. This is a routing contract, not a completed iOS camera. Implement AVFoundation behind 'native-camera.ts' and extend the capability guard only after that implementation exists. A browser/PWA cannot expose iPhone native photo output merely by sharing a TS interface.
 
 References: [Apple custom URL schemes](https://developer.apple.com/documentation/xcode/defining-a-custom-url-scheme-for-your-app), [AVCapturePhotoOutput](https://developer.apple.com/documentation/avfoundation/avcapturephotooutput), [CameraX video architecture](https://developer.android.com/media/camera/camerax/video-capture).
+
+
+Camera layout follow-up (16 October): the Android native camera keeps its control layout in portrait while capture mode is open, restoring the previous Activity orientation policy on exit. Physical sensor orientation still determines the saved photo/video orientation independently. Mirror this separation on iOS: keep the capture controls in their portrait positions rather than reflowing them into a short landscape viewport; handle media orientation in AVFoundation. Rotating individual icons/short labels is optional and must not move the controls or shrink the preview. Do not apply the camera orientation policy to the whole editor or force browser orientation through unsupported APIs.
+
+
+## Camera UI catch-up prompt
+
+Use this for an iOS agent that has already started work:
+
+```text
+Continue the existing ClearWater iOS branch/worktree. Read the current AGENTS instructions, HANDOFF.md, MAINTENANCE.md and IOS_PLAN.md, inspect Git status, and preserve existing iOS work. Review current origin/main and integrate the shared camera/editor changes with a reviewed merge or selective commits. Keep Android signing, versioning and platform implementation unchanged. Use lower-cost agents capable of any involved coding.
+
+Bring the AVFoundation camera into sync with the current React camera UI: preview first, no Camera heading, tight outer spacing, large underwater shutter/record/WB/reset/mic/flip controls, icon-only actions, and persistent capture mode. Keep controls in portrait positions while physical orientation determines saved media; freeze orientation when video starts. Rotating individual icons/short labels is optional. Restore the prior orientation, idle-timer and WKWebView background policies on close/interruption.
+
+Support optional sampled Five A+ assist, Balanced red-filter/depth hints, and replacement neutral-point picking from uncorrected frames with a small loupe. Native picker coordinates use cover fit and reject releases outside the preview; browser picking remains contain fit. Keep capture sessions stable during layout/bounds changes, ignore retired-renderer callbacks, and release native resources using the platform's required threading contract.
+
+Zoom tap cycles supported choices; long press opens actual lens/zoom options. Label front-facing lenses explicitly, including 1x choices. Preserve accurate photo/video dimensions, serialised startup/teardown, cancellation, permissions and recovery. Use the native-camera.ts contract and the recipe.cameraColour format documented in this plan. Keep iOS Photos saves independent; Android gallery linking is excluded.
+
+Include the shared landscape editor change that lets the collection scroll off screen. Preserve English, Hong Kong written Traditional Chinese and Japanese. Run shared checks and the isolated iOS build, then report what still needs a real iPhone. Android device checks are currently paused; preserve that boundary and do not claim iPhone validation from browser or Android results.
+```

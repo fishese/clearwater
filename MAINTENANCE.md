@@ -147,7 +147,7 @@ The quality preview APK is version 1.0.3-quality.1 (code 14), debug-signed for m
 
 ## Native camera and editor preview follow-up
 
-The current experimental debug build is 1.0.3-camera.1 (code 15). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
+The current prepared experimental debug build is 1.0.3-camera.5 (code 19). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
 
 After the normal unit/build checks, run `camera-check.mjs`, `camera-controls-check.mjs`, `editor-preview-check.mjs` and `layered-controls-check.mjs` against a production preview (`CHECK_URL`). Camera browser checks use synthetic media; native camera tests must separately verify transparent preview placement, full still dimensions, upright portrait/landscape output, front mirroring, lens/zoom choices, visible correction in saved video, replacement white balance and background finalisation. Never remove an installed app to bypass a signing mismatch: preserve its private originals and edits.
 
@@ -161,6 +161,22 @@ The user-supplied custom-model contract lives at `editor/public/models/CUSTOM_MO
 
 Native startup regression: `native-camera-check.mjs` also defers stop/start responses, emits duplicate resume events and tests a withheld-stop timeout. Preserve serialized teardown and generation ownership: a stale start completion must not stop the newer session. The 20-second watchdog includes teardown, not only CameraX startup. `preview-queue-cancel-check.mjs` must not wait for the export button while deliberately withholding its enabling render; wait for source tiles and switch to the actual unselected item.
 
-The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. The final physical acceptance gate is still pending an unlocked phone; the last observed Samsung startup hang must not be reported resolved based solely on mocks.
+The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. Native startup was confirmed after the R8 permission metadata fix; saved-file and broader physical acceptance checks remain paused while the phone is off ADB.
 
-Final 16 October checkpoint: 138 unit tests pass; production build, Android sync, minified debug assemble/signature verification and focused browser camera/editor/export/share/i18n checks passed. The installed APK was checksum-confirmed against the final local artifact after a stalled ADB completion response. Physical camera preview/capture remains unverified because the phone is locked. Stable APK v1.0.2 remains unchanged.
+Earlier debug builds were installed and native preview was confirmed. The current non-device follow-up prepares code 19 without installing it. Physical saved-file checks are paused by the user; stable APK v1.0.2 remains unchanged.
+
+
+### Minified Capacitor permission metadata
+
+Keep `com.getcapacitor.PluginHandle` and the Capacitor permission annotation interfaces in `android/app/proguard-rules.pro`. The camera startup investigation found that R8 removed `PluginHandle.pluginAnnotation` and its constructor assignment, then folded `Plugin.getPermissionStates()` into an empty map. The camera class still had a valid runtime annotation in DEX, so checking that annotation alone did not detect the regression. Android could grant CAMERA while Capacitor returned null and silently skipped requesting its missing alias.
+
+After changing R8/AGP/Capacitor or these keep rules, inspect the minified APK to confirm the stored annotation field/getter and permission iteration survive, and test both already-granted startup and a fresh permission prompt on a physical device. Preserve normal OS permission checks and callbacks; a runtime-grant-only workaround leaves first-time permission requests broken. Debug builds intentionally exercise the same minification path as release builds.
+
+
+### Layout and capture stability follow-up
+
+On short landscape screens (651–900px wide, at most 540px high), the editor occupies the viewport and the collection follows in normal page scrolling. The previous fixed 136px collection row reduced usable editor space. The existing mobile-readability check covers the page-scroll behavior in all three languages and existing portrait/wide/expanded layouts.
+
+Never rebuild CameraX use cases for ordinary preview DOM bounds changes: this interrupted captures and caused release-timeout errors. Keep the shared viewport stable and map the native picker using cover fit after resizes. Both picker modes reject off-preview releases. Every Media3Effect error callback, including the video rebind path, must check its effect generation and active session. The installed alpha adapter requires close() on the main thread and can synchronously wait up to 500ms; invalidate the retired effect and defer its close until after the current unbind/lifecycle callback. Do not move close to a worker thread or suppress failures from the active effect.
+
+Code 19 non-device validation passed: 140 unit tests; production build/Android sync; multilingual mobile-readability (including landscape collection scrolling); native-camera mock; minified assembleDebug; APK signature and version checks. Artifact: `android/build/clearwater-1.0.3-camera.5-debug.apk`, with adjacent SHA-256 sidecar. No ADB connection or installation was attempted during the user-requested device pause.

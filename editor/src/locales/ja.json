@@ -451,6 +451,7 @@
   "AI colour correction runs locally. Strength and manual edits still apply; Balanced after AI also uses dive hints.": "AI の色補正は端末内で実行します。強度と手動調整は引き続き有効で、AI 後のバランス補正には潜水条件も反映されます。",
   "Invalid Balanced after AI settings.": "AI 後のバランス補正の設定が無効です。",
   "Camera": "カメラ",
+  "Front camera": "前面カメラ",
   "Camera uses a local Balanced live preview. Photos keep an untouched original and editable correction. MP4 recordings save the visible correction directly, up to 720p and 30 fps; no raw video is kept. Choose a 1, 3 or 5 minute recording limit in Settings. Microphone audio is optional. Photos use stream resolution without RAW, HDR or GPS/EXIF. Closing the camera or leaving the app stops camera and microphone access.": "カメラは端末内のバランス補正でライブ表示します。写真は未加工の元データと調整可能な補正設定を保持します。MP4 録画には画面に表示された補正が直接反映され、最大 720p、30 fps で保存されます。未補正の動画は保存されません。設定で録画上限を 1、3、5 分から選べます。マイク音声は任意です。写真はストリーム解像度で撮影し、RAW・HDR・GPS・EXIF は含みません。カメラを閉じるかアプリを離れると、カメラとマイクは停止します。",
   "New camera videos show the correction in the gallery immediately. Their private editing source is the enhanced capture; later edits can update the same gallery file.": "新しく撮影した動画は、補正済みの状態でギャラリーに表示されます。非公開の編集元には補正済みの撮影データを使い、後からの編集で同じギャラリーファイルを更新できます。",
   "Take photo": "撮影",
