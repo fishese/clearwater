@@ -103,6 +103,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
             controller.didMove(toParent: presenter)
             embeddedController = controller
             controller.embeddedReady { result in
+                guard self.embeddedController === controller else { call.reject("Camera start was cancelled.", "CAMERA_CLOSED"); return }
                 switch result {
                 case .success(let info): call.resolve(info)
                 case .failure(let error): controller.embeddedStopSession(); call.reject("The native camera could not start.", "CAMERA_START_FAILED", error)
@@ -135,6 +136,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
         DispatchQueue.main.async {
             guard let id = call.getString("lensId"), let controller = self.embeddedController else { call.reject("Lens selection is invalid.", "CAMERA_LENS"); return }
             controller.embeddedSetLens(id) { result in
+                guard self.embeddedController === controller else { call.reject("Lens change was cancelled.", "CAMERA_CLOSED"); return }
                 switch result { case .success(let info): call.resolve(info); case .failure(let error): call.reject("The selected lens is unavailable.", "CAMERA_LENS", error) }
             }
         }
@@ -143,7 +145,10 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
         DispatchQueue.main.async {
             guard let ratio = call.getDouble("ratio"), let controller = self.embeddedController else { call.reject("Zoom setting is invalid.", "CAMERA_ZOOM"); return }
             controller.embeddedSetZoom(CGFloat(ratio)) { result in
-                DispatchQueue.main.async { switch result { case .success(let value): call.resolve(["zoom": value]); case .failure(let error): call.reject("Zoom could not be changed.", "CAMERA_ZOOM", error) } }
+                DispatchQueue.main.async {
+                    guard self.embeddedController === controller else { call.reject("Zoom change was cancelled.", "CAMERA_CLOSED"); return }
+                    switch result { case .success(let value): call.resolve(["zoom": value]); case .failure(let error): call.reject("Zoom could not be changed.", "CAMERA_ZOOM", error) }
+                }
             }
         }
     }
@@ -165,6 +170,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
         DispatchQueue.main.async {
             guard let controller = self.embeddedController, let recipe = call.getObject("recipe") else { call.reject("Recording options are invalid.", "RECORDING_START"); return }
             let begin: (Bool) -> Void = { granted in
+                guard self.embeddedController === controller else { call.reject("Recording start was cancelled.", "CAMERA_CLOSED"); return }
                 guard granted || !(call.getBool("microphone") ?? false) else { call.reject("Microphone permission was not granted.", "AUDIO_PERMISSION"); return }
                 guard self.pendingRecordingStartCall == nil else { call.reject("A recording is already starting.", "CAMERA_BUSY"); return }
                 do { self.pendingRecordingStartCall = call; try controller.embeddedStartRecording(maxMs: call.getInt("maxMs") ?? 60_000, maxBytes: Int64(call.getInt("maxBytes") ?? 64 * 1024 * 1024), microphone: call.getBool("microphone") ?? false, recipe: recipe) }

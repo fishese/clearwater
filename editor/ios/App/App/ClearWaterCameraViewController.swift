@@ -451,11 +451,11 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private func configureOrientation(angle: CGFloat) {
         guard !orientationLocked else { return }
         captureOrientationAngle = angle
-        if let c = photoOutput.connection(with: .video), c.isVideoRotationAngleSupported(angle) { c.videoRotationAngle = angle }
+        if let c = photoOutput.connection(with: .video), c.isVideoRotationAngleSupported(angle), c.videoRotationAngle != angle { c.videoRotationAngle = angle }
         // Keep the source upright for the portrait preview. The writer applies
         // the frozen physical device orientation when recording begins.
         if let c = videoOutput.connection(with: .video), c.isVideoRotationAngleSupported(90) {
-            c.videoRotationAngle = 90
+            if c.videoRotationAngle != 90 { c.videoRotationAngle = 90 }
             if c.isVideoMirroringSupported {
                 c.automaticallyAdjustsVideoMirroring = false
                 c.isVideoMirrored = cameraPosition == .front
@@ -641,7 +641,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let formatSize = device.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
         var previewWidth = Int(frameSize?.width ?? CGFloat(formatSize?.width ?? 0))
         var previewHeight = Int(frameSize?.height ?? CGFloat(formatSize?.height ?? 0))
-        if frameSize == nil && (captureOrientationAngle == 90 || captureOrientationAngle == 270) { swap(&previewWidth, &previewHeight) }
+        if frameSize == nil { swap(&previewWidth, &previewHeight) }
         let zoom = device?.videoZoomFactor ?? 1
         var photoWidth = Int(dimensions.width), photoHeight = Int(dimensions.height)
         if captureOrientationAngle == 90 || captureOrientationAngle == 270 { swap(&photoWidth, &photoHeight) }
@@ -1031,7 +1031,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             }
             self.mediaQueue.async {
                 self.writerAcceptingFrames = false
-                self.latestSource = nil; self.latestRendered = nil
+                self.frameLock.lock(); self.latestSource = nil; self.latestRendered = nil; self.frameLock.unlock()
                 self.previewPool = nil; self.previewPoolSize = nil
                 self.recipeLock.lock(); self.photoRecipes.removeAll(); self.recipeLock.unlock()
                 DispatchQueue.main.async {

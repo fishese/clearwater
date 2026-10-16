@@ -697,8 +697,12 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     if (nativeSessionActiveRef.current) {
       const next = cameraZoomValue(value, zoomRange);
       if (next === null) return;
+      const generation = generationRef.current;
+      if (!aliveRef.current || !nativeSessionActiveRef.current) return;
+      const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
       try {
         const result = await nativeCamera.setZoom({ ratio: next });
+        if (!isCurrentSession()) return;
         setZoom(result.zoom);
         const currentInfo = nativeInfoRef.current;
         if (currentInfo) {
@@ -707,6 +711,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setNativeInfo(updated);
         }
       } catch {
+        if (!isCurrentSession()) return;
         const actual = nativeInfoRef.current?.zoom;
         if (typeof actual === 'number' && Number.isFinite(actual)) setZoom(actual);
       }
@@ -753,12 +758,15 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     setPickingBalance(false);
     setLoupeVisible(false);
     if (nativeSessionActiveRef.current) {
+      const generation = generationRef.current;
+      const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
       try {
         if (cameraAiEnabledRef.current) {
           cameraAiInvalidateRef.current();
           cameraAiMatrixRef.current = null;
         }
         const info = await nativeCamera.setLens({ lensId: deviceId });
+        if (!isCurrentSession()) return;
         nativeInfoRef.current = info;
         setNativeInfo(info);
         setNativeLenses(info.lenses);
@@ -773,7 +781,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setRecipe(freshRecipe);
           void nativeCamera.setCorrection({ recipe: freshRecipe }).catch(() => {});
         }
-      } catch { setError('Could not switch camera.'); }
+      } catch { if (isCurrentSession()) setError('Could not switch camera.'); }
       return;
     }
     facingRef.current = 'environment';
@@ -789,6 +797,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setError('');
       const frozenRecipe = structuredClone(recipeWithCameraColour(recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1), strength / 100, undefined, cameraHintsRef.current), cameraAi.enabled, cameraAi.matrix));
       let capture: NativeCameraCapture | null = null;
+      const generation = generationRef.current;
+      const isCurrentView = () => aliveRef.current && generation === generationRef.current;
       try {
         capture = await nativeCamera.capturePhoto();
           const file = capture.iosCaptureId
@@ -796,7 +806,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
             : await readNativeCameraCapture(capture);
           await saveCapture(file, frozenRecipe, capture.iosCaptureId?{iosCaptureId:capture.iosCaptureId}:{jpegQuality: qualityProfile.jpegQuality});
       } catch {
-        setError('Photo capture failed.');
+        if (isCurrentView()) setError('Photo capture failed.');
       } finally {
         if (capture) await nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {});
         photoPendingRef.current = false;

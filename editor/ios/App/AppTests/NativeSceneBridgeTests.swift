@@ -33,10 +33,10 @@ final class NativeSceneBridgeTests: XCTestCase {
 
     func testLandscapeMovieDimensionsAndFrontUnmirroring() throws {
         let sourceSize = CGSize(width: 720, height: 1280)
-        for angle: CGFloat in [0, 180] {
+        for angle in [CGFloat(0), CGFloat(180)] {
             XCTAssertEqual(ClearWaterCameraOrientation.orientedVideoSize(sourceSize, angle: angle), CGSize(width: 1280, height: 720))
         }
-        for angle: CGFloat in [90, 270] {
+        for angle in [CGFloat(90), CGFloat(270)] {
             XCTAssertEqual(ClearWaterCameraOrientation.orientedVideoSize(sourceSize, angle: angle), sourceSize)
         }
         let red = CIImage(color: CIColor(red: 1, green: 0, blue: 0)).cropped(to: CGRect(x: 0, y: 0, width: 30, height: 120))
