@@ -1,5 +1,5 @@
 import {BUNDLED_MODEL_IDS,migrateOfflineModelSelection,type BundledModelId} from './core/bundled-models';
-import {isAndroid} from './native';
+import {getPlatformCapabilities} from './platform/capabilities';
 export type OfflineModel=BundledModelId;
 export type OfflineModelState={state:'checking'|'downloading'|'ready'|'incomplete';cached:number;total:number};
 export type OfflineSettings={automatic:boolean;models:OfflineModel[]};
@@ -41,7 +41,7 @@ export function setSelectedOfflineModels(models:OfflineModel[]){
 }
 /** Ask the controlling worker without blocking editing or the initial app installation. */
 export function refreshOfflineModels(download=false){
- if(isAndroid()||!('serviceWorker' in navigator)||configuring)return;
+ if(!getPlatformCapabilities().webServiceWorkerUpdates||!('serviceWorker' in navigator)||configuring)return;
  if(running){if(download)pendingDownload=true;return;}
  const worker=navigator.serviceWorker.controller;
  if(!worker){publish({...snapshot,state:'incomplete'});return;}
@@ -61,7 +61,7 @@ export function refreshOfflineModels(download=false){
  try{worker.postMessage({type:download?'CACHE_OFFLINE_MODELS':'OFFLINE_MODELS_STATUS',models:settings.models},[channel.port2]);}catch{timedOut();}
 }
 export function initialiseOfflineModels(){
- if(started||isAndroid()||!('serviceWorker' in navigator))return;
+ if(started||!getPlatformCapabilities().webServiceWorkerUpdates||!('serviceWorker' in navigator))return;
  started=true;
  const refresh=()=>{
   if(installed()&&settings.automatic&&navigator.onLine){void navigator.storage?.persist?.().catch(()=>false);refreshOfflineModels(true);}

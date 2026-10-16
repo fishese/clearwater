@@ -1,13 +1,15 @@
 import { migrateRetiredEngine } from './core/engine';
 import type { Recipe } from './core/types';
 import { newestPhotos } from './core/library-order';
+import type { IOSCaptureDescriptor } from './platform/ios-camera';
 
 export interface CameraCapture { uri?:string; name?:string; renderedSha256?:string; enhancedVideo?:boolean }
+export interface NativeCaptureSource { descriptor:IOSCaptureDescriptor; loaded:boolean }
 export interface StoredPhoto {
   id:string; file:File; recipe?:Recipe; thumbnail?:string; addedAt?:number; pendingShare?:boolean;
-  cameraCapture?:CameraCapture; sourceUri?:string;
+  cameraCapture?:CameraCapture; sourceUri?:string; nativeCapture?:NativeCaptureSource; previewFile?:File;
 }
-type PhotoMetadata=Omit<StoredPhoto,'file'>;
+type PhotoMetadata=Omit<StoredPhoto,'file'|'previewFile'|'nativeCapture'>;
 function withCurrentEngines<T extends {recipe?:Recipe}>(photo:T):T {
   return photo.recipe?{...photo,recipe:migrateRetiredEngine(photo.recipe as Recipe & {engine:string}) as Recipe}:photo;
 }
@@ -35,6 +37,9 @@ function finishTransaction<T>(db:IDBDatabase,tx:IDBTransaction,value:()=>T):Prom
 }
 function hasFile(value:unknown):value is File {
   return !!value&&typeof value==='object'&&typeof (value as File).name==='string'&&typeof (value as File).slice==='function';
+}
+function hasSourceBytes(value:unknown):value is File {
+  return hasFile(value)&&(value as File).size>0;
 }
 function namedCameraFile(original:StoredPhoto,metadata?:PhotoMetadata):File {
   const name=metadata?.cameraCapture?.name??original.cameraCapture?.name;
@@ -73,6 +78,9 @@ export const listPhotos=async()=>{
   return newestPhotos(joined);
 };
 export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
+  // iOS camera sources belong to the native manifest. Persisting a hydrated File
+  // here would create a second full-size private copy in IndexedDB.
+  if(photo.nativeCapture)return;
   const {id,file,recipe,thumbnail,addedAt,pendingShare,cameraCapture,sourceUri}=photo;
   photo={id,file,recipe,thumbnail,addedAt,pendingShare,cameraCapture,sourceUri};
   const db=await openDB();
@@ -81,7 +89,7 @@ export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
     const originals=tx.objectStore(CAMERA_ORIGINALS),existing=originals.get(photo.id);
     existing.onsuccess=()=>{
       const archived=existing.result as StoredPhoto|undefined;
-      if(!archived||!hasFile(archived.file))originals.put(photo);
+      if(!archived||!hasSourceBytes(archived.file)){if(hasSourceBytes(photo.file))originals.put(photo);}
       else {
         const {file,...metadata}=photo;
         const name=photo.cameraCapture?.name??archived.file.name;
@@ -91,7 +99,14 @@ export const savePhoto=(photo:StoredPhoto)=>enqueueWrite(async()=>{
     };
     const {file:_,...metadata}=photo;
     tx.objectStore(PHOTOS).put(metadata);
-  }else tx.objectStore(PHOTOS).put(photo);
+  }else{
+    const store=tx.objectStore(PHOTOS),existing=store.get(photo.id);
+    existing.onsuccess=()=>{
+      const current=existing.result as StoredPhoto|undefined;
+      if(current&&hasSourceBytes(current.file))store.put({...photo,file:current.file});
+      else if(hasSourceBytes(photo.file))store.put(photo);
+    };
+  }
   return finishTransaction(db,tx,()=>undefined);
 });
 export const deletePhoto=(id:string)=>enqueueWrite(async()=>{

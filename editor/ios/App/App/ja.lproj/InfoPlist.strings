@@ -1,0 +1,4 @@
+/* iOS のカメラとメディアの許可説明。 */
+"NSCameraUsageDescription" = "ClearWater は水中の写真や動画を撮影・補正するためにカメラを使用します。";
+"NSMicrophoneUsageDescription" = "音声付き動画を録画する場合、ClearWater はマイクを使用します。";
+"NSPhotoLibraryAddUsageDescription" = "「写真に保存」を選ぶと、補正した撮影データを写真ライブラリに保存できます。";

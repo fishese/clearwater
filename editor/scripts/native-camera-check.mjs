@@ -117,6 +117,12 @@ try {
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app-shell')).display), 'none', 'editor is hidden behind the native preview');
   assert.equal(await page.locator('.camera-resolution').innerText(), 'Photo resolution: 1600 × 1200', 'native chip reports photo pixels, not the 390 × 844 viewport');
   const photoInfoGeneration = await page.evaluate(() => window.nativeCameraInfo().sessionGeneration);
+  await page.evaluate(() => window.emitNative('ClearWaterCamera', 'cameraError', { message: 'camera interruption detail', recoverable: true }));
+  await page.waitForFunction(() => document.querySelector('.camera-error[role="alert"]')?.textContent === 'Camera interrupted.');
+  assert.equal(await page.locator('.camera-photo').isDisabled(), true, 'transient interruption disables capture while native frames are stopped');
+  assert.equal(await page.getByRole('button', { name: 'Retry camera' }).count(), 0, 'transient interruption waits for the same native session to recover');
+  await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation, photoWidth: 1200, photoHeight: 1600 }), photoInfoGeneration);
+  await page.waitForFunction(() => document.querySelector('.camera-error[role="alert"]') === null && document.querySelector('.camera-photo')?.disabled === false);
   await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation, photoWidth: 1200, photoHeight: 1600 }), photoInfoGeneration);
   await page.waitForFunction(() => document.querySelector('.camera-resolution')?.textContent === 'Photo resolution: 1200 × 1600');
   await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation - 1, photoWidth: 1920, photoHeight: 1080 }), photoInfoGeneration);

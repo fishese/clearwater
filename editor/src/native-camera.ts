@@ -9,7 +9,7 @@ export interface NativeCameraInfo {
  width:number;height:number;photoWidth:number;photoHeight:number;sessionGeneration:number;
  lenses:NativeCameraLens[];lensId:string;zoom:number;minZoom:number;maxZoom:number;
 }
-export interface NativeCameraCapture {uri:string;name:string;type:'image/jpeg'|'video/mp4';width:number;height:number}
+export interface NativeCameraCapture {uri:string;name:string;type:'image/jpeg'|'video/mp4';width:number;height:number;iosCaptureId?:string}
 export interface NativeCameraRecordingResult extends Partial<NativeCameraCapture> {error?:string;discarded?:boolean}
 export interface NativeCameraPlugin {
  getLaunchMode():Promise<{mode:'camera'|'edit'|null}>;
@@ -27,11 +27,11 @@ export interface NativeCameraPlugin {
  stopSession():Promise<void>;
  addListener(event:'cameraInfoChanged',listener:(result:NativeCameraPhotoInfoChanged)=>void):Promise<PluginListenerHandle>;
  addListener(event:'recordingFinished',listener:(result:NativeCameraRecordingResult)=>void):Promise<PluginListenerHandle>;
- addListener(event:'cameraError',listener:(result:{message:string})=>void):Promise<PluginListenerHandle>;
+ addListener(event:'cameraError',listener:(result:{message:string;sessionClosed?:boolean;recoverable?:boolean})=>void):Promise<PluginListenerHandle>;
  addListener(event:'launchMode',listener:(result:{mode:'camera'|'edit'})=>void):Promise<PluginListenerHandle>;
 }
 export const nativeCamera=registerPlugin<NativeCameraPlugin>('ClearWaterCamera');
-export const supportsNativeCamera=()=>Capacitor.getPlatform()==='android'&&Capacitor.isPluginAvailable('ClearWaterCamera');
+export const supportsNativeCamera=()=>['android','ios'].includes(Capacitor.getPlatform())&&Capacitor.isPluginAvailable('ClearWaterCamera');
 /** Temp URI ownership stays native until the caller's durable save has finished. */
 export async function readNativeCameraCapture(capture:NativeCameraCapture):Promise<File>{
  const response=await fetch(Capacitor.convertFileSrc(capture.uri));

@@ -1,0 +1,4 @@
+/* iOS 顯示的相機及媒體權限說明。 */
+"NSCameraUsageDescription" = "ClearWater 會在你拍攝及修復水底相片和影片時使用相機。";
+"NSMicrophoneUsageDescription" = "你選擇錄製含聲音的影片時，ClearWater 會使用咪高峰。";
+"NSPhotoLibraryAddUsageDescription" = "你選擇儲存至「相片」時，ClearWater 可將已修復的拍攝內容儲存至「相片」。";

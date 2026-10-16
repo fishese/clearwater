@@ -9,6 +9,7 @@ import { cameraRecordingBudget, getCameraSettings, subscribeCameraSettings } fro
 import { analyse } from './core/engine';
 import { isAndroid } from './native';
 import { nativeCamera, readNativeCameraCapture, supportsNativeCamera, type NativeCameraBounds, type NativeCameraCapture, type NativeCameraInfo, type NativeCameraLens } from './native-camera';
+import {getIOSCameraPreferences,setIOSMicrophoneEnabled} from './platform/ios-camera';
 import { DEFAULT_HINTS, type Hints, type Recipe } from './core/types';
 import { t, useLanguage } from './i18n';
 
@@ -17,7 +18,7 @@ export interface CameraHandle {
 }
 
 export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
-export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number }
+export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string }
 
 interface CameraProps {
   onCapture: (file: File, recipe: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult>;
@@ -92,6 +93,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const nativeSessionActiveRef = useRef(false);
+  const recoverableNativeErrorRef = useRef(false);
   const nativeRecordingRef = useRef(false);
   const nativeFrameBusyRef = useRef(false);
   const nativeLastFrameAtRef = useRef(0);
@@ -123,6 +125,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [ready, setReady] = useState(false);
   const [starting, setStarting] = useState(true);
   const [error, setError] = useState('');
+  const [nativeInterrupted,setNativeInterrupted]=useState(false);
   const [pickingBalance,setPickingBalance]=useState(false);
   const [balanceLocked,setBalanceLocked]=useState(false);
   const [savePending,setSavePending]=useState(false);
@@ -137,7 +140,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [recording, setRecording] = useState(false);
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const [recordingBytePercent, setRecordingBytePercent] = useState(0);
-  const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(()=>supportsNativeCamera()&&getIOSCameraPreferences().microphoneEnabled);
   const [photoPending, setPhotoPending] = useState(false);
   const [recordPending, setRecordPending] = useState(false);
   const photoPendingRef = useRef(false);
@@ -561,6 +564,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       const updated = { ...current, photoWidth: event.photoWidth, photoHeight: event.photoHeight };
       nativeInfoRef.current = updated;
       setNativeInfo(updated);
+      setDepthChooserOpen(false);setZoomChooserOpen(false);
+      if(recoverableNativeErrorRef.current){recoverableNativeErrorRef.current=false;setNativeInterrupted(false);setError('');setStarting(false);setReady(true);}
     }));
     attach(nativeCamera.addListener('recordingFinished', result => {
       nativeRecordingRef.current = false;
@@ -571,18 +576,26 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       if (result.error) { setError('Could not save video capture.'); return; }
       if (result.discarded) return;
       if (!result.uri || !result.name || !result.type) { setError('The recording contained no video data.'); return; }
-      const capture = result as NativeCameraCapture;
+        const capture = result as NativeCameraCapture;
       const frozen = structuredClone(frozenRecipeRef.current ?? recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1)));
-      void readNativeCameraCapture(capture).then(file => saveCaptureRef.current(file, frozen, { enhancedVideo: true })).catch(() => setError('Could not save video capture.')).finally(() => void nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {}));
+        const save = capture.iosCaptureId
+          ? Promise.resolve(new File([],capture.name,{type:capture.type,lastModified:Date.now()})).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,iosCaptureId:capture.iosCaptureId}))
+          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true}));
+        void save.catch(() => setError('Could not save video capture.')).finally(() => void nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {}));
     }));
     attach(nativeCamera.addListener('cameraError', event => {
-      if (aliveRef.current) setError(event.message || 'Could not start the camera.');
+      if (!aliveRef.current) return;
+      setError(event.recoverable&&!event.sessionClosed?'Camera interrupted.':event.message || 'Could not start the camera.');
+      recoverableNativeErrorRef.current=event.recoverable===true&&!event.sessionClosed;
+      setNativeInterrupted(recoverableNativeErrorRef.current);
+      if(event.sessionClosed){recoverableNativeErrorRef.current=false;whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);setLoupeVisible(false);setDepthChooserOpen(false);setZoomChooserOpen(false);void releaseCamera();setNativeInterrupted(false);}
+      else if(recoverableNativeErrorRef.current){setReady(false);setStarting(false);setDepthChooserOpen(false);setZoomChooserOpen(false);setPickingBalance(false);setLoupeVisible(false);}
     }));
     return () => {
       disposed = true;
       for (const handle of handles) void handle.remove().catch(() => {});
     };
-  }, [nativeCameraSupported]);
+  }, [nativeCameraSupported,releaseCamera]);
 
   useEffect(() => {
     if (!nativeActive || !cameraStageRef.current) return;
@@ -699,8 +712,12 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     if (nativeSessionActiveRef.current) {
       const next = cameraZoomValue(value, zoomRange);
       if (next === null) return;
+      const generation = generationRef.current;
+      if (!aliveRef.current || !nativeSessionActiveRef.current) return;
+      const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
       try {
         const result = await nativeCamera.setZoom({ ratio: next });
+        if (!isCurrentSession()) return;
         setZoom(result.zoom);
         const currentInfo = nativeInfoRef.current;
         if (currentInfo) {
@@ -709,6 +726,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setNativeInfo(updated);
         }
       } catch {
+        if (!isCurrentSession()) return;
         const actual = nativeInfoRef.current?.zoom;
         if (typeof actual === 'number' && Number.isFinite(actual)) setZoom(actual);
       }
@@ -755,12 +773,15 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     setPickingBalance(false);
     setLoupeVisible(false);
     if (nativeSessionActiveRef.current) {
+      const generation = generationRef.current;
+      const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
       try {
         if (cameraAiEnabledRef.current) {
           cameraAiInvalidateRef.current();
           cameraAiMatrixRef.current = null;
         }
         const info = await nativeCamera.setLens({ lensId: deviceId });
+        if (!isCurrentSession()) return;
         nativeInfoRef.current = info;
         setNativeInfo(info);
         setNativeLenses(info.lenses);
@@ -775,7 +796,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setRecipe(freshRecipe);
           void nativeCamera.setCorrection({ recipe: freshRecipe }).catch(() => {});
         }
-      } catch { setError('Could not switch camera.'); }
+      } catch { if (isCurrentSession()) setError('Could not switch camera.'); }
       return;
     }
     facingRef.current = 'environment';
@@ -791,12 +812,16 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setError('');
       const frozenRecipe = structuredClone(recipeWithCameraColour(recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1), strength / 100, undefined, cameraHintsRef.current), cameraAi.enabled, cameraAi.matrix));
       let capture: NativeCameraCapture | null = null;
+      const generation = generationRef.current;
+      const isCurrentView = () => aliveRef.current && generation === generationRef.current;
       try {
         capture = await nativeCamera.capturePhoto();
-        const file = await readNativeCameraCapture(capture);
-        await saveCapture(file, frozenRecipe, { jpegQuality: qualityProfile.jpegQuality });
+          const file = capture.iosCaptureId
+            ? new File([],capture.name,{type:capture.type,lastModified:Date.now()})
+            : await readNativeCameraCapture(capture);
+          await saveCapture(file, frozenRecipe, capture.iosCaptureId?{iosCaptureId:capture.iosCaptureId}:{jpegQuality: qualityProfile.jpegQuality});
       } catch {
-        setError('Photo capture failed.');
+        if (isCurrentView()) setError('Photo capture failed.');
       } finally {
         if (capture) await nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {});
         photoPendingRef.current = false;
@@ -1069,7 +1094,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         ><ZoomIn size={20}/><span>{zoomLabel}</span></button> : <button type="button" ref={zoomButtonRef} className={`camera-zoom-button ${zoomChooserOpen ? 'active' : ''}`} aria-label={t(nativeActive ? 'Choose camera lens' : 'Choose rear camera')} aria-expanded={zoomChooserOpen} aria-controls="camera-zoom-chooser" disabled={!ready || recording || starting || recordPending} onClick={() => setZoomChooserOpen(v => !v)}><CameraIcon size={20}/><span>{t('Camera')}</span></button>}
         {zoomChooserOpen && <div id="camera-zoom-chooser" ref={zoomChooserRef} className="camera-zoom-chooser" role="group" aria-label={t('Camera controls')}>
           {canAdjustZoom && zoomRange && <label className="camera-zoom-slider">{t('Zoom')} <output>{zoomLabel}</output>
-            <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
+            <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={nativeInterrupted||recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
           </label>}
           {hasCameraChoices && <div className="camera-lens-choices" role="group" aria-label={t(nativeActive ? 'Camera lenses' : 'Rear cameras')}>
             {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
@@ -1077,7 +1102,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         </div>}
       </div>}
     </div>
-    {error && <div className="camera-error" role="alert">{t(error)}{!ready && !starting && <button className="text-button" type="button" onClick={() => void startCamera(facing)}>{t('Retry camera')}</button>}</div>}
+    {error && <div className="camera-error" role="alert">{t(error)}{!ready && !starting&&!nativeInterrupted && <button className="text-button" type="button" onClick={() => void startCamera(facing)}>{t('Retry camera')}</button>}</div>}
     <div className="camera-options">
       <div className="camera-feature-controls" aria-label={t('Camera controls')}>
         <button type="button" className={`camera-feature-button ${cameraAi.matrix ? 'active' : ''} ${cameraAi.status === 'error' ? 'camera-ai-error-state' : ''}`} aria-pressed={cameraAi.enabled} aria-label={t('Five A+ assist · {0}', [t(cameraAi.status)])} title={t('Five A+ assist · {0}', [t(cameraAi.status)])} disabled={!ready || recording || recordPending} onClick={() => { if (!cameraAi.enabled) setDepthChooserOpen(false); cameraAi.setEnabled(!cameraAi.enabled); }}>{cameraAi.enabled && cameraAi.status === 'loading' ? <LoaderCircle size={18} className="camera-ai-spinner" aria-hidden="true"/> : <Sparkles size={18}/>}<span>{t('AI')}</span></button>
@@ -1086,15 +1111,15 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           <button ref={depthButtonRef} type="button" className={`camera-feature-button ${cameraHints.depth !== null ? 'active' : ''}`} aria-expanded={depthChooserOpen} aria-controls="camera-depth-chooser" disabled={!ready || recording || recordPending || cameraAi.enabled} onClick={() => setDepthChooserOpen(value => !value)}><SlidersHorizontal size={18}/><span>{t('Depth')} {cameraHints.depth === null ? t('Auto') : `${cameraHints.depth} m`}</span></button>
           {depthChooserOpen && <div id="camera-depth-chooser" className="camera-depth-chooser" role="group" aria-label={t('Depth hint')}>
             <label>{t('Depth')} <output>{cameraHints.depth === null ? t('Auto') : t('{0} m', [cameraHints.depth])}</output>
-              <input type="range" min="0" max="100" step="1" value={cameraHints.depth ?? 0} disabled={recording || recordPending || cameraAi.enabled} aria-label={t('Depth in metres')} onChange={event => updateCameraHints({ depth: Number(event.target.value) })}/>
+              <input type="range" min="0" max="100" step="1" value={cameraHints.depth ?? 0} disabled={nativeInterrupted||recording || recordPending || cameraAi.enabled} aria-label={t('Depth in metres')} onChange={event => updateCameraHints({ depth: Number(event.target.value) })}/>
             </label>
-            <button type="button" className="camera-depth-auto" aria-pressed={cameraHints.depth === null} disabled={cameraAi.enabled} onClick={() => updateCameraHints({ depth: null })}>{t('Use automatic depth')}</button>
+            <button type="button" className="camera-depth-auto" aria-pressed={cameraHints.depth === null} disabled={nativeInterrupted||cameraAi.enabled} onClick={() => updateCameraHints({ depth: null })}>{t('Use automatic depth')}</button>
             <small>{t('Balanced restoration uses this hint.')}</small>
           </div>}
         </div>
       </div>
-      <label className="camera-strength-control">{t('Strength')} <output>{strength}%</output><input type="range" aria-label={t('Strength')} min="0" max="100" value={strength} disabled={!ready || recording || recordPending} onChange={event => applyStrength(Number(event.target.value))}/></label>
-      <div className="camera-white-balance"><button type="button" className={`camera-control ${pickingBalance||balanceLocked?'active':''}`} aria-label={pickingBalance?t('Cancel picker'):t('White balance')} title={t('White balance')} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>{setPickingBalance(v=>!v);setLoupeVisible(false);}}><Pipette size={28}/></button><button type="button" className="camera-control" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={()=>{setLoupeVisible(false);resetBalance();}}><RotateCcw size={28}/></button><button type="button" className={`camera-control camera-audio ${microphoneEnabled?'active':''}`} aria-label={t('Use microphone audio')} title={t('Use microphone audio')} aria-pressed={microphoneEnabled} disabled={recording||starting||recordPending} onClick={()=>setMicrophoneEnabled(v=>!v)}>{microphoneEnabled?<Mic size={28}/>:<MicOff size={28}/>}</button></div>
+      <label className="camera-strength-control">{t('Strength')} <output>{strength}%</output><input type="range" aria-label={t('Strength')} min="0" max="100" value={strength} disabled={nativeInterrupted||!ready || recording || recordPending} onChange={event => applyStrength(Number(event.target.value))}/></label>
+      <div className="camera-white-balance"><button type="button" className={`camera-control ${pickingBalance||balanceLocked?'active':''}`} aria-label={pickingBalance?t('Cancel picker'):t('White balance')} title={t('White balance')} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>{setPickingBalance(v=>!v);setLoupeVisible(false);}}><Pipette size={28}/></button><button type="button" className="camera-control" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={()=>{setLoupeVisible(false);resetBalance();}}><RotateCcw size={28}/></button><button type="button" className={`camera-control camera-audio ${microphoneEnabled?'active':''}`} aria-label={t('Use microphone audio')} title={t('Use microphone audio')} aria-pressed={microphoneEnabled} disabled={nativeInterrupted||recording||starting||recordPending} onClick={()=>setMicrophoneEnabled(v=>{const next=!v;if(supportsNativeCamera())setIOSMicrophoneEnabled(next);return next;})}>{microphoneEnabled?<Mic size={28}/>:<MicOff size={28}/>}</button></div>
       <small>{t('{0} min / {1} MiB limit', [cameraSettings.minutes, Math.round(recordingBudget.maxBytes / (1024 * 1024))])}{recording && !nativeActive && ` · ${Math.round(byteLimitPercent)}%`}</small>
     </div>
     {cameraAi.enabled && <small className="camera-hints-note">{t('Red filter and depth hints apply to Balanced restoration.')}</small>}

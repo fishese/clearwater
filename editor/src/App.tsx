@@ -13,12 +13,16 @@ import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
 import About from './About';
 import Settings from './Settings';
+import CaptureRemovalDialog from './CaptureRemovalDialog';
 import Camera,{type CameraHandle,type CameraSaveResult,type CameraCaptureDetails} from './Camera';
 import {isVideo,isRaw,supportedMedia,mediaLimit,videoTime,videoExportPlan,type VideoExportMode,type VideoInfo} from './core/media';
 import {useStableTabScroll} from './use-stable-tab-scroll';
 import {useLaunchMode} from './use-launch-mode';
 import {newestPhotos} from './core/library-order';
 import {renderCameraPhoto,cameraThumbnail,cameraFileHash} from './core/camera-photo';
+import {getPlatformCapabilities} from './platform/capabilities';
+import {shareIOSFile} from './platform/ios-media';
+import {acknowledgeIOSCapture,deleteIOSCapture,drainIOSCaptures,getIOSCameraPreferences,isIOSCameraAvailable,listIOSCaptures,readIOSCaptureFile,saveIOSCaptureToPhotos,setIOSCaptureRecipe,setIOSCaptureVisible,shareIOSCapture,toIOSStoredPhotos} from './platform/ios-camera';
 import {videoPreviewPlayhead} from './core/video-preview-playback';
 import {supportsFileShare,shareExport} from './export-share';
 import './editor-preview.css';
@@ -41,10 +45,11 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
 function RadioGroup<T extends string>({label,name,value,options,onChange}:{label:string;name:string;value:T;options:[T,string][];onChange:(value:T)=>void}) {
   return <fieldset className="radio-group"><legend>{label}</legend><div>{options.map(([key,text])=><label key={key}><input type="radio" name={name} value={key} checked={value===key} onChange={()=>onChange(key)}/><span>{text}</span></label>)}</div></fieldset>;
 }
-function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert(t("Could not save this file. Please choose a writable folder."));});return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert(t("Could not save this file. Please choose a writable folder."));});return;}if(getPlatformCapabilities().platform==='ios'){if(!getPlatformCapabilities().nativeMediaSave){window.alert(t('Photo export is unavailable in this iOS build.'));return;}void shareIOSFile(blob,name).then(result=>{if(result.completed)window.alert(t('Saved {0}.',[name]));}).catch(error=>window.alert(error instanceof Error?error.message:t('Photo export is unavailable in this iOS build.')));return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 
 export default function App() {
   useLanguage();
+  const capabilities=getPlatformCapabilities();
   const [about,setAbout]=useState(()=>window.location.hash.startsWith('#about'));
   useEffect(()=>{const change=()=>setAbout(window.location.hash.startsWith('#about'));window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
   function closeAbout(){window.history.replaceState(window.history.state,'',window.location.pathname+window.location.search);setAbout(false);}
@@ -53,7 +58,7 @@ export default function App() {
   const [cameraOpen,setCameraOpen]=useState(false),cameraRef=useRef<CameraHandle>(null),cameraLastCapture=useRef<string|null>(null),cameraSession=useRef(0);
   const [updating,setUpdating]=useState(false);
   const [keepMetadata,setKeepMetadata]=useState(true);
-  const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0);
+  const [photoInfo,setPhotoInfo]=useState<PhotoInfo|null>(null),[photoRetry,setPhotoRetry]=useState(false),[photoReload,setPhotoReload]=useState(0),[processorEpoch,setProcessorEpoch]=useState(0);
   const [resolutions,setResolutions]=useState<Map<string,PhotoResolution>>(()=>new Map());
   const [expanded,setExpanded]=useState(false),[adjustmentsOpen,setAdjustmentsOpen]=useState(false);
   const [controlTab,setControlTab]=useState<'correction'|'enhancement'|'export'>('correction');
@@ -63,6 +68,7 @@ export default function App() {
   useEffect(()=>{const media=window.matchMedia('(max-width: 650px)'),change=()=>setNarrowControls(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[]);
   useEffect(()=>{if(!expanded||cameraOpen||settingsOpen)return;const escape=(e:KeyboardEvent)=>{if(e.key==='Escape')setExpanded(false);};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[expanded,cameraOpen,settingsOpen]);
   const [photos,setPhotos]=useState<Photo[]>([]),[active,setActive]=useState<string|null>(null);
+  const [pendingCaptureRemoval,setPendingCaptureRemoval]=useState<Photo|null>(null),[captureRemovalError,setCaptureRemovalError]=useState('');
   const [clearCollectionOpen,setClearCollectionOpen]=useState(false),[clearingCollection,setClearingCollection]=useState(false);
   const collectionEpoch=useRef(0),clearingCollectionRef=useRef(false),pendingPhotoWrites=useRef<Set<string>>(new Set()),removedPhotoIds=useRef<Set<string>>(new Set()),clearDialogRef=useRef<HTMLDivElement>(null),clearCancelRef=useRef<HTMLButtonElement>(null),clearOpenerRef=useRef<HTMLButtonElement>(null),deferredShareIds=useRef<Set<string>>(new Set()),deferredFiles=useRef<File[][]>([]);
   useEffect(()=>{if(!clearCollectionOpen)return;clearCancelRef.current?.focus();const escape=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();closeClearCollection();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[clearCollectionOpen]);
@@ -95,12 +101,17 @@ export default function App() {
   const lastBackAt=useRef(0),exitPromptTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
-  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
+  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),pendingCustomCommand=useRef<Record<string,unknown>|null>(null),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
+  const workerRecovery=useRef<{photoId:string|null;attempts:number}>({photoId:null,attempts:0});
+  const deferredWorkerFailure=useRef(false);
   const previewRenderQueue=useRef<{inFlight:number|null;pending:{type:'render';gen:number;request:number;recipe:Recipe;time:number}|null}>({inFlight:null,pending:null});
   const hdrWorkingCopies=useRef(new Map<string,{id:string;file:File}>()),hdrJobId=useRef<string|null>(null),hdrActive=useRef<{generation:number;photoId:string}|null>(null);
   const photoProcessor=useRef<Worker|null>(null),videoProcessor=useRef<Worker|null>(null);
   const photoRef=useRef<Photo[]>([]),activeRef=useRef<string|null>(null),initialized=useRef(false),pendingBitmap=useRef<ImageBitmap|null>(null);
-  photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||saving||customOpen||customLoading||hdrConverting;
+  const iosSyncPromise=useRef<Promise<void>|null>(null),iosSyncSelectLatest=useRef(false),iosSyncAgain=useRef(false);
+  const iosPhotosSaveAttempts=useRef(new Map<string,Promise<boolean>>());
+  photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||saving||!!pendingCaptureRemoval||customOpen||customLoading||hdrConverting;
+  const exportingRef=useRef(exporting);exportingRef.current=exporting;
   const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
   const video=!!photo&&isVideo(photo.file),exportFormat=video?'mp4':format;
   const pauseVideoPreview=useCallback(()=>{
@@ -138,11 +149,56 @@ export default function App() {
   const aspect=dimensions[0]/dimensions[1];
   const fitInset=4;
   const fitWidth=Math.max(1,Math.min(Math.max(1,stageSize.width-fitInset),Math.max(1,(stageSize.height-fitInset)*aspect)));
-  const persist=(p:Photo)=>{if(removedPhotoIds.current.has(p.id)||clearingCollectionRef.current||(!photoRef.current.some(item=>item.id===p.id)&&!pendingPhotoWrites.current.has(p.id)))return;const {id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}=p;savePhoto({id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}).catch(()=>setStorageWarning(true)).finally(()=>{if(!photoRef.current.some(item=>item.id===id))pendingPhotoWrites.current.delete(id);});};
+  const persist=(p:Photo)=>{if(removedPhotoIds.current.has(p.id)||clearingCollectionRef.current||(!photoRef.current.some(item=>item.id===p.id)&&!pendingPhotoWrites.current.has(p.id)))return;if(p.nativeCapture){if(p.recipe)void setIOSCaptureRecipe(p.id,p.recipe as unknown as Record<string,unknown>).catch(()=>setStorageWarning(true));return;}const {id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}=p;savePhoto({id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}).catch(()=>setStorageWarning(true)).finally(()=>{if(!photoRef.current.some(item=>item.id===id))pendingPhotoWrites.current.delete(id);});};
   function disposeHdrWorkingCopy(id:string){hdrWorkingCopies.current.delete(id);}
   function disposeHdrWorkingCopies(){hdrWorkingCopies.current.clear();}
   async function cancelHdrWorkingCopy(){const id=hdrJobId.current;if(id)await cancelAndroidHdrWorkingCopy(id);}
   const notify=(message:string)=>setNotice(message);
+  async function syncIOSCaptureRecords(selectLatest=false):Promise<void>{
+    if(!capabilities.nativeCamera)return;
+    if(selectLatest)iosSyncSelectLatest.current=true;
+    iosSyncAgain.current=true;
+    if(iosSyncPromise.current)return iosSyncPromise.current;
+    const epoch=collectionEpoch.current;
+    const task=(async()=>{
+      do{
+      iosSyncAgain.current=false;
+      const [descriptors,pending]=await Promise.all([listIOSCaptures(),drainIOSCaptures()]);
+      if(epoch!==collectionEpoch.current)return;
+      if(clearingCollectionRef.current){for(const item of pending)await setIOSCaptureVisible(item.id,false).catch(()=>{});return;}
+      const visible=descriptors.filter(item=>item.visible&&!removedPhotoIds.current.has(item.id)),loaded=await toIOSStoredPhotos(visible);
+      if(epoch!==collectionEpoch.current||clearingCollectionRef.current)return;
+      const currentById=new Map(photoRef.current.filter(item=>item.nativeCapture).map(item=>[item.id,item]));
+      const entries=loaded.filter(item=>!removedPhotoIds.current.has(item.id)).map(item=>{
+        const current=currentById.get(item.id);if(!current)return {...item,url:URL.createObjectURL(item.previewFile!),past:[],future:[]} as Photo;
+        return {...item,file:current.file,previewFile:current.previewFile,url:current.url,recipe:current.recipe??item.recipe,past:current.past,future:current.future,nativeCapture:{descriptor:item.nativeCapture!.descriptor,loaded:current.nativeCapture!.loaded}} as Photo;
+      });
+      const stale=currentById;
+      for(const item of entries)stale.delete(item.id);
+      for(const item of stale.values())URL.revokeObjectURL(item.url);
+      setPhotos(current=>newestPhotos([...current.filter(item=>!item.nativeCapture),...entries]));
+      for(const item of pending)if(visible.some(entry=>entry.id===item.id))await acknowledgeIOSCapture(item.id).catch(()=>setStorageWarning(true));
+      if(iosSyncSelectLatest.current&&!iosSyncAgain.current){iosSyncSelectLatest.current=false;if(entries.length){setReady(false);setActive(entries[0].id);cameraLastCapture.current=entries[0].id;}}
+      }while(iosSyncAgain.current);
+    })();
+    iosSyncPromise.current=task;
+    try{await task;}finally{if(iosSyncPromise.current===task)iosSyncPromise.current=null;}
+  }
+  function saveIOSPhotosCopyOnce(id:string):Promise<boolean>{
+    const attempted=iosPhotosSaveAttempts.current.get(id);if(attempted)return attempted;
+    const task=(async()=>{
+      const existing=(await listIOSCaptures()).find(capture=>capture.id===id);
+      if(existing?.photosSaved)return true;
+      const result=await saveIOSCaptureToPhotos(id);
+      if(result.saved)await syncIOSCaptureRecords(false).catch(()=>setStorageWarning(true));
+      return result.saved;
+    })();
+    iosPhotosSaveAttempts.current.set(id,task);return task;
+  }
+  function launchIOSCamera(){
+    if(!isIOSCameraAvailable()||cameraOpen||exporting||saving||busy||customLoading||clearingCollectionRef.current)return;
+    cameraSession.current++;cameraLastCapture.current=null;setReady(false);setCameraOpen(true);
+  }
   function clearPreviewRenderQueue(){
     const queue=previewRenderQueue.current;
     queue.inFlight=null;queue.pending=null;
@@ -206,9 +262,13 @@ export default function App() {
         return;
       }
       if(target.folder){const file=await createUniqueFile(target.folder,target.name);await writeFile(file.handle,blob);target.name=file.name;}
-      else download(blob,target.name);
-      notify((target.folder?t("Saved {0}.",[target.name]):t("Downloaded {0}.",[target.name]))+(metadataWarning?` ${message(metadataWarning)}`:''));
-    }catch(error){if(target.share){if(!(error instanceof DOMException&&error.name==='AbortError'))notify(t('Could not share the restored file. Try Share now again.'));}else if(target.cameraUri)notify(t("Could not update the gallery image. Your original and edits are kept."));else if(isAndroid())notify(t("Could not save to this folder. Choose another output folder and try again."));else{download(blob,target.name);notify(t("Could not save to the chosen destination. Downloaded the restored file instead."));}}
+      else if(capabilities.platform==='ios'){
+        if(!capabilities.nativeMediaSave)throw new Error(t('Photo export is unavailable in this iOS build.'));
+        const shared=await shareIOSFile(blob,target.name);
+        if(!shared.completed)return;
+      }else download(blob,target.name);
+      notify((target.folder||capabilities.platform==='ios'?t("Saved {0}.",[target.name]):t("Downloaded {0}.",[target.name]))+(metadataWarning?` ${message(metadataWarning)}`:''));
+    }catch(error){if(target.cameraUri)notify(t("Could not update the gallery image. Your original and edits are kept."));else if(isAndroid())notify(t("Could not save to this folder. Choose another output folder and try again."));else if(capabilities.platform==='ios')notify(error instanceof Error?error.message:t('Photo export is unavailable in this iOS build.'));else{download(blob,target.name);notify(t("Could not save to the chosen destination. Downloaded the restored file instead."));}}
     finally{exportTarget.current=null;setSaving(false);setExporting(false);setProgress(100);}
   }
   async function updateApp(){
@@ -216,6 +276,7 @@ export default function App() {
     try{
       const saveCurrent=async()=>{const current=photoRef.current.find(p=>p.id===activeRef.current);if(current){const {id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}=current;await savePhoto({id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri});}};await saveCurrent();
       if(import.meta.env.DEV){location.reload();return;}
+      if(!capabilities.webServiceWorkerUpdates)return;
       if(await activateWebUpdate(import.meta.env.BASE_URL)){await saveCurrent();location.reload();}else notify(t("You already have the latest version."));
     }catch(error){notify(error instanceof Error?error.message:t("Could not update. Your files and edits have been kept."));}
     finally{setUpdating(false);}
@@ -254,6 +315,16 @@ export default function App() {
     // Corrected video is the editable source; do not apply its capture correction twice.
     if(details?.enhancedVideo)recipe={...recipe,strength:0,manual:clone(DEFAULT_MANUAL),enhancement:undefined,balancedAfterAI:undefined,cameraColour:undefined};
     const session=cameraSession.current;
+    if(details?.iosCaptureId){
+      const id=details.iosCaptureId;
+      try{await setIOSCaptureRecipe(id,recipe as unknown as Record<string,unknown>);await syncIOSCaptureRecords(true);}
+      catch{setStorageWarning(true);notify(t('Could not load the new camera capture. It remains saved on this device.'));}
+      if(cameraSession.current===session)cameraLastCapture.current=id;
+      const deviceExpected=getIOSCameraPreferences().saveEnhancedPhotos;
+      let device=false;
+      if(deviceExpected)try{device=await saveIOSPhotosCopyOnce(id);}catch{device=false;}
+      return {collection:true,device,deviceExpected};
+    }
     const id=crypto.randomUUID();
     if(isAndroid()&&file.type==='image/jpeg')file=new File([file],`clearwater-camera-${id}.jpg`,{type:file.type,lastModified:file.lastModified});
     const stored:StoredPhoto={id,file,recipe:clone(recipe),addedAt:Date.now(),...(isAndroid()?{cameraCapture:{...(details?.enhancedVideo?{enhancedVideo:true}:{})}}:{})};
@@ -292,15 +363,22 @@ export default function App() {
     if(initialized.current)return;initialized.current=true;
     const loadEpoch=collectionEpoch.current;
     promoteSharedPhotos().then(()=>listPhotos()).then(items=>{if(loadEpoch!==collectionEpoch.current)return;setPhotos(all=>newestPhotos([...items.filter(p=>!photoRef.current.some(existing=>existing.id===p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]})),...all]));if(items.length){const shared=new URLSearchParams(location.search).get('shared');setActive(current=>current??items.find(p=>p.id===shared)?.id??items[0].id);}}).catch(()=>setStorageWarning(true));
+    if(isIOSCameraAvailable())void syncIOSCaptureRecords(false).catch(()=>setStorageWarning(true));
     if(import.meta.env.DEV) fetch('/__samples').then(r=>r.json()).then((names:string[])=>setSamples(names.map(name=>({name,label:labelFor(name)})))).catch(()=>{});
     const receive=(event:MessageEvent)=>{if(event.data?.type!=='shared-photos')return;const epoch=collectionEpoch.current;if(clearingCollectionRef.current){if(event.data.id)deferredShareIds.current.add(event.data.id);return;}promoteSharedPhotos(event.data.id?[event.data.id]:undefined).then(()=>listPhotos()).then(items=>{if(epoch!==collectionEpoch.current)return;const ids=new Set(photoRef.current.map(p=>p.id)),added=items.filter(p=>!ids.has(p.id));setPhotos(all=>{const current=new Set(all.map(p=>p.id));return newestPhotos([...all,...added.filter(p=>!current.has(p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}))]);});if(!librarySwitchLock.current&&event.data.id&&items.some(p=>p.id===event.data.id))setActive(event.data.id);}).catch(()=>setStorageWarning(true));};
     navigator.serviceWorker?.addEventListener('message',receive);
     return ()=>navigator.serviceWorker?.removeEventListener('message',receive);
   },[]);
+  const suspendWorkers=capabilities.nativeCamera&&cameraOpen;
   useEffect(()=>{
+    if(suspendWorkers){worker.current=null;photoProcessor.current=null;videoProcessor.current=null;return;}
     let w=new Worker(new URL('./processor.worker.ts',import.meta.url),{type:'module'});const v=new Worker(new URL('./video.worker.ts',import.meta.url),{type:'module'});worker.current=w;photoProcessor.current=w;videoProcessor.current=v;
+    if(pendingCustomCommand.current)w.postMessage({...pendingCustomCommand.current,gen:generation.current});
+    let disposed=false;
     const receive=({data}:MessageEvent)=>{
+      if(disposed){data.bitmap?.close();data.original?.close();return;}
       if(data.type==='custom-ready') {
+        pendingCustomCommand.current=null;
         const blob=pendingModelBlob.current;pendingModelBlob.current=null;pendingModelRestore.current=false;
         setCustomModel(data.config);setCustomFile(blob);setCustomCandidate(null);setCustomOpen(false);
         if(blob&&!data.restore){setCustomLoading(true);void rememberCustomModel(blob,data.config).then(()=>setRememberedModel(data.config)).catch(()=>notify(t("The model loaded, but could not be saved for the next launch."))).finally(()=>setCustomLoading(false));}
@@ -308,6 +386,7 @@ export default function App() {
         return;
       }
       if(data.type==='error'&&data.operation==='custom-model'){
+        pendingCustomCommand.current=null;
         setCustomLoading(false);
         if(data.restore){pendingModelBlob.current=null;pendingModelRestore.current=false;setCustomOpen(true);setCustomError(data.message==='Saved custom model is missing or damaged.'?t("The saved model is missing or damaged. Choose it again; saved colour ranges are kept."):t("The saved model could not be restored. Try again or choose its file; the saved model and ranges are kept."));}
         else {pendingModelBlob.current=null;applyCustomModel.current=false;setCustomError(data.message);}
@@ -354,12 +433,12 @@ export default function App() {
         const thumbnailCanvas=document.createElement('canvas');thumbnailCanvas.width=160;thumbnailCanvas.height=Math.round(160*data.height/data.width);
         if(c)thumbnailCanvas.getContext('2d')!.drawImage(c,0,0,thumbnailCanvas.width,thumbnailCanvas.height);
         const thumbnail=c?thumbnailCanvas.toDataURL('image/jpeg',.75):undefined;
-        setPhotos(all=>all.map(p=>{if(p.id!==activeRef.current)return p;let next=p.recipe??(data.video?makeVideoRecipe(data.analysis):makePhotoRecipe(data.analysis));return {...p,recipe:next,thumbnail:p.cameraCapture?(p.thumbnail??thumbnail):(thumbnail??p.thumbnail)};}));
+        setPhotos(all=>all.map(p=>{if(p.id!==activeRef.current)return p;let next=p.recipe??(data.video?makeVideoRecipe(data.analysis):makePhotoRecipe(data.analysis));return {...p,recipe:next,thumbnail:p.cameraCapture||p.nativeCapture?(p.thumbnail??thumbnail):(thumbnail??p.thumbnail)};}));
       } else if(data.type==='neutral-picked'&&data.request===neutralRequest.current) {
         if(!data.neutral){notify(t("Choose a midtone white or grey area, away from deep shadows and bright highlights."));}
         else {update(r=>({...r,manual:{...r.manual,neutral:data.neutral}}));notify(t("Neutral point applied. Undo if the selected area was not white or grey."));}
       } else if(data.type==='rendered') {
-        if(data.request===latest.current){if(data.analysis&&!previewPlayback.current.playing)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');
+        if(data.request===latest.current){workerRecovery.current={photoId:activeRef.current,attempts:0};if(data.analysis&&!previewPlayback.current.playing)setAnalysis(data.analysis);const c=editedCanvas.current;if(c){c.width=data.bitmap.width;c.height=data.bitmap.height;c.getContext('2d')!.drawImage(data.bitmap,0,0);c.dataset.generation=String(data.gen);c.dataset.request=String(data.request);}if(data.original&&originalCanvas.current){const o=originalCanvas.current;o.width=data.original.width;o.height=data.original.height;o.getContext('2d')!.drawImage(data.original,0,0);}setRendering(false);setModelStatus('');
           if(previewPlayback.current.playing){const next=videoPreviewPlayhead(previewPlayback.current.startTime,previewPlayback.current.startedAt,performance.now(),videoDurationRef.current);if(next.ended){pauseVideoPreview();setPreviewTime(next.time);}else if(next.time>previewTimeRef.current+.001)setPreviewTime(next.time);}}
         data.original?.close();
         data.bitmap.close();
@@ -369,6 +448,11 @@ export default function App() {
         void finishExport(data.blob,data.metadataWarning);
       } else if(data.type==='error') {
         if(data.operation==='render'&&data.request!==latest.current)return;
+        if(data.operation==='load'||data.operation==='render'){
+          const id=activeRef.current;
+          if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+          if(id&&workerRecovery.current.attempts<1){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();setBusy(t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);return;}
+        }
         setModelStatus('');
         setBusy('');setExporting(false);setRendering(false);
         if(data.operation==='load')setReady(false);
@@ -377,16 +461,39 @@ export default function App() {
       }
     };
     w.onmessage=receive;v.onmessage=receive;
-    const fail=()=>{clearPreviewRenderQueue();pauseVideoPreview();setBusy('');setExporting(false);setReady(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));};const recoverPhotoWorker=()=>{w.terminate();w=new Worker(new URL('./processor.worker.ts',import.meta.url),{type:'module'});w.onmessage=receive;w.onerror=recoverPhotoWorker;photoProcessor.current=w;if(worker.current!==v)worker.current=w;fail();};w.onerror=recoverPhotoWorker;v.onerror=fail;
-    return ()=>{clearPreviewRenderQueue();w.terminate();v.terminate();worker.current=null;photoProcessor.current=null;videoProcessor.current=null;pendingBitmap.current?.close();};
-  },[]);
+    const fail=()=>{clearPreviewRenderQueue();pauseVideoPreview();setBusy('');setExporting(false);setReady(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));};
+    const recover=(failed:Worker)=>{
+      if(failed!==photoProcessor.current&&failed!==videoProcessor.current)return;
+      if(document.visibilityState==='hidden'){deferredWorkerFailure.current=true;return;}
+      const id=activeRef.current;
+      if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+      if(workerRecovery.current.attempts<1&&id){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();if(exportingRef.current){exportTarget.current=null;setExporting(false);notify(t("Export cancelled."));}const current=photoRef.current.find(item=>item.id===id);setBusy(current&&isVideo(current.file)?t("Opening video…"):t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);return;}
+      fail();
+    };
+    w.onerror=()=>recover(w);v.onerror=()=>recover(v);w.onmessageerror=()=>recover(w);v.onmessageerror=()=>recover(v);
+    return ()=>{disposed=true;clearPreviewRenderQueue();w.terminate();v.terminate();if(worker.current===w||worker.current===v)worker.current=null;if(photoProcessor.current===w)photoProcessor.current=null;if(videoProcessor.current===v)videoProcessor.current=null;pendingBitmap.current?.close();};
+  },[processorEpoch,suspendWorkers]);
+  useEffect(()=>{
+    const recoverOnForeground=()=>{
+      if(document.visibilityState!=='visible'||!deferredWorkerFailure.current||cameraOpen||saving||hdrConverting)return;
+      deferredWorkerFailure.current=false;const id=activeRef.current;if(!id)return;
+      if(exporting){exportTarget.current=null;setExporting(false);notify(t("Export cancelled."));}
+      if(customLoading){pendingModelBlob.current=null;pendingModelRestore.current=false;pendingCustomCommand.current=null;applyCustomModel.current=false;setCustomLoading(false);setCustomError(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));}
+      if(workerRecovery.current.photoId!==id)workerRecovery.current={photoId:id,attempts:0};
+      if(workerRecovery.current.attempts<1){workerRecovery.current.attempts++;clearPreviewRenderQueue();pauseVideoPreview();const current=photoRef.current.find(item=>item.id===id);setBusy(current&&isVideo(current.file)?t("Opening video…"):t("Opening photo…"));setReady(false);setRendering(true);setPhotoRetry(false);setProcessorEpoch(epoch=>epoch+1);}
+      else{setBusy('');setReady(false);setRendering(false);setPhotoRetry(true);notify(t("The processing worker stopped. Reopen the file, or refresh and try a smaller file."));}
+    };
+    document.addEventListener('visibilitychange',recoverOnForeground);window.addEventListener('pageshow',recoverOnForeground);window.addEventListener('focus',recoverOnForeground);recoverOnForeground();
+    return()=>{document.removeEventListener('visibilitychange',recoverOnForeground);window.removeEventListener('pageshow',recoverOnForeground);window.removeEventListener('focus',recoverOnForeground);};
+  },[cameraOpen,exporting,saving,customLoading,hdrConverting]);
   useEffect(()=>{
     if(modelRestoreStarted.current)return;modelRestoreStarted.current=true;let cancelled=false;
     loadRememberedCustomModel().then(saved=>{
       if(cancelled||modelSelectionStarted.current||!saved)return;setRememberedModel(saved.config);setInputRange(saved.config.inputRange);setOutputRange(saved.config.outputRange);
       if(!saved.blob){setCustomOpen(true);setCustomError(t("The saved model is missing or damaged. Choose it again; saved colour ranges are kept."));return;}
       pendingModelBlob.current=saved.blob;pendingModelRestore.current=true;setCustomLoading(true);
-      photoProcessor.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:saved.blob,name:saved.config.name,inputRange:saved.config.inputRange,outputRange:saved.config.outputRange,restore:true,expectedConfig:saved.config});
+      pendingCustomCommand.current={type:'custom-model',permission:true,blob:saved.blob,name:saved.config.name,inputRange:saved.config.inputRange,outputRange:saved.config.outputRange,restore:true,expectedConfig:saved.config};
+      if(photoProcessor.current)photoProcessor.current.postMessage({...pendingCustomCommand.current,gen:generation.current});
     }).catch(()=>{if(!cancelled){setCustomOpen(true);setCustomLoading(false);setCustomError(t("Saved custom model storage could not be read. Choose the model file again; saved colour ranges are kept."));}});
     return()=>{cancelled=true;};
   },[]);
@@ -395,9 +502,14 @@ export default function App() {
     videoProcessor.current.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,name:customModel.name,inputRange:customModel.inputRange,outputRange:customModel.outputRange,silent:true,expectedConfig:customModel});
   },[video,customFile,customModel]);
   useEffect(()=>{
+    if(capabilities.nativeCamera&&cameraOpen){
+      pauseVideoPreview();clearPreviewRenderQueue();pendingBitmap.current?.close();pendingBitmap.current=null;
+      for(const canvas of [originalCanvas.current,editedCanvas.current])if(canvas){canvas.width=1;canvas.height=1;delete canvas.dataset.generation;delete canvas.dataset.request;}
+      setReady(false);setRendering(false);setBusy('');setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setModelStatus('');setAnalysis(null);setDimensions([1,1]);
+      return;
+    }
     pauseVideoPreview();
-    clearPreviewRenderQueue();
-    if(!active){
+    clearPreviewRenderQueue();    if(!active){
       const converting=hdrActive.current;if(converting){hdrActive.current=null;void cancelHdrWorkingCopy();}disposeHdrWorkingCopies();setHdrConverting(false);hdrJobId.current=null;
       const gen=++generation.current;photoProcessor.current?.postMessage({type:'unload',gen});videoProcessor.current?.postMessage({type:'unload',gen});worker.current=null;
       pendingBitmap.current?.close();pendingBitmap.current=null;
@@ -406,6 +518,23 @@ export default function App() {
       return;
     }
     const p=photoRef.current.find(p=>p.id===active);if(!p)return;
+    if(workerRecovery.current.photoId!==p.id)workerRecovery.current={photoId:p.id,attempts:0};
+    if(p.nativeCapture&&!p.nativeCapture.loaded){
+      const token=++generation.current,epoch=collectionEpoch.current,controller=new AbortController();
+      const clip=p.nativeCapture.descriptor.kind==='video';
+      if(clip&&!capabilities.videoExport){setBusy('');setRendering(false);setReady(false);notify(t('Video editing and export are unavailable on this device.'));return()=>controller.abort();}
+      setBusy(clip?t('Opening video…'):t('Opening photo…'));setReady(false);setRendering(true);
+      void readIOSCaptureFile(p.nativeCapture.descriptor,'source',controller.signal).then(file=>{
+        if(controller.signal.aborted||token!==generation.current||epoch!==collectionEpoch.current||activeRef.current!==p.id)return;
+        setPhotos(all=>all.map(item=>item.id===p.id?{...item,file,nativeCapture:{...item.nativeCapture!,loaded:true}}:item));
+        setPhotoReload(n=>n+1);
+      }).catch(error=>{
+        if(controller.signal.aborted||token!==generation.current)return;
+        setBusy('');setRendering(false);setReady(false);notify(error instanceof Error?error.message:t('Could not open this file.'));
+      });
+      return()=>controller.abort();
+    }
+    if(p.nativeCapture?.descriptor.kind==='video'&&!capabilities.videoEditing){setBusy('');setRendering(false);setReady(false);return;}
     for(const id of hdrWorkingCopies.current.keys())if(id!==p.id)disposeHdrWorkingCopy(id);
     const clip=isVideo(p.file);worker.current=clip?videoProcessor.current:photoProcessor.current;
     const loadGeneration=++generation.current;setShareReady(null);setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setPreviewTime(0);setKeepAudio(true);setModelStatus('');setReady(false);setRendering(true);setAnalysis(null);setBusy(clip?t("Opening video…"):isRaw(p.file)?t("Developing DNG locally…"):/\.hei[cf]$/i.test(p.file.name)?t("Decoding HEIC locally…"):t("Opening photo…"));setEyedropper(false);
@@ -413,30 +542,23 @@ export default function App() {
     if(customFile&&customModel)worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,name:customModel.name,inputRange:customModel.inputRange,outputRange:customModel.outputRange,silent:true,expectedConfig:customModel});
     const hdrCopy=hdrWorkingCopies.current.get(p.id);
     worker.current?.postMessage({type:'load',gen:loadGeneration,blob:hdrCopy?.file??p.file,photoResolution,photoDevice});
-    return ()=>{const conversion=hdrActive.current;if(conversion?.generation===loadGeneration){hdrActive.current=null;void cancelHdrWorkingCopy();}const previous=photoRef.current.find(item=>item.id===active);if(previous?.recipe)persist(previous);};
-  },[active,photoResolution,photoReload,pauseVideoPreview]);
+    return ()=>{const conversion=hdrActive.current;if(conversion?.generation===loadGeneration){hdrActive.current=null;void cancelHdrWorkingCopy();}const previous=photoRef.current.find(item=>item.id===active);if(previous?.recipe)persist(previous);if(previous?.nativeCapture?.loaded&&previous.previewFile&&!clearingCollectionRef.current)setPhotos(all=>all.map(item=>item.id===previous.id?{...item,file:previous.previewFile!,nativeCapture:{...item.nativeCapture!,loaded:false}}:item));};
+  },[active,photoResolution,photoReload,cameraOpen,processorEpoch]);
   useEffect(()=>{
     if(ready&&pendingBitmap.current&&originalCanvas.current){const b=pendingBitmap.current,c=originalCanvas.current;c.width=b.width;c.height=b.height;c.getContext('2d')!.drawImage(b,0,0);b.close();pendingBitmap.current=null;}
   },[ready]);
   useEffect(()=>{
-    if(!video||!ready||exporting||cameraOpen||settingsOpen||about||customOpen||saveDialog)pauseVideoPreview();
-  },[video,ready,exporting,cameraOpen,settingsOpen,about,customOpen,saveDialog,pauseVideoPreview]);
-  useEffect(()=>{setShareReady(null);},[recipe,format,jpegQuality,keepMetadata,keepAudio,exportMode]);
-  useEffect(()=>{
-    const pauseWhenHidden=()=>{if(document.visibilityState!=='visible')pauseVideoPreview();};
-    document.addEventListener('visibilitychange',pauseWhenHidden);window.addEventListener('pagehide',pauseVideoPreview);
-    return()=>{document.removeEventListener('visibilitychange',pauseWhenHidden);window.removeEventListener('pagehide',pauseVideoPreview);};
-  },[pauseVideoPreview]);
-  useEffect(()=>()=>{previewPlayback.current.playing=false;},[]);
-  useEffect(()=>{
-    if(!recipe||!ready||exporting)return;
-    previewRenderQueue.current.pending=null;
+    if(!recipe||!ready||exporting||cameraOpen||(photo?.nativeCapture&&(!photo.nativeCapture.loaded||(video&&!capabilities.videoEditing))))return;
     if(recipe.engine==='wave'&&(!customModel||(recipe.customModel&&(recipe.customModel.sha256!==customModel.sha256||recipe.customModel.inputRange!==customModel.inputRange||recipe.customModel.outputRange!==customModel.outputRange)))){latest.current=++request.current;setInputRange(recipe.customModel?.inputRange??'unit');setOutputRange(recipe.customModel?.outputRange??'unit');setCustomOpen(true);setRendering(true);return;}
     const id=++request.current;latest.current=id;setRendering(true);
     const timer=setTimeout(()=>{previewRenderQueue.current.pending={type:'render',gen:generation.current,request:id,recipe,time:previewTime};drainPreviewRenderQueue();},40);
     return ()=>clearTimeout(timer);
-  },[recipe,ready,exporting,customModel,previewTime]);
-  useEffect(()=>{if(exporting)previewRenderQueue.current.pending=null;},[exporting]);
+  },[recipe,ready,exporting,customModel,previewTime,photo?.id,photo?.nativeCapture?.loaded,cameraOpen]);
+  useEffect(()=>{if(!video||!ready||exporting||cameraOpen||settingsOpen||about||customOpen||saveDialog)pauseVideoPreview();},[video,ready,exporting,cameraOpen,settingsOpen,about,customOpen,saveDialog,pauseVideoPreview]);
+  useEffect(()=>{setShareReady(null);},[recipe,format,jpegQuality,keepMetadata,keepAudio,exportMode]);
+  useEffect(()=>{const pauseWhenHidden=()=>{if(document.visibilityState!=='visible')pauseVideoPreview();};document.addEventListener('visibilitychange',pauseWhenHidden);window.addEventListener('pagehide',pauseVideoPreview);return()=>{document.removeEventListener('visibilitychange',pauseWhenHidden);window.removeEventListener('pagehide',pauseVideoPreview);};},[pauseVideoPreview]);
+  useEffect(()=>()=>{previewPlayback.current.playing=false;},[]);
+  useEffect(()=>{if(!recipe||!ready||exporting)return;previewRenderQueue.current.pending=null;},[recipe,ready,exporting]);
   useEffect(()=>{
     if(customModel&&analysis&&applyCustomModel.current){applyCustomModel.current=false;update(r=>({...r,engine:'wave',customModel,auto:suggest(analysis,r.hints,'wave')}));setCustomOpen(false);}
   },[customModel,analysis]);
@@ -477,7 +599,7 @@ export default function App() {
   }
   function reset(){if(analysis)update(()=>video?makeVideoRecipe(analysis):makePhotoRecipe(analysis));setEyedropper(false);}
   function cancelCustom(){
-    if(customLoading)return;pendingModelBlob.current=null;applyCustomModel.current=false;setCustomCandidate(null);setCustomOpen(false);setCustomError('');
+    if(customLoading)return;pendingModelBlob.current=null;pendingCustomCommand.current=null;applyCustomModel.current=false;setCustomCandidate(null);setCustomOpen(false);setCustomError('');
     const matching=!!customModel&&(!recipe?.customModel||(recipe.customModel.sha256===customModel.sha256&&recipe.customModel.inputRange===customModel.inputRange&&recipe.customModel.outputRange===customModel.outputRange));
     if(recipe?.engine==='wave'&&!matching&&analysis)update(r=>({...r,engine:'balanced',auto:suggest(analysis,r.hints,'balanced')}));
   }
@@ -489,6 +611,8 @@ export default function App() {
     (recipe.enhancement.brightness??0)!==0||recipe.enhancement.black!==0||recipe.enhancement.white!==1);
   async function exportPhoto(saveAs=false,chooseNewFolder=false,downloadOnly=false,saveGallery=false,shareOnly=false){
     if(!canEdit||rendering||!photo)return;
+    if(video&&!capabilities.videoExport){notify(t('Video editing and export are unavailable on this device.'));return;}
+    if(capabilities.platform==='ios'&&!capabilities.nativeMediaSave){notify(t('Photo export is unavailable in this iOS build.'));return;}
     if(video&&videoPlan&&!videoPlan.supported){notify(message(videoPlan.reason??''));return;}
     if(saveAs&&!saveDialog&&supportsFolder()){setSaveName(restoredName(photo.file.name,exportFormat,!outputFolder));setSaveDialog(true);return;}
     pauseVideoPreview();
@@ -510,10 +634,28 @@ export default function App() {
     }catch(error){setExporting(false);if(!(error instanceof DOMException&&error.name==='AbortError'))notify(error instanceof Error?error.message:t("Could not open the save folder."));}
   }
   async function exportCameraOriginal(){
+    if(photo?.nativeCapture){if(saving||exporting)return;setSaving(true);try{const result=await shareIOSCapture(photo.id,'source');if(result.completed)notify(t('Saved {0}.',[photo.file.name]));}catch{notify(t('Could not export the camera original.'));}finally{setSaving(false);}return;}
     if(!photo?.cameraCapture||saving||exporting)return;setSaving(true);
     const stem=photo.file.name.replace(/\.[^.]+$/,''),extension=photo.file.name.match(/\.[^.]+$/)?.[0]??(video?'.mp4':'.jpg'),name=stem+'-original'+extension;
-    try{if(isAndroid()){const folder=outputFolder??await chooseFolder(),target=await createUniqueFile(folder,name);await writeFile(target.handle,photo.file);notify(t('Saved {0}.',[target.name]));}else download(photo.file,name);}
+    try{if(isAndroid()){const folder=outputFolder??await chooseFolder(),target=await createUniqueFile(folder,name);await writeFile(target.handle,photo.file);notify(t('Saved {0}.',[target.name]));}else if(capabilities.platform==='ios'){if(!capabilities.nativeMediaSave)throw new Error(t('Photo export is unavailable in this iOS build.'));const shared=await shareIOSFile(photo.file,name);if(shared.completed)notify(t('Saved {0}.',[name]));}else download(photo.file,name);}
     catch(error){if(!(error instanceof DOMException&&error.name==='AbortError'))notify(t('Could not export the camera original.'));}finally{setSaving(false);}
+  }
+  async function shareNativeVideo(){
+    if(!photo?.nativeCapture||photo.nativeCapture.descriptor.kind!=='video'||saving||exporting)return;
+    setSaving(true);try{const result=await shareIOSCapture(photo.id,'source');if(result.completed)notify(t('Saved {0}.',[photo.nativeCapture.descriptor.name]));}catch(error){notify(error instanceof Error?error.message:t('Could not export the camera original.'));}finally{setSaving(false);}
+  }
+  async function saveNativeEnhancedPhoto(){
+    if(!photo?.nativeCapture||photo.nativeCapture.descriptor.kind!=='photo'||saving||exporting)return;
+    setSaving(true);try{const result=await saveIOSCaptureToPhotos(photo.id);if(result.saved){notify(t('Saved captured copy to Photos.'));return;}const shared=await shareIOSCapture(photo.id,'enhanced');if(shared.completed)notify(t('Shared captured copy.'));else notify(t('Could not save the captured copy to Photos. You can share it from the editor.'));}
+    catch{notify(t('Could not save the captured copy to Photos. You can share it from the editor.'));}
+    finally{setSaving(false);}
+  }
+  async function saveRecipeFile(){
+    if(!recipe)return;const blob=new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),name='clearwater-recipe.json';
+    if(capabilities.platform==='ios'){
+      if(!capabilities.nativeMediaSave){notify(t('Photo export is unavailable in this iOS build.'));return;}
+      try{const shared=await shareIOSFile(blob,name);if(shared.completed)notify(t('Saved {0}.',[name]));}catch(error){notify(error instanceof Error?error.message:t('Photo export is unavailable in this iOS build.'));}
+    }else download(blob,name);
   }
   function cancelExport(){if(saving)return;pauseVideoPreview();clearPreviewRenderQueue();generation.current++;exportTarget.current=null;worker.current?.postMessage({type:'cancel',gen:generation.current});setExporting(false);notify(t("Export cancelled."));}
   function pickNeutralAt(clientX:number,clientY:number,frame:HTMLDivElement){
@@ -571,11 +713,32 @@ export default function App() {
   }
   async function removePhoto(p:Photo){
     if(exporting||saving||folderLoading||clearingCollectionRef.current)return;
+    if(p.nativeCapture){setCaptureRemovalError('');setPendingCaptureRemoval(p);return;}
     if(p.cameraCapture&&!window.confirm(t(p.cameraCapture.uri?'Delete this camera photo from the gallery and ClearWater? Its original and edits will also be deleted.':'Delete this camera original and its edits?')))return;
     setSaving(true);
-    try{if(p.cameraCapture?.uri)await deleteAndroidCameraCapture(p.cameraCapture.uri);removedPhotoIds.current.add(p.id);await deletePhoto(p.id);detachPhotos(new Set([p.id]));}
-    catch{removedPhotoIds.current.delete(p.id);notify(t(p.cameraCapture?'Could not delete the camera photo. Your original and edits are kept.':'Could not remove this collection item.'));}
+    try{if(p.nativeCapture){await setIOSCaptureVisible(p.id,false);removedPhotoIds.current.add(p.id);detachPhotos(new Set([p.id]));}else{if(p.cameraCapture?.uri)await deleteAndroidCameraCapture(p.cameraCapture.uri);removedPhotoIds.current.add(p.id);await deletePhoto(p.id);detachPhotos(new Set([p.id]));}}
+    catch{removedPhotoIds.current.delete(p.id);notify(t(p.nativeCapture?'Could not remove this camera item. Its private source is kept.':p.cameraCapture?'Could not delete the camera photo. Your original and edits are kept.':'Could not remove this collection item.'));}
     finally{setSaving(false);}
+  }
+  async function finishCaptureRemoval(permanent:boolean){
+    const target=pendingCaptureRemoval;
+    if(!target||saving||exporting)return;
+    setSaving(true);setCaptureRemovalError('');
+    // Block queued inventory reads and metadata writes from resurrecting this item.
+    removedPhotoIds.current.add(target.id);
+    try{
+      const current=photoRef.current.find(item=>item.id===target.id)??target;
+      if(permanent)await deleteIOSCapture(target.id);
+      else{
+        if(current.recipe)await setIOSCaptureRecipe(target.id,current.recipe as unknown as Record<string,unknown>);
+        await setIOSCaptureVisible(target.id,false);
+      }
+      detachPhotos(new Set([target.id]));setPendingCaptureRemoval(null);
+    }catch{
+      removedPhotoIds.current.delete(target.id);
+      setCaptureRemovalError(t('Could not remove this camera item. Its private source is kept.'));
+      await syncIOSCaptureRecords(false).catch(()=>{});
+    }finally{setSaving(false);}
   }
   sourceCleanup.current=async()=>{
     if(!isAndroid()||sourceCheckBusy.current||cameraOpen||cameraArchiveBusy||exporting||saving||busy||folderLoading||clearingCollectionRef.current)return;
@@ -607,6 +770,35 @@ export default function App() {
       notify(t('Restored {0} camera items to the collection.',[added.length]));
     }catch{notify(t('Could not restore camera items. Your saved originals are kept.'));}finally{setCameraArchiveBusy(false);}
   }
+  async function restoreIOSPrivateCaptures(){
+    if(!isIOSCameraAvailable()||cameraArchiveBusy||cameraOpen||saving||exporting||busy||clearingCollectionRef.current)return;
+    setCameraArchiveBusy(true);
+    try{
+      const hidden=(await listIOSCaptures()).filter(capture=>!capture.visible);
+      for(const capture of hidden){await setIOSCaptureVisible(capture.id,true);removedPhotoIds.current.delete(capture.id);}
+      await syncIOSCaptureRecords(false);
+      notify(t('Restored {0} private camera captures to the collection.',[hidden.length]));
+    }catch{
+      await syncIOSCaptureRecords(false).catch(()=>{});
+      notify(t('Could not restore all private camera captures. Already restored captures remain in the collection.'));
+    }finally{setCameraArchiveBusy(false);}
+  }
+  async function deleteIOSPrivateCaptures(){
+    if(!isIOSCameraAvailable()||cameraArchiveBusy||cameraOpen||saving||exporting||clearingCollectionRef.current)return;
+    if(!window.confirm(t('Delete all private camera captures from this app? Independent copies already saved to Photos are not affected.')))return;
+    setCameraArchiveBusy(true);
+    const guarded=new Set<string>(),deleted=new Set<string>();
+    try{
+      const captures=await listIOSCaptures();
+      for(const capture of captures){guarded.add(capture.id);removedPhotoIds.current.add(capture.id);}
+      for(const capture of captures){await deleteIOSCapture(capture.id);deleted.add(capture.id);}
+      detachPhotos(deleted);notify(t('Private camera captures deleted. Photos copies are unchanged.'));
+    }catch{
+      for(const id of guarded)if(!deleted.has(id))removedPhotoIds.current.delete(id);
+      detachPhotos(deleted);await syncIOSCaptureRecords(false).catch(()=>{});
+      notify(t('Could not delete all private camera captures. Remaining captures are kept.'));
+    }finally{setCameraArchiveBusy(false);}
+  }
   const clearBlocked=cameraArchiveBusy||exporting||saving||!!busy||folderLoading||customOpen||customLoading||sampleBusy||rendering||updating||saveDialog||hdrConverting;
   function openClearCollection(event:React.MouseEvent<HTMLButtonElement>){if(clearBlocked||clearingCollectionRef.current)return;clearOpenerRef.current=event.currentTarget;setClearError('');setClearCollectionOpen(true);}
   function closeClearCollection(){if(clearingCollectionRef.current)return;setClearCollectionOpen(false);setClearError('');requestAnimationFrame(()=>clearOpenerRef.current?.focus());}
@@ -625,6 +817,7 @@ export default function App() {
     clearPreviewRenderQueue();const gen=++generation.current;photoProcessor.current?.postMessage({type:'unload',gen});videoProcessor.current?.postMessage({type:'unload',gen});
     folderRequest.current++;setFolderLoading(false);
     try{
+      for(const p of photoRef.current)if(p.nativeCapture)await setIOSCaptureVisible(p.id,false);
       const current=photoRef.current.find(p=>p.id===activeRef.current);if(current?.cameraCapture){const {id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri}=current;await savePhoto({id,file,recipe,thumbnail,addedAt,cameraCapture,sourceUri});}
       await clearPhotos();
       for(const p of photoRef.current){disposeHdrWorkingCopy(p.id);URL.revokeObjectURL(p.url);}
@@ -634,9 +827,10 @@ export default function App() {
       setClearCollectionOpen(false);notify(t("Collection cleared."));requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('.top-actions button.secondary')?.focus());
     }catch{
       setPhotoReload(n=>n+1);
-      setClearError(t("Could not clear collection. Your photos and edits are still here."));
+      setClearError(capabilities.nativeCamera?t("Could not clear collection completely. Some private camera captures may be hidden; restore them in Settings."):t("Could not clear collection. Your photos and edits are still here."));
     }finally{
       clearingCollectionRef.current=false;setClearingCollection(false);
+      if(capabilities.nativeCamera)void syncIOSCaptureRecords(false).catch(()=>setStorageWarning(true));
       const files=deferredFiles.current.splice(0);for(const batch of files)addFiles(batch);
       const shareIds=[...deferredShareIds.current];deferredShareIds.current.clear();
       if(shareIds.length){const epoch=collectionEpoch.current;promoteSharedPhotos(shareIds).then(()=>listPhotos()).then(items=>{if(epoch!==collectionEpoch.current)return;const added=items.filter(p=>shareIds.includes(p.id)&&!photoRef.current.some(existing=>existing.id===p.id)).map(p=>({...p,url:URL.createObjectURL(p.file),past:[],future:[]}));if(added.length)setPhotos(all=>newestPhotos([...all,...added]));}).catch(()=>setStorageWarning(true));}
@@ -681,14 +875,14 @@ export default function App() {
   },[]);
   const expandButton=<button className="expand-view-button" disabled={!photo} aria-label={expanded?t("Exit expanded view"):t("Expand photo")} title={expanded?t("Exit expanded view (Esc)"):t("Expand photo")} aria-pressed={expanded} onClick={()=>{expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setExpanded(!expanded);setZoom(1);setAdjustmentsOpen(false);}}>{expanded?<Minimize2 size={16}/>:<Maximize2 size={16}/>}</button>;
   return <><div hidden={about||cameraOpen||settingsOpen} className={`app-shell editor-preview ${expanded?'expanded-photo':''} ${adjustmentsOpen?'adjustments-open':''}`} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!exporting&&!folderLoading)addFiles(Array.from(e.dataTransfer.files));}}>
-    <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{!isAndroid()&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<button className="settings-launch" aria-label={t("Settings")} title={t("Settings")} onClick={()=>setSettingsOpen(true)}><SettingsIcon size={17}/></button></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
-      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span><button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||hdrConverting||clearingCollection} onClick={()=>{cameraSession.current++;cameraLastCapture.current=null;setCameraOpen(true);}}><CameraIcon size={16}/></button><button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{isAndroid()&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}<button className="button primary" aria-label={photo?.cameraCapture?.uri?t("Save to gallery"):video?t("Export video"):t("Export photo")} disabled={!canEdit||rendering} onClick={()=>exportPhoto(false,false,false,!!photo?.cameraCapture?.uri)}><Download size={16}/><span className="export-action-label">{photo?.cameraCapture?.uri?t("Save to gallery"):video?t("Export video"):t("Export photo")}</span></button></div></header>
+    <header className="topbar"><div className="brand-cluster"><a className="brand" href={import.meta.env.BASE_URL} aria-label={t("ClearWater home")}><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><span>clearwater<span className="brand-dot">.</span></span></a>{capabilities.webServiceWorkerUpdates&&<button className="app-update" aria-label={t("Update app")} title={t("Check for updates and reload")} disabled={updating||exporting||saving||customLoading||folderLoading} onClick={updateApp}><RefreshCw size={12} className={updating?'spin':undefined}/></button>}<button className="settings-launch" aria-label={t("Settings")} title={t("Settings")} onClick={()=>setSettingsOpen(true)}><SettingsIcon size={17}/></button></div><a className="edition about-nav" href="#about">{t("About & guide")}</a>
+      <div className="top-actions"><span className="private-note"><LockKeyhole size={12}/> {t("Stays on your device")}</span>{capabilities.webStreamCamera?<button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||customLoading||hdrConverting||clearingCollection} onClick={()=>{cameraSession.current++;cameraLastCapture.current=null;setCameraOpen(true);}}><CameraIcon size={16}/></button>:capabilities.nativeCamera?<button className="button secondary camera-launch" title={t("Camera")} aria-label={t("Camera")} disabled={exporting||saving||!!busy||folderLoading||customOpen||customLoading||hdrConverting||clearingCollection} onClick={()=>void launchIOSCamera()}><CameraIcon size={16}/></button>:<button className="button secondary camera-launch" title={t("Native camera is unavailable in this iOS build.")} aria-label={t("Native camera is unavailable in this iOS build.")} disabled><CameraIcon size={16}/></button>}<button className="button secondary" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><Plus size={16}/> {t("Open files")}</button>{capabilities.platform==='android'&&<button className="button secondary" aria-label={t("Open folder")} title={t("Open folder")} disabled={!!busy||exporting||folderLoading||customOpen} onClick={openPhotoFolder}><FolderOpen size={16}/> {t("Open folder")}</button>}{photo?.nativeCapture&&video&&(!capabilities.videoExport||!canEdit)?<button className="button primary" aria-label={t('Share or save…')} disabled={saving||exporting} onClick={()=>void shareNativeVideo()}><Download size={16}/><span className="export-action-label">{t('Share or save…')}</span></button>:<button className="button primary" aria-label={photo?.cameraCapture?.uri?t("Save to gallery"):video?t("Export video"):t("Export photo")} disabled={!canEdit||rendering||(video&&!capabilities.videoExport)||(!video&&capabilities.platform==='ios'&&!capabilities.nativeMediaSave)} onClick={()=>exportPhoto(false,false,false,!!photo?.cameraCapture?.uri)}><Download size={16}/><span className="export-action-label">{photo?.cameraCapture?.uri?t("Save to gallery"):capabilities.platform==='ios'?t("Share or save…"):video?t("Export video"):t("Export photo")}</span></button>}{supportsFileShare()&&<button className="button secondary" aria-label={shareReady?t("Share now"):t("Share file")} disabled={!canEdit||rendering||exporting||saving} onClick={()=>shareReady?void shareReadyFile():void exportPhoto(false,false,false,false,true)}><Upload size={16}/><span className="export-action-label">{shareReady?t("Share now"):t("Share file")}</span></button>}</div></header>
     <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,video/mp4,video/quicktime,.heic,.heif,.dng,.mp4,.mov" aria-label={t("Choose photos")} onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
     <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label={t("Choose recipe")} onChange={readRecipe}/>
     <main className="studio">
       <aside className="library"><div className="section-title collection-heading"><span>{t("YOUR PHOTOS")}</span><span className="count">{photos.length.toString().padStart(2,'0')}</span><button className={`clear-collection-button ${photos.length>=100?'large-collection':''}`} type="button" disabled={clearBlocked||photos.length===0} title={photos.length>=100?t("Large collection"):undefined} aria-describedby={photos.length>=100?'large-collection-hint':undefined} onClick={openClearCollection}>{t("Clear collection")}</button>{photos.length>=100&&<span id="large-collection-hint" className="visually-hidden">{t("Large collection")}</span>}</div>
         <button className="import-tile" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>{t("Add to your collection")}</span><small>{t("Photos · DNG · MP4 · MOV")}</small></button>
-        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||folderLoading||busy!==''||customOpen||customLoading} onClick={()=>selectPhoto(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting||customOpen||customLoading} title={p.cameraCapture?t("Delete camera photo"):t("Remove local copy")} aria-label={t(p.cameraCapture?"Delete {0}":"Remove {0}",[p.file.name])} onClick={()=>removePhoto(p)}>{p.cameraCapture?<Trash2 size={12}/>:<X size={12}/>}</button></div>)}</div>
+        <div className="photo-grid">{photos.map(p=><div className={`photo-tile ${p.id===active?'selected':''}`} key={p.id}><button className="photo-select" disabled={exporting||folderLoading||busy!==''||customOpen||customLoading} onClick={()=>selectPhoto(p.id)} title={p.file.name}><img src={p.thumbnail??p.url} alt={p.file.name} onLoad={e=>{e.currentTarget.style.visibility='visible';}} onError={e=>{e.currentTarget.style.visibility='hidden';}}/>{p.id===active&&<span className="selected-check"><Check size={12}/></span>}<span>{p.file.name.replace(/\.[^.]+$/,'')}</span></button><button className="remove-photo" disabled={exporting||customOpen||customLoading} title={p.nativeCapture?t("Remove camera capture"):p.cameraCapture?t("Delete camera photo"):t("Remove local copy")} aria-label={t(p.nativeCapture?"Remove {0}":p.cameraCapture?"Delete {0}":"Remove {0}",[p.file.name])} onClick={()=>removePhoto(p)}>{p.nativeCapture||p.cameraCapture?<Trash2 size={12}/>:<X size={12}/>}</button></div>)}</div>
         {samples.length>0&&<><div className="section-title sample-heading"><span>{t("YOUR DIVE SAMPLES")}</span><span className="count">09</span></div><div className="sample-list">{samples.map((s,i)=><button key={s.name} disabled={exporting||sampleBusy||busy!==''} onClick={()=>sample(s.name)}><img src={'/__thumb/'+encodeURIComponent(s.name)} alt=""/><span><strong>{s.label}</strong><small>{t("Dive study")} {String(i+1).padStart(2,'0')}</small></span><Plus size={13}/></button>)}</div></>}
       </aside>
       <section className="workspace">
@@ -762,22 +956,23 @@ export default function App() {
           </section>
           <section id="control-panel-export" role="tabpanel" aria-labelledby="control-tab-export" className={`mobile-panel export-panel ${controlTab==='export'?'is-active':''}`}>
 
-          <details className="settings-group" open><summary>{t("Export")} <span className="summary-meta">{video?(exportMode==='source'?t("MP4 · Source size"):t("MP4 · up to 1080p")):photoInfo&&(photoInfo.exportWidth!==photoInfo.sourceWidth||photoInfo.exportHeight!==photoInfo.sourceHeight)?t("Reduced resolution"):t("Full resolution")}</span><ChevronDown size={14}/></summary><div className="group-content export-section"><div className="export-options">{video?<div className="video-export-options"><span>MP4 · H.264 · SDR</span><label className="video-quality-choice">{t("Video quality")}<select aria-label={t("Video quality")} value={exportMode} disabled={exporting} onChange={e=>setExportMode(e.target.value as VideoExportMode)}><option value="compatible">{t("Compact · 1080p / 30 fps")}</option><option value="source">{t("Source · Resolution & frame rate")}</option></select></label>{videoPlan&&<small>{t("{0} × {1} · {2} Mbps · about {3} MB",[videoPlan.width,videoPlan.height,(videoPlan.bitrate/1e6).toFixed(1),Math.ceil(videoPlan.estimatedBytes/1e6)])}</small>}{exportMode==='source'&&<small>{t("Source export uses more memory and can take longer.")}</small>}{videoPlan&&!videoPlan.supported&&<small role="alert">{message(videoPlan.reason??'')}</small>}<label><input type="checkbox" aria-label={t("Keep audio")} checked={keepAudio} disabled={!videoInfo?.hasAudio} onChange={e=>setKeepAudio(e.target.checked)}/> {t("Keep audio")}{videoInfo&&!videoInfo.hasAudio?t(" (no audio track)"):''}</label><small>{t("Source keeps frame timing and requests a higher bitrate; device encoding support is required. Compact reduces size. Both export 8-bit SDR.")}</small>{videoInfo&&(videoInfo.duration>=120||(photo?.file.size??0)>=100*1024*1024)&&<small className="video-cost-note">{t("Large/long clip: processing can take several minutes.")} {recipe&&isAIEngine(recipe.engine)&&(recipe.videoCorrection?.mode??'sampled')==='sampled'?t("About {0} AI samples. A 10-second interval or Fixed selected frame reduces analysis.",[Math.ceil(videoInfo.duration/(recipe.videoCorrection?.interval??5))+1]):t("Keep the app open during export.")}</small>}<a href={import.meta.env.BASE_URL+'licenses/README.txt'} target="_blank" rel="noreferrer">{t("Video toolkit licence")}</a></div>:<label>{t("File format")}<select aria-label={t("File format")} value={format==='png'?'png':jpegQuality===.99?'jpg-max':'jpg'} onChange={e=>{setFormat(e.target.value==='png'?'png':'jpg');setJpegQuality(e.target.value==='jpg-max'?.99:.95);}}><option value="jpg">{t("JPEG · High quality")}</option><option value="jpg-max">{t("JPEG · Maximum quality")}</option><option value="png">{t("PNG · Lossless")}</option></select></label>}<div className="export-actions"><button className="button primary" disabled={!canEdit||rendering||exporting||saving} onClick={()=>exportPhoto(false,false,false,!!photo?.cameraCapture?.uri)}><Download size={14}/>{supportsFolder()?t("Save restored file"):t("Download restored file")}</button>{supportsFileShare()&&<button className="button secondary" disabled={!canEdit||rendering||exporting||saving} onClick={()=>shareReady?void shareReadyFile():void exportPhoto(false,false,false,false,true)}><Upload size={14}/>{shareReady?t("Share now"):t("Share file")}</button>}</div></div>{video&&<label className="metadata-option"><input type="checkbox" checked={keepMetadata} onChange={e=>setKeepMetadata(e.target.checked)}/> {t("Keep video metadata")}</label>}{!video&&<label className="metadata-option" title={t("Includes location when present in the imported file")}><input type="checkbox" aria-label={t("Keep EXIF/GPS metadata")} checked={keepMetadata} onChange={e=>setKeepMetadata(e.target.checked)}/> {t("Keep EXIF/GPS metadata")}</label>}<div className="save-destination"><span title={outputFolder?.name}>{outputFolder?t("Output: {0}",[outputFolder.name]):supportsFolder()?t("Choose output folder"):t("Output: Downloads")}</span>{supportsFolder()&&<button className="text-button" onClick={selectOutputFolder}><FolderOpen size={12}/>{outputFolder?t("Change output folder"):t("Choose output folder")}</button>}<button className="button secondary save-as" disabled={rendering} onClick={()=>exportPhoto(true)}><Download size={13}/>{supportsFolder()?t("Save as…"):video?t("Download restored video"):t("Download restored photo")}</button>{supportsFolder()&&!isAndroid()&&<button className="text-button" disabled={rendering} onClick={()=>exportPhoto(false,false,true)}>{t("Download instead")}</button>}<>{photo?.cameraCapture&&<button className="button secondary" disabled={saving||exporting} onClick={exportCameraOriginal}>{t(photo.cameraCapture.enhancedVideo?"Export captured video":"Export original")}</button>}</><small>{photo?restoredName(photo.file.name,exportFormat,!outputFolder):'original-filename-restore.jpg'}</small>{!supportsFolder()&&<small>{t("Your browser chooses the download location and handles existing filenames.")}</small>}</div></div></details>
-          <details className="settings-group preset-group"><summary>{t("Save edit presets")} <ChevronDown size={14}/></summary><div className="group-content preset-actions"><button className="button secondary" disabled={!recipe} onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),'clearwater-recipe.json')}><FileJson size={15}/>{t("Save preset")}</button><button className="button secondary" disabled={!photo} onClick={()=>recipeInput.current?.click()}><Upload size={15}/>{t("Load preset")}</button></div></details>
+          <details className="settings-group" open><summary>{t("Export")} <span className="summary-meta">{video?(exportMode==='source'?t("MP4 · Source size"):t("MP4 · up to 1080p")):photoInfo&&(photoInfo.exportWidth!==photoInfo.sourceWidth||photoInfo.exportHeight!==photoInfo.sourceHeight)?t("Reduced resolution"):t("Full resolution")}</span><ChevronDown size={14}/></summary><div className="group-content export-section"><div className="export-options">{video?<div className="video-export-options"><span>MP4 · H.264 · SDR</span><label className="video-quality-choice">{t("Video quality")}<select aria-label={t("Video quality")} value={exportMode} disabled={exporting} onChange={e=>setExportMode(e.target.value as VideoExportMode)}><option value="compatible">{t("Compact · 1080p / 30 fps")}</option><option value="source">{t("Source · Resolution & frame rate")}</option></select></label>{videoPlan&&<small>{t("{0} × {1} · {2} Mbps · about {3} MB",[videoPlan.width,videoPlan.height,(videoPlan.bitrate/1e6).toFixed(1),Math.ceil(videoPlan.estimatedBytes/1e6)])}</small>}{exportMode==='source'&&<small>{t("Source export uses more memory and can take longer.")}</small>}{videoPlan&&!videoPlan.supported&&<small role="alert">{message(videoPlan.reason??'')}</small>}<label><input type="checkbox" aria-label={t("Keep audio")} checked={keepAudio} disabled={!videoInfo?.hasAudio} onChange={e=>setKeepAudio(e.target.checked)}/> {t("Keep audio")}{videoInfo&&!videoInfo.hasAudio?t(" (no audio track)"):''}</label><small>{t("Source keeps frame timing and requests a higher bitrate; device encoding support is required. Compact reduces size. Both export 8-bit SDR.")}</small>{videoInfo&&(videoInfo.duration>=120||(photo?.file.size??0)>=100*1024*1024)&&<small className="video-cost-note">{t("Large/long clip: processing can take several minutes.")} {recipe&&isAIEngine(recipe.engine)&&(recipe.videoCorrection?.mode??'sampled')==='sampled'?t("About {0} AI samples. A 10-second interval or Fixed selected frame reduces analysis.",[Math.ceil(videoInfo.duration/(recipe.videoCorrection?.interval??5))+1]):t("Keep the app open during export.")}</small>}<a href={import.meta.env.BASE_URL+'licenses/README.txt'} target="_blank" rel="noreferrer">{t("Video toolkit licence")}</a></div>:<label>{t("File format")}<select aria-label={t("File format")} value={format==='png'?'png':jpegQuality===.99?'jpg-max':'jpg'} onChange={e=>{setFormat(e.target.value==='png'?'png':'jpg');setJpegQuality(e.target.value==='jpg-max'?.99:.95);}}><option value="jpg">{t("JPEG · High quality")}</option><option value="jpg-max">{t("JPEG · Maximum quality")}</option><option value="png">{t("PNG · Lossless")}</option></select></label>}<button className="icon-button" title={t("Save edit recipe")} aria-label={t("Save recipe")} onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:'application/json'}),'clearwater-recipe.json')}><FileJson size={17}/></button><button className="icon-button" title={t("Load edit recipe")} aria-label={t("Load recipe")} onClick={()=>recipeInput.current?.click()}><Upload size={16}/></button></div>{video&&<label className="metadata-option"><input type="checkbox" checked={keepMetadata} onChange={e=>setKeepMetadata(e.target.checked)}/> {t("Keep video metadata")}</label>}{!video&&<label className="metadata-option" title={t("Includes location when present in the imported file")}><input type="checkbox" checked={keepMetadata} onChange={e=>setKeepMetadata(e.target.checked)}/> {t("Keep EXIF/GPS metadata")}</label>}<div className="save-destination"><span title={outputFolder?.name}>{outputFolder?t("Output: {0}",[outputFolder.name]):supportsFolder()?t("Choose output folder"):capabilities.platform==='ios'?t("Output: Share or save"):t("Output: Downloads")}</span>{supportsFolder()&&<><button className="text-button" onClick={selectOutputFolder}><FolderOpen size={12}/>{outputFolder?t("Change output folder"):t("Choose output folder")}</button>{outputFolder&&<button className="text-button" onClick={()=>setOutputFolder(null)}>{t("Use default destination")}</button>}</>}<button className="button secondary save-as" disabled={rendering} onClick={()=>exportPhoto(true)}><Download size={13}/>{supportsFolder()?t("Save as…"):capabilities.platform==='ios'?t("Share or save…"):video?t("Download restored video"):t("Download restored photo")}</button>{supportsFolder()&&!isAndroid()&&!outputFolder&&<button className="text-button" disabled={rendering} onClick={()=>exportPhoto(false,false,true)}>{t("Download instead")}</button>}<>{(photo?.cameraCapture||photo?.nativeCapture)&&<button className="button secondary" disabled={saving||exporting} onClick={exportCameraOriginal}>{t(photo?.nativeCapture?.descriptor.kind==="video"||photo?.cameraCapture?.enhancedVideo?"Export captured video":"Export original")}</button>}{photo?.nativeCapture?.descriptor.kind==="photo"&&!photo.nativeCapture.descriptor.photosSaved&&<button className="button secondary" disabled={saving||exporting} onClick={()=>void saveNativeEnhancedPhoto()}>{t("Save captured copy to Photos")}</button>}</><small>{photo?restoredName(photo.file.name,exportFormat,!outputFolder):'original-filename-restore.jpg'}</small>{!supportsFolder()&&<small>{capabilities.platform==='ios'?t("Choose a destination from the iOS share sheet."):t("Your browser chooses the download location and handles existing filenames.")}</small>}</div></div></details>
+          <details className="settings-group preset-group"><summary>{t("Save edit presets")} <ChevronDown size={14}/></summary><div className="group-content preset-actions"><button className="button secondary" disabled={!recipe} onClick={()=>recipe&&download(new Blob([JSON.stringify(recipe,null,2)],{type:"application/json"}),"clearwater-recipe.json")}><FileJson size={15}/>{t("Save preset")}</button><button className="button secondary" disabled={!photo} onClick={()=>recipeInput.current?.click()}><Upload size={15}/>{t("Load preset")}</button></div></details>
           </section>
         </fieldset>
         <a className="about-footer" href="#about">{t("About & guide")}</a>
       </aside>
     </main>
-    {clearCollectionOpen&&<div className="modal-shade"><div ref={clearDialogRef} className="export-dialog clear-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-collection-title" aria-describedby="clear-collection-description" onKeyDown={e=>{if(e.key!=='Tab')return;const items=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]'));if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}><h2 id="clear-collection-title">{t("Clear collection?")}</h2><p id="clear-collection-description">{t("Removes thumbnails, app copies and saved edits. Original and exported files stay untouched.")}</p>{clearError&&<p className="clear-error" role="alert">{message(clearError)}</p>}<div className="clear-actions"><button ref={clearCancelRef} className="button secondary" disabled={clearingCollection} onClick={closeClearCollection}>{t("Cancel")}</button><button className="button primary" disabled={clearBlocked||clearingCollection} onClick={()=>void clearCollection()}>{clearingCollection?t("Clearing…"):t("Clear collection")}</button></div></div></div>}
-    {saveDialog&&<div className="modal-shade"><div className="export-dialog save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><h2 id="save-title">{t("Save as")}</h2><label>{t("Filename")}<input aria-label={t("Export filename")} value={saveName} onChange={e=>setSaveName(e.target.value)}/></label><p>{outputFolder?t("Folder: {0}",[outputFolder.name]):t("Choose an output folder for the restored file.")} {t("Existing names get a number.")}</p><button className="button primary" disabled={!saveName.trim()||exporting} onClick={()=>exportPhoto(true)}>{outputFolder?t("Save copy"):t("Choose folder and save")}</button>{outputFolder&&<button className="button secondary" disabled={exporting} onClick={()=>exportPhoto(true,true)}>{t("Choose another folder…")}</button>}<button className="button secondary" disabled={exporting} onClick={()=>setSaveDialog(false)}>{t("Cancel")}</button></div></div>}
-    {customOpen&&<div className="modal-shade"><div className="export-dialog research-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-title"><h2 id="custom-title">{t("Load other ONNX model")}</h2><p>{t("Choose a self-contained RGB image-to-image model (up to 64 MB). This adapter supports one float32 NCHW input and output at 256 × 256. Other layouts, sizes, extra inputs and super-resolution models need a different adapter.")}</p><p>{t("Use the model’s documented colour ranges below. After validation, the model and ranges are kept on this device for later launches.")} <a href={`${import.meta.env.BASE_URL}models/CUSTOM_MODELS.md`} target="_blank" rel="noreferrer">{t("Custom model specifications (English)")}</a></p>{recipe?.customModel&&<p>{t("Recipe model:")} {recipe.customModel.name}</p>}<label>{t("ONNX file")}<input aria-label={t("ONNX model file")} type="file" accept=".onnx" disabled={customLoading} onChange={e=>{const file=e.target.files?.[0]??null;if(file)modelSelectionStarted.current=true;setCustomCandidate(file);setCustomError('');}}/></label><div className="context-grid"><label>{t("Input range")}<select aria-label={t("Model input range")} value={inputRange} disabled={customLoading} onChange={e=>setInputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label><label>{t("Output range")}<select aria-label={t("Output range")} value={outputRange} disabled={customLoading} onChange={e=>setOutputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label></div><label className="research-consent"><input type="checkbox" checked={customAccepted} disabled={customLoading} onChange={e=>setCustomAccepted(e.target.checked)}/> {t("I have permission to use this model and will follow its licence.")}</label>{customError&&<p className="model-error" role="alert">{message(customError)}</p>}<button className="button primary" disabled={!customAccepted||!customCandidate||customLoading} onClick={()=>{if(!customCandidate)return;setCustomError('');setCustomLoading(true);pendingModelBlob.current=customCandidate;pendingModelRestore.current=false;applyCustomModel.current=true;worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customCandidate,name:customCandidate.name,inputRange,outputRange});}}>{customLoading?t("Validating model…"):t("Load model")}</button><button className="button secondary" disabled={customLoading} onClick={cancelCustom}>{t("Cancel")}</button></div></div>}
+    {pendingCaptureRemoval&&<CaptureRemovalDialog filename={pendingCaptureRemoval.file.name} busy={saving} error={captureRemovalError} onCancel={()=>{if(!saving)setPendingCaptureRemoval(null);}} onHide={()=>void finishCaptureRemoval(false)} onDelete={()=>void finishCaptureRemoval(true)}/>}
+    {clearCollectionOpen&&<div className="modal-shade"><div ref={clearDialogRef} className="export-dialog clear-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-collection-title" aria-describedby="clear-collection-description" onKeyDown={e=>{if(e.key!=='Tab')return;const items=Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),[tabindex="0"]'));if(!items.length)return;const first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}><h2 id="clear-collection-title">{t("Clear collection?")}</h2><p id="clear-collection-description">{capabilities.nativeCamera?t("On iOS, clearing hides camera captures and removes imported app copies and edits. Private camera originals stay in the app; exported files and Photos copies stay untouched. Restore hidden captures in Settings."):t("Removes thumbnails, app copies and saved edits. Original and exported files stay untouched.")}</p>{clearError&&<p className="clear-error" role="alert">{message(clearError)}</p>}<div className="clear-actions"><button ref={clearCancelRef} className="button secondary" disabled={clearingCollection} onClick={closeClearCollection}>{t("Cancel")}</button><button className="button primary" disabled={clearBlocked||clearingCollection} onClick={()=>void clearCollection()}>{clearingCollection?t("Clearing…"):t("Clear collection")}</button></div></div></div>}
+    {saveDialog&&<div className="modal-shade"><div className="export-dialog save-dialog" role="dialog" aria-modal="true" aria-labelledby="save-title"><h2 id="save-title">{t("Save as")}</h2><label>{t("Filename")}<input aria-label={t("Export filename")} value={saveName} onChange={e=>setSaveName(e.target.value)}/></label><p>{outputFolder?t("Folder: {0}",[outputFolder.name]):t("Choose a folder to save your restored file.")} {t("Existing names get a number.")}</p><button className="button primary" disabled={!saveName.trim()||exporting} onClick={()=>exportPhoto(true)}>{outputFolder?t("Save copy"):t("Choose folder and save")}</button>{outputFolder&&<button className="button secondary" disabled={exporting} onClick={()=>exportPhoto(true,true)}>{t("Choose another folder…")}</button>}<button className="button secondary" disabled={exporting} onClick={()=>setSaveDialog(false)}>{t("Cancel")}</button></div></div>}
+    {customOpen&&<div className="modal-shade"><div className="export-dialog research-dialog" role="dialog" aria-modal="true" aria-labelledby="custom-title"><h2 id="custom-title">{t("Load other ONNX model")}</h2><p>{t("Choose a self-contained RGB image-to-image model (up to 64 MB). This adapter supports one float32 NCHW input and output at 256 × 256. Other layouts, sizes, extra inputs and super-resolution models need a different adapter.")}</p><p>{t("Use the model’s documented colour ranges below. After validation, the model and ranges are kept on this device for later launches.")}</p>{recipe?.customModel&&<p>{t("Recipe model:")} {recipe.customModel.name}</p>}<label>{t("ONNX file")}<input aria-label={t("ONNX model file")} type="file" accept=".onnx" disabled={customLoading} onChange={e=>{const file=e.target.files?.[0]??null;if(file)modelSelectionStarted.current=true;setCustomCandidate(file);setCustomError('');}}/></label><div className="context-grid"><label>{t("Input range")}<select aria-label={t("Model input range")} value={inputRange} disabled={customLoading} onChange={e=>setInputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label><label>{t("Output range")}<select aria-label={t("Model output range")} value={outputRange} disabled={customLoading} onChange={e=>setOutputRange(e.target.value as 'unit'|'signed')}><option value="unit">{t("0 to 1")}</option><option value="signed">{t("−1 to 1")}</option></select></label></div><label className="research-consent"><input type="checkbox" checked={customAccepted} disabled={customLoading} onChange={e=>setCustomAccepted(e.target.checked)}/> {t("I have permission to use this model and will follow its licence.")}</label>{customError&&<p className="model-error" role="alert">{message(customError)}</p>}<button className="button primary" disabled={!customAccepted||!customCandidate||customLoading} onClick={()=>{if(!customCandidate)return;setCustomError('');setCustomLoading(true);pendingModelBlob.current=customCandidate;pendingModelRestore.current=false;applyCustomModel.current=true;pendingCustomCommand.current={type:'custom-model',permission:true,blob:customCandidate,name:customCandidate.name,inputRange,outputRange};if(worker.current)worker.current.postMessage({...pendingCustomCommand.current,gen:generation.current});}}>{customLoading?t("Validating model…"):t("Load model")}</button><button className="button secondary" disabled={customLoading} onClick={cancelCustom}>{t("Cancel")}</button></div></div>}
     {storageWarning&&<div className="storage-warning" role="status">{t("Local storage is unavailable or full. Export your edits before closing.")}<button aria-label={t("Dismiss storage warning")} onClick={()=>setStorageWarning(false)}><X size={14}/></button></div>}
     {notice&&<div className="toast" role="status"><span>{message(notice)}</span><button aria-label={t("Dismiss message")} onClick={()=>setNotice('')}><X size={15}/></button></div>}
     {hdrConverting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="hdr-conversion-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="hdr-conversion-title">{t("Converting HDR video to SDR")}</h2><p>{t("Preparing HDR video…")}</p><progress max="100" value={hdrProgress}/><span>{hdrProgress}%</span><button className="button secondary" onClick={()=>void cancelHdrWorkingCopy()}>{t("Cancel conversion")}</button></div></div>}
     {exporting&&<div className="modal-shade"><div className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-title"><span className="brand-icon"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt=""/></span><h2 id="export-title">{t("Exporting")} {video?t("video"):t("photo")}</h2><p>{saving?(exportTarget.current?.share?t("Preparing file to share…"):t("Saving your restored file…")):video?t("Processing video frames locally. Keep this app open."):t("Rendering your photo at the selected resolution.")}</p><progress max="100" value={progress}/><span>{progress}%</span><button className="button secondary" disabled={saving} onClick={cancelExport}>{t("Cancel export")}</button></div></div>}
   </div>{about&&!settingsOpen&&<About onClose={closeAbout} customModel={customModel} onOpenSettings={()=>setSettingsOpen(true)}/>}
-  {settingsOpen&&<Settings parentAbout={about} onClose={closeSettings} onRestoreCamera={restoreCameraCollection} restoringCamera={cameraArchiveBusy}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>{if(cameraLastCapture.current)setActive(cameraLastCapture.current);setCameraOpen(false);}} onCapture={saveCameraCapture}/>}</>;
+  {settingsOpen&&<Settings parentAbout={about} onClose={closeSettings} onRestoreCamera={restoreCameraCollection} onRestoreIOSCaptures={restoreIOSPrivateCaptures} onDeleteIOSCaptures={deleteIOSPrivateCaptures} restoringCamera={cameraArchiveBusy}/>}{cameraOpen&&<Camera ref={cameraRef} onClose={()=>{if(cameraLastCapture.current)setActive(cameraLastCapture.current);setCameraOpen(false);}} onCapture={saveCameraCapture}/>}</>;
 }
 
 

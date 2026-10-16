@@ -4,15 +4,28 @@ on:
     branches: [main]
     paths: ['editor/**', '.github/workflows/pages.yml']
   workflow_dispatch:
+    inputs:
+      ios_native_tests:
+        description: Run native iOS regression for the feature branch
+        type: boolean
+        default: true
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('ios-sideload-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 jobs:
+  ios-sideload:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/ios-native-camera'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ios-build.yml
+    with:
+      run_native_tests: ${{ inputs.ios_native_tests }}
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
