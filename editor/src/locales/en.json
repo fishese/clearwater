@@ -784,7 +784,7 @@
   "Private camera captures stay inside ClearWater. Photos receives a separate copy only when you save one there. Clear collection hides captures; restore them in Settings or permanently delete their private files.": "Private camera captures stay inside ClearWater. Photos receives a separate copy only when you save one there. Clear collection hides captures; restore them in Settings or permanently delete their private files.",
   "Remove {0} from ClearWater?": "Remove {0} from ClearWater?",
   "Hide capture": "Hide capture",
-  "Hide this capture from the collection? Its private original stays on this device. Restore it later in Settings. Any Photos copy stays untouched.": "Hide this capture from the collection? Its private original stays on this device. Restore it later in Settings. Any Photos copy stays untouched.",
+  "Hide this capture from the collection? Its private files stay in the app. Restore it later in Settings. Any Photos copy stays untouched.": "Hide this capture from the collection? Its private files stay in the app. Restore it later in Settings. Any Photos copy stays untouched.",
   "Delete from ClearWater": "Delete from ClearWater",
   "Delete this capture permanently?": "Delete this capture permanently?",
   "Delete permanently": "Delete permanently",

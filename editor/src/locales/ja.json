@@ -784,7 +784,7 @@
   "Private camera captures stay inside ClearWater. Photos receives a separate copy only when you save one there. Clear collection hides captures; restore them in Settings or permanently delete their private files.": "カメラで撮影したデータはClearWater内にのみ保存されます。「写真」に保存した場合は独立したコピーが作成されます。「コレクションをクリア」すると撮影データは非表示になります。設定から再表示するか、アプリ内のファイルを完全に削除できます。",
   "Remove {0} from ClearWater?": "ClearWaterから「{0}」を削除しますか？",
   "Hide capture": "撮影データを非表示",
-  "Hide this capture from the collection? Its private original stays on this device. Restore it later in Settings. Any Photos copy stays untouched.": "この撮影データをコレクションで非表示にしますか？元ファイルはこのデバイスに残り、設定から再表示できます。「写真」のコピーは変更されません。",
+  "Hide this capture from the collection? Its private files stay in the app. Restore it later in Settings. Any Photos copy stays untouched.": "この撮影データをコレクションで非表示にしますか？非公開ファイルはアプリ内に残り、設定から再表示できます。「写真」のコピーは変更されません。",
   "Delete from ClearWater": "ClearWaterから削除",
   "Delete this capture permanently?": "この撮影データを完全に削除しますか？",
   "Delete permanently": "完全に削除",

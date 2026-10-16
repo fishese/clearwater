@@ -784,7 +784,7 @@
   "Private camera captures stay inside ClearWater. Photos receives a separate copy only when you save one there. Clear collection hides captures; restore them in Settings or permanently delete their private files.": "相機拍攝檔只會保存在 ClearWater 內。只有你選擇儲存至「照片」時，才會建立獨立副本。清除收藏集只會隱藏拍攝項目；你可在「設定」還原，或永久刪除私人檔案。",
   "Remove {0} from ClearWater?": "要從 ClearWater 移除「{0}」嗎？",
   "Hide capture": "隱藏拍攝項目",
-  "Hide this capture from the collection? Its private original stays on this device. Restore it later in Settings. Any Photos copy stays untouched.": "要在收藏集中隱藏此拍攝項目嗎？私人原始檔會保留在此裝置，你可稍後在「設定」還原。「照片」中的副本不受影響。",
+  "Hide this capture from the collection? Its private files stay in the app. Restore it later in Settings. Any Photos copy stays untouched.": "要在收藏集中隱藏此拍攝項目嗎？私人檔案會保留在程式內，可稍後在「設定」還原。「照片」中的副本不受影響。",
   "Delete from ClearWater": "從 ClearWater 刪除",
   "Delete this capture permanently?": "要永久刪除此拍攝項目嗎？",
   "Delete permanently": "永久刪除",
