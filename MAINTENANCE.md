@@ -143,7 +143,7 @@ Maximum JPEG requests .99; default remains .95. Browser chroma subsampling is ou
 
 Tests added for video plan/cap/metadata allowlist, Maximum/default JPEG quality and raw Unicode UserComment bytes. Run video-check (including its high-resolution round-trip), video-ai-check, metadata-check, About and multilingual mobile layout checks against a production preview. Physical 4K/60 encoding, memory and HDR compatibility require device tests; browser mocks are insufficient.
 
-The quality preview APK is version 1.0.3-quality.1 (code 14), debug-signed for manual testing. It is not a stable release. Stable signed APK v1.0.2 remains the Settings install target until device acceptance of these changes.
+The earlier quality preview was 1.0.3-quality.1 (code 14), debug-signed for manual testing. Its changes are included in the approved signed v1.0.3 release (code 22), now used by the Settings install link.
 
 ## Native camera and editor preview follow-up
 
@@ -163,7 +163,7 @@ Native startup regression: `native-camera-check.mjs` also defers stop/start resp
 
 The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. Native startup, first-use permission prompts and saved-file dimensions have been checked on the phone; broader physical acceptance is listed in the current Handoff checkpoint.
 
-Code 21 is installed and the focused physical checks pass. Stable APK v1.0.2 remains unchanged.
+The focused physical camera checks first passed on code 21. Final debug code 22 is installed, and the user-approved signed v1.0.3 release is now the latest APK download.
 
 
 ### Minified Capacitor permission metadata
