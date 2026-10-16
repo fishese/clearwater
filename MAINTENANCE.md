@@ -1,8 +1,8 @@
 # Maintenance
 
-## Current release status (17 October 2026)
+## Current published release (17 October 2026)
 
-The working iOS implementation is merged into main (PR #2 / 966660b), and the user confirmed iPhone acceptance before authorizing coordinated v1.0.4 publication. Older feature-branch/pending-approval passages are historical checkpoints. Android v1.0.4 uses versionCode 23; iOS v1.0.4 uses CFBundleVersion 2 and requires iOS 26.0+. Both native platforms keep their existing identity and offline models. Preserve the signed Android certificate; iOS is distributed unsigned for local sideload signing. The web-only download section states the iOS requirement.
+The working iOS implementation is merged into main (PR #2 / 966660b), and the user confirmed iPhone acceptance before authorizing coordinated v1.0.4 publication. Older feature-branch/pending-approval passages are historical checkpoints. Android v1.0.4 uses versionCode 23; iOS v1.0.4 uses CFBundleVersion 2 and requires iOS 26.0+. Both native platforms keep their existing identity and offline models. Preserve the signed Android certificate; iOS is distributed unsigned for local sideload signing. The web-only download section states the iOS requirement. v1.0.4 is published as latest from 1c429d0, with versioned/canonical APK and unsigned IPA assets, SHA-256 sidecars and release-provenance.json. Both canonical links returned anonymous HTTP 200, and the public IOS_IPA_URL variable is enabled. Every future latest release must carry both canonical binaries or update the platform URLs deliberately.
 
 
 ## iPhone acceptance and merge approval (17 October 2026)

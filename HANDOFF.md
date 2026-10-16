@@ -1,10 +1,12 @@
 # Handoff
 
-## Current coordinated release (17 October 2026)
+## Published coordinated release (17 October 2026)
 
 PR #2 is merged as 966660b and the user reports the iPhone tests passed. The user has now explicitly authorized building Android and publishing the coordinated APK/IPA release. This supersedes the older pending-merge/publication notes below. Release version is 1.0.4: Android code 23, iOS bundle version 2. Native behavior and signing identities are unchanged. Main passed 164 shared tests and 22 hosted native tests before the release version/label changes.
 
-Release builds use the committed release revision; iOS packaging can reuse the previously verified native regression because only version metadata and the web-only iOS requirement label changed. Publish versioned and canonical APK/unsigned-IPA assets plus checksums, retaining the canonical Android alias. Enable IOS_IPA_URL only after public IPA publication, then rerun Pages and verify both download links. Remaining broad hardware gates (long recordings, thermal/storage stress and interruptions) remain limitations, not blockers to the user-authorized experimental release.
+Published v1.0.4 as latest from 1c429d063705b9a5687d70ab954c96e6414469f1: https://github.com/fishese/clearwater/releases/tag/v1.0.4 . Both minified Android variants passed signature/version checks; release certificate matches v1.0.3. All 12 uploaded assets match local SHA-256 digests. Canonical APK and unsigned IPA download anonymously with HTTP 200. IOS_IPA_URL now targets the canonical latest IPA; Pages run 38936463184 activates the link. iOS packaging run 38934249296 passed for version 1.0.4 (2); unchanged native sources retain the 22-test verification from merged main. Shared suite passes 164 tests; production/About checks pass in three languages. No physical installation was attempted for this release task.
+
+Local public artifacts/checksums/provenance are in ignored editor/android/build/release-1.0.4. Release APK SHA-256: d1197b4091b055b9a27481e93a5f331ce7d9597f6fa5884ff160b41c3702cc31. Debug APK: ecd3d3604965fc520beb05c77b5c74f74fea975b77c2680cc4574e0e78e4ea75. Unsigned IPA: b81a56c942d844d14507c9c5b48cbb0e1b8e8a0dfa5c15fa8a70cab0ecba77dd. Remaining broad hardware gates (long recordings, thermal/storage stress and interruptions) remain limitations of this experimental release.
 
 
 ## iPhone acceptance and merge approval (17 October 2026)
