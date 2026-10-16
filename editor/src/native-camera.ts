@@ -4,8 +4,9 @@ import type {Recipe} from './core/types';
 /** CSS viewport coordinates; native converts these to physical view pixels. */
 export interface NativeCameraBounds {x:number;y:number;width:number;height:number;pixelRatio?:number}
 export interface NativeCameraLens {id:string;label:string;facing:'environment'|'user';intrinsicZoom:number}
+export interface NativeCameraPhotoInfoChanged {sessionGeneration:number;photoWidth:number;photoHeight:number}
 export interface NativeCameraInfo {
- width:number;height:number;photoWidth:number;photoHeight:number;
+ width:number;height:number;photoWidth:number;photoHeight:number;sessionGeneration:number;
  lenses:NativeCameraLens[];lensId:string;zoom:number;minZoom:number;maxZoom:number;
 }
 export interface NativeCameraCapture {uri:string;name:string;type:'image/jpeg'|'video/mp4';width:number;height:number}
@@ -24,6 +25,7 @@ export interface NativeCameraPlugin {
  startRecording(options:{maxMs:number;maxBytes:number;microphone:boolean;recipe:Recipe}):Promise<void>;
  stopRecording(options:{discard?:boolean}):Promise<void>;
  stopSession():Promise<void>;
+ addListener(event:'cameraInfoChanged',listener:(result:NativeCameraPhotoInfoChanged)=>void):Promise<PluginListenerHandle>;
  addListener(event:'recordingFinished',listener:(result:NativeCameraRecordingResult)=>void):Promise<PluginListenerHandle>;
  addListener(event:'cameraError',listener:(result:{message:string})=>void):Promise<PluginListenerHandle>;
  addListener(event:'launchMode',listener:(result:{mode:'camera'|'edit'})=>void):Promise<PluginListenerHandle>;

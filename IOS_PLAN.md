@@ -158,6 +158,10 @@ Camera layout follow-up (16 October): the Android native camera keeps its contro
 
 ## Camera UI catch-up prompt
 
+Capture-resolution follow-up: preview bounds must crop only the display, not the saved native photo/video frame. Android no longer attaches the preview ViewPort to its capture group; retain the selected still resolution and video quality independently on iOS too. Photo results report actual JPEG dimensions after EXIF orientation. The shared bridge now includes `sessionGeneration` in session info and a `cameraInfoChanged` event carrying that generation plus `photoWidth`/`photoHeight`, so sensor rotation updates the resolution chip without moving controls or rebinding capture. Ignore old-session events and freeze video orientation at recording start.
+
+Lifecycle follow-up: retire the native renderer before stopping/unbinding a preview session. Queued correction updates must retain the next recipe without reaching a released renderer. Resume with a fresh renderer, preserve pending startup ownership, and report active rendering failures rather than crashing. Verify background/return with AI enabled and the first microphone-permission transition on a real iPhone.
+
 Use this for an iOS agent that has already started work:
 
 ```text

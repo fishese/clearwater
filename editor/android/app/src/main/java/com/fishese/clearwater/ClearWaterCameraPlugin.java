@@ -14,6 +14,7 @@ import android.graphics.ImageFormat;
 import android.hardware.display.DisplayManager;
 import android.graphics.YuvImage;
 import android.net.Uri;
+import android.media.ExifInterface;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -328,7 +329,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         if (recordingActive) { call.resolve(); return; }
         JSONObject next=call.getObject("recipe"); if(next==null){call.reject("Missing camera correction recipe.");return;}
         recipe=next;
-        if(media3Effect!=null)media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+        if(media3Effect!=null)try{media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));}catch(Exception error){fail(call,"Could not update live camera correction.",error);return;}
         call.resolve();
     }
 
@@ -373,15 +374,21 @@ public class ClearWaterCameraPlugin extends Plugin {
         long captureGeneration=sessionGeneration;
         ImageCapture.OutputFileOptions options=new ImageCapture.OutputFileOptions.Builder(output).build();
         try{activeCapture.setTargetRotation(captureRotation);}catch(Exception ignored){}
-        final int captureWidth=photoWidth(activeCapture),captureHeight=photoHeight(activeCapture);
+
         activeCapture.takePicture(options,mainExecutor,new ImageCapture.OnImageSavedCallback(){
             @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults result){
                 if(captureGeneration!=sessionGeneration){if(output.exists())output.delete();call.reject("Photo capture was cancelled.","CANCELLED");return;}
                 if(!output.isFile()||output.length()<=0){if(output.exists())output.delete();call.reject("The camera returned an empty photo.");return;}
                 BitmapFactory.Options jpegBounds=new BitmapFactory.Options();jpegBounds.inJustDecodeBounds=true;BitmapFactory.decodeFile(output.getAbsolutePath(),jpegBounds);
-                Log.i("ClearWaterCamera","photo saved JPEG="+jpegBounds.outWidth+"x"+jpegBounds.outHeight+" bytes="+output.length()+" lens="+captureLensId+" rotation="+captureRotation);
+                int photoWidth=jpegBounds.outWidth,photoHeight=jpegBounds.outHeight;
+                try{
+                    ExifInterface exif=new ExifInterface(output.getAbsolutePath());
+                    int orientation=exif.getAttributeInt(ExifInterface.TAG_ORIENTATION,ExifInterface.ORIENTATION_NORMAL);
+                    if(orientation==ExifInterface.ORIENTATION_ROTATE_90||orientation==ExifInterface.ORIENTATION_ROTATE_270||orientation==ExifInterface.ORIENTATION_TRANSPOSE||orientation==ExifInterface.ORIENTATION_TRANSVERSE){int swap=photoWidth;photoWidth=photoHeight;photoHeight=swap;}
+                }catch(Exception error){Log.w("ClearWaterCamera","Could not read photo orientation metadata.",error);}
+                Log.i("ClearWaterCamera","photo saved JPEG="+jpegBounds.outWidth+"x"+jpegBounds.outHeight+" oriented="+photoWidth+"x"+photoHeight+" bytes="+output.length()+" lens="+captureLensId+" rotation="+captureRotation);
                 temporaryCaptures.put(Uri.fromFile(output).toString(),output);
-                JSObject value=new JSObject();value.put("uri",Uri.fromFile(output).toString());value.put("name",name);value.put("type","image/jpeg");value.put("width",captureWidth);value.put("height",captureHeight);value.put("lensId",captureLensId);call.resolve(value);
+                JSObject value=new JSObject();value.put("uri",Uri.fromFile(output).toString());value.put("name",name);value.put("type","image/jpeg");value.put("width",photoWidth);value.put("height",photoHeight);value.put("lensId",captureLensId);call.resolve(value);
             }
             @Override public void onError(@NonNull ImageCaptureException error){if(output.exists())output.delete();fail(call,"Could not capture the photo.",error);}
         });
@@ -400,7 +407,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         if(!sessionActive||recordingActive){call.reject("The camera is not ready to record.");return;}
         if(pendingRecordingPermissionCall!=null){pendingRecordingPermissionCall.reject("A newer video request replaced this one.");pendingRecordingPermissionCall=null;}
         JSONObject recordingRecipe=call.getObject("recipe");if(recordingRecipe!=null)recipe=recordingRecipe;
-        if(media3Effect!=null)media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
+        if(media3Effect!=null)try{media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));}catch(Exception error){fail(call,"Could not prepare camera correction for recording.",error);return;}
         microphoneRequested=call.getBoolean("microphone",false);
         if(microphoneRequested&&getPermissionState("microphone")!=PermissionState.GRANTED){pendingRecordingPermissionCall=call;requestPermissionForAlias("microphone",call,"recordingPermissionResult");return;}
         beginRecording(call);
@@ -492,7 +499,7 @@ public class ClearWaterCameraPlugin extends Plugin {
                 synchronized(this){latestSampleData=null;}long frameGeneration=++analysisGeneration;
                 if(provider!=null)provider.unbindAll();closeEffect();
                 preview=new Preview.Builder().setTargetRotation(displayRotation()).build();
-                imageCapture=new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).setJpegQuality(98).setTargetRotation(displayRotation()).build();
+                imageCapture=new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).setJpegQuality(98).setTargetRotation(captureRotation).build();
                 imageAnalysis=new ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).setTargetResolution(new Size(640,480)).setTargetRotation(displayRotation()).build();
                 imageAnalysis.setAnalyzer(analysisExecutor,image->analyzeFrame(image,frameGeneration));
                 long effectGeneration=++media3EffectGeneration;
@@ -504,9 +511,10 @@ public class ClearWaterCameraPlugin extends Plugin {
                     if(call!=null&&call!=pendingBindCall)return;
                     if(!sessionActive||generation!=sessionGeneration){if(call!=null&&call==pendingBindCall){pendingBindCall=null;call.reject("Camera operation was cancelled.","CANCELLED");}return;}
                     try{
-                        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture).addUseCase(imageAnalysis).addEffect(media3Effect).setViewPort(previewView.getViewPort()).build();
+                        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture).addUseCase(imageAnalysis).addEffect(media3Effect).build();
                         camera=provider.bindToLifecycle((LifecycleOwner)getActivity(),lensSelector(),group);
                         Log.i("ClearWaterCamera","camera use cases bound");
+                        notifyPhotoInfoChanged();
                         restoreZoom(zoomToRestore);
                         if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;call.resolve(sessionInfo());}
                     }catch(Exception error){closeEffect();sessionActive=false;cleanupSessionResources();if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not open the selected camera lens.",error);}else notifyCameraError("Could not open the selected camera lens.",error);}
@@ -531,7 +539,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         media3Effect=new Media3Effect(getContext(),CameraEffect.PREVIEW|CameraEffect.VIDEO_CAPTURE,mainExecutor,error->{if(effectGeneration==media3EffectGeneration&&sessionActive)notifyCameraError("Live camera correction stopped.",error);});
         media3Effect.setEffects(Collections.singletonList(new CameraRecipeEffect(recipe)));
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
-        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(videoCapture).addEffect(media3Effect).setViewPort(previewView.getViewPort()).build();
+        UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(videoCapture).addEffect(media3Effect).build();
         camera=provider.bindToLifecycle((LifecycleOwner)getActivity(),lensSelector(),group);
         restoreZoom(zoomToRestore);
     }
@@ -641,7 +649,23 @@ public class ClearWaterCameraPlugin extends Plugin {
         return Surface.ROTATION_0;
     }
     private int displayRotation(){Display display=getActivity().getWindowManager().getDefaultDisplay();return display.getRotation();}
-    private void updateTargetRotation(){int display=displayRotation();if(imageCapture!=null)imageCapture.setTargetRotation(captureRotation);if(imageAnalysis!=null)imageAnalysis.setTargetRotation(display);if(!recordingActive){if(preview!=null)preview.setTargetRotation(display);if(videoCapture!=null)videoCapture.setTargetRotation(captureRotation);}}
+    private void notifyPhotoInfoChanged(){
+        if(!sessionActive||recordingActive||imageCapture==null)return;
+        JSObject info=new JSObject();
+        info.put("sessionGeneration",sessionGeneration);
+        info.put("photoWidth",photoWidth());
+        info.put("photoHeight",photoHeight());
+        notifyListeners("cameraInfoChanged",info);
+    }
+    private void updateTargetRotation(){
+        int display=displayRotation();
+        if(imageAnalysis!=null)imageAnalysis.setTargetRotation(display);
+        if(recordingActive)return;
+        if(imageCapture!=null)imageCapture.setTargetRotation(captureRotation);
+        if(preview!=null)preview.setTargetRotation(display);
+        if(videoCapture!=null)videoCapture.setTargetRotation(captureRotation);
+        notifyPhotoInfoChanged();
+    }
     private float zoomRatio(){if(camera==null||camera.getCameraInfo().getZoomState().getValue()==null)return 1f;return camera.getCameraInfo().getZoomState().getValue().getZoomRatio();}
     private int photoWidth(){return photoWidth(imageCapture);}
     private int photoHeight(){return photoHeight(imageCapture);}
@@ -651,7 +675,7 @@ public class ClearWaterCameraPlugin extends Plugin {
     private int videoHeight(){if(videoCapture==null||videoCapture.getResolutionInfo()==null)return 0;androidx.camera.core.ResolutionInfo info=videoCapture.getResolutionInfo();return info.getRotationDegrees()%180==0?info.getResolution().getHeight():info.getResolution().getWidth();}
 
     private JSObject sessionInfo(){
-        JSObject result=new JSObject();float ratio=zoomRatio();
+        JSObject result=new JSObject();float ratio=zoomRatio();result.put("sessionGeneration",sessionGeneration);
         if(camera!=null&&camera.getCameraInfo().getZoomState().getValue()!=null){minZoom=(int)Math.ceil(camera.getCameraInfo().getZoomState().getValue().getMinZoomRatio());maxZoom=(int)Math.floor(camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio());}
         result.put("width",previewView==null?0:Math.round(previewView.getWidth()/Math.max(.1f,previewPixelRatio)));
         result.put("height",previewView==null?0:Math.round(previewView.getHeight()/Math.max(.1f,previewPixelRatio)));
@@ -664,7 +688,7 @@ public class ClearWaterCameraPlugin extends Plugin {
     private void fail(PluginCall call,String message,Throwable error){if(error!=null)Log.e("ClearWaterCamera",message,error);if(call!=null)call.reject(message,error instanceof Exception?(Exception)error:new Exception(error));else notifyCameraError(message,error);}
     private void notifyCameraError(String message,Throwable error){if(error!=null)Log.e("ClearWaterCamera",message,error);JSObject value=new JSObject();value.put("message",message);if(error!=null)value.put("cause",error.getClass().getSimpleName());notifyListeners("cameraError",value);}
 
-    @Override protected void handleOnPause(){super.handleOnPause();if(provider!=null&&!recordingActive)provider.unbindAll();}
-    @Override protected void handleOnResume(){super.handleOnResume();if(sessionActive&&provider!=null&&!recordingActive)bindIdle(null);}
+    @Override protected void handleOnPause(){super.handleOnPause();if(provider!=null&&!recordingActive){bindGeneration++;closeEffect();provider.unbindAll();}}
+    @Override protected void handleOnResume(){super.handleOnResume();if(sessionActive&&provider!=null&&!recordingActive)bindIdle(pendingBindCall);}
     @Override protected void handleOnDestroy(){sessionGeneration++;bindGeneration++;sessionActive=false;if(recording!=null){recordingDiscard=true;recording.stop();}if(orientationListener!=null)orientationListener.disable();cleanupSessionResources();for(File file:temporaryCaptures.values())if(file!=null&&file.exists())file.delete();temporaryCaptures.clear();analysisExecutor.shutdownNow();super.handleOnDestroy();}
 }

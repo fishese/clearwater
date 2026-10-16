@@ -20,7 +20,7 @@ try {
       { id: 'rear-wide', label: 'Rear wide', facing: 'environment', intrinsicZoom: 1 },
       { id: 'front-main', label: 'Front camera', facing: 'user', intrinsicZoom: 1 },
     ];
-    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 4 });
+    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 4 });
     const cameraMethods = ['getLaunchMode', 'startSession', 'setPreviewBounds', 'setCorrection', 'listLenses', 'setLens', 'setZoom', 'sampleFrame', 'capturePhoto', 'releaseCapture', 'startRecording', 'stopRecording', 'stopSession'];
     const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
     const backMethods = ['setEnabled', 'exitApp'];
@@ -116,6 +116,12 @@ try {
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), 'rgba(0, 0, 0, 0)', 'root document is transparent for CameraX beneath the WebView');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.app-shell')).display), 'none', 'editor is hidden behind the native preview');
   assert.equal(await page.locator('.camera-resolution').innerText(), 'Photo resolution: 1600 × 1200', 'native chip reports photo pixels, not the 390 × 844 viewport');
+  const photoInfoGeneration = await page.evaluate(() => window.nativeCameraInfo().sessionGeneration);
+  await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation, photoWidth: 1200, photoHeight: 1600 }), photoInfoGeneration);
+  await page.waitForFunction(() => document.querySelector('.camera-resolution')?.textContent === 'Photo resolution: 1200 × 1600');
+  await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation - 1, photoWidth: 1920, photoHeight: 1080 }), photoInfoGeneration);
+  await page.waitForTimeout(50);
+  assert.equal(await page.locator('.camera-resolution').innerText(), 'Photo resolution: 1200 × 1600', 'stale photo dimensions from an older session are ignored');
 
   const zoom = page.locator('.camera-zoom-button');
   await zoom.click();
@@ -172,6 +178,8 @@ try {
 
   await page.getByRole('button', { name: 'Record video' }).click();
   await page.waitForFunction(() => window.nativeCameraState.recording === true);
+  await page.evaluate(generation => window.emitNative('ClearWaterCamera', 'cameraInfoChanged', { sessionGeneration: generation, photoWidth: 9999, photoHeight: 8888 }), photoInfoGeneration);
+  assert.match(await page.locator('.camera-resolution').innerText(), /^Video target: /, 'photo dimension events do not replace the video target chip');
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await page.evaluate(() => {
     window.nativeFileReadCalls = [];

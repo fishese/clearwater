@@ -554,6 +554,14 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         else handles.push(handle);
       }).catch(() => {});
     };
+    attach(nativeCamera.addListener('cameraInfoChanged', event => {
+      if (!aliveRef.current || !nativeSessionActiveRef.current) return;
+      const current = nativeInfoRef.current;
+      if (!current || current.sessionGeneration !== event.sessionGeneration) return;
+      const updated = { ...current, photoWidth: event.photoWidth, photoHeight: event.photoHeight };
+      nativeInfoRef.current = updated;
+      setNativeInfo(updated);
+    }));
     attach(nativeCamera.addListener('recordingFinished', result => {
       nativeRecordingRef.current = false;
       recordingRef.current = false;

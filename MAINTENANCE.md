@@ -147,7 +147,7 @@ The quality preview APK is version 1.0.3-quality.1 (code 14), debug-signed for m
 
 ## Native camera and editor preview follow-up
 
-The current prepared experimental debug build is 1.0.3-camera.5 (code 19). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
+The current installed experimental debug build is 1.0.3-camera.7 (code 21). Native Android camera uses CameraX 1.6.2, Media3 1.11.1 and the CameraX Media3 adapter 1.0.0-alpha04. Keep the adapter version pinned and repeat physical-phone testing when updating it. Web capture remains independent of Android dependencies. iOS implementation requirements and the shared launch URL contract are in IOS_PLAN.md.
 
 After the normal unit/build checks, run `camera-check.mjs`, `camera-controls-check.mjs`, `editor-preview-check.mjs` and `layered-controls-check.mjs` against a production preview (`CHECK_URL`). Camera browser checks use synthetic media; native camera tests must separately verify transparent preview placement, full still dimensions, upright portrait/landscape output, front mirroring, lens/zoom choices, visible correction in saved video, replacement white balance and background finalisation. Never remove an installed app to bypass a signing mismatch: preserve its private originals and edits.
 
@@ -161,9 +161,9 @@ The user-supplied custom-model contract lives at `editor/public/models/CUSTOM_MO
 
 Native startup regression: `native-camera-check.mjs` also defers stop/start responses, emits duplicate resume events and tests a withheld-stop timeout. Preserve serialized teardown and generation ownership: a stale start completion must not stop the newer session. The 20-second watchdog includes teardown, not only CameraX startup. `preview-queue-cancel-check.mjs` must not wait for the export button while deliberately withholding its enabling render; wait for source tiles and switch to the actual unselected item.
 
-The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. Native startup was confirmed after the R8 permission metadata fix; saved-file and broader physical acceptance checks remain paused while the phone is off ADB.
+The camera preview-first layout removes the heading and overlays its accessible close button. Keep the large underwater capture controls while reducing outer spacing. Temporary explicit WebView debugging must be absent from final minified debug and release APKs. Native startup, first-use permission prompts and saved-file dimensions have been checked on the phone; broader physical acceptance is listed in the current Handoff checkpoint.
 
-Earlier debug builds were installed and native preview was confirmed. The current non-device follow-up prepares code 19 without installing it. Physical saved-file checks are paused by the user; stable APK v1.0.2 remains unchanged.
+Code 21 is installed and the focused physical checks pass. Stable APK v1.0.2 remains unchanged.
 
 
 ### Minified Capacitor permission metadata
@@ -177,6 +177,14 @@ After changing R8/AGP/Capacitor or these keep rules, inspect the minified APK to
 
 On short landscape screens (651–900px wide, at most 540px high), the editor occupies the viewport and the collection follows in normal page scrolling. The previous fixed 136px collection row reduced usable editor space. The existing mobile-readability check covers the page-scroll behavior in all three languages and existing portrait/wide/expanded layouts.
 
-Never rebuild CameraX use cases for ordinary preview DOM bounds changes: this interrupted captures and caused release-timeout errors. Keep the shared viewport stable and map the native picker using cover fit after resizes. Both picker modes reject off-preview releases. Every Media3Effect error callback, including the video rebind path, must check its effect generation and active session. The installed alpha adapter requires close() on the main thread and can synchronously wait up to 500ms; invalidate the retired effect and defer its close until after the current unbind/lifecycle callback. Do not move close to a worker thread or suppress failures from the active effect.
+Never rebuild CameraX use cases for ordinary preview DOM bounds changes: this interrupted captures and caused release-timeout errors. Keep the use-case group stable and map the native picker using cover fit after resizes. Preview cropping must affect display only: attaching its ViewPort to the capture group also crops saved photos and video. Both picker modes reject off-preview releases. Every Media3Effect error callback, including the video rebind path, must check its effect generation and active session. The installed alpha adapter requires close() on the main thread and can synchronously wait up to 500ms; invalidate the retired effect and defer its close until after the current unbind/lifecycle callback. Do not move close to a worker thread or suppress failures from the active effect.
 
 Code 19 non-device validation passed: 140 unit tests; production build/Android sync; multilingual mobile-readability (including landscape collection scrolling); native-camera mock; minified assembleDebug; APK signature and version checks. Artifact: `android/build/clearwater-1.0.3-camera.5-debug.apk`, with adjacent SHA-256 sidecar. No ADB connection or installation was attempted during the user-requested device pause.
+
+### Device validation and capture frame (16 October)
+
+Code 21 (1.0.3-camera.7) is installed. Portrait/landscape stills retain the selected 12.5 MP frame; full 1080p video and its portrait/landscape transforms were verified. Short clips measured about 30 fps and 17-18 Mbps H.264 with AAC audio when enabled. First-use camera/microphone prompts, sampled AI, repeated capture and two AI-on background/return cycles passed; a full-resolution still also saved after resume. See HANDOFF.md for remaining physical acceptance and the final artifact checksum.
+
+Photo capture returns actual JPEG bounds after EXIF orientation. Idle ImageCapture starts with physical captureRotation. Session info and cameraInfoChanged include sessionGeneration; the shared UI rejects old-session dimension updates and removes its listener on cleanup. Rebinding idle also refreshes the resolution chip. Preview dimensions must never substitute for saved-file dimensions.
+
+Pause must retire/null Media3Effect before provider.unbindAll(), invalidating queued binds as well. Leaving the old effect in the field let queued setCorrection calls reach its released processor and crash. Resume reuses pendingBindCall; normal first-use microphone permission transitions must continue working. Active setEffects failures reject the plugin call with an error. Keep rendering failures visible in diagnostics, and do not move Media3Effect.close() off the main thread.
