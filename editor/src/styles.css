@@ -474,3 +474,5 @@ body.native-camera .camera-close-button{background:#101c20e8}
  .library{overflow:visible}
 }
 .photo-select .gallery-placeholder{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#789a92;pointer-events:none}
+
+.about-index .about-other-projects{margin-left:auto;white-space:nowrap}
