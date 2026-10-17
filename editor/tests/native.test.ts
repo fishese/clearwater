@@ -1,14 +1,27 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
+const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),createCapture:vi.fn(),copyCameraCapture:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
 const hdrBridge=vi.hoisted(()=>({beginHdrInput:vi.fn(),writeHdrInputChunk:vi.fn(),finishHdrInput:vi.fn(),convertHdrToSdr:vi.fn(),cancelHdrConversion:vi.fn(),deleteHdrWorkingCopy:vi.fn(),addListener:vi.fn()}));
 const backBridge=vi.hoisted(()=>({setEnabled:vi.fn(),exitApp:vi.fn(),addListener:vi.fn(),remove:vi.fn()}));
 vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:(name:string)=>name==='ClearWaterHdr'?hdrBridge:name==='ClearWaterBack'?backBridge:bridge}));
-import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp} from '../src/native';
+import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,saveAndroidCameraCapture} from '../src/native';
 import {convertHdrImportRequest} from '../src/hdr-import';
 import {writeFile} from '../src/file-save';
 
 describe('Android file bridge',()=>{
- beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});backBridge.setEnabled.mockResolvedValue(undefined);backBridge.remove.mockResolvedValue(undefined);backBridge.addListener.mockResolvedValue({remove:backBridge.remove});});
+ beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.createCapture.mockResolvedValue({uri:'content://media/video/42',name:'ClearWater_video.mp4',destination:'Movies/ClearWater/ClearWater_video.mp4'});bridge.copyCameraCapture.mockResolvedValue(undefined);bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});backBridge.setEnabled.mockResolvedValue(undefined);backBridge.remove.mockResolvedValue(undefined);backBridge.addListener.mockResolvedValue({remove:backBridge.remove});});
+ it('copies an owned native video directly without uploading its bytes through JavaScript',async()=>{
+  const file=new File(['archived source'],'clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4',{type:'video/mp4'});
+  const saved=await saveAndroidCameraCapture(file,'file:///cache/camera-captures/clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4');
+  expect(saved.uri).toBe('content://media/video/42');
+  expect(bridge.createCapture).toHaveBeenCalledWith({name:expect.stringMatching(/^ClearWater_.*\.mp4$/),type:'video/mp4'});
+  expect(bridge.copyCameraCapture).toHaveBeenCalledWith({sourceUri:'file:///cache/camera-captures/clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4',uri:'content://media/video/42'});
+  expect(bridge.beginWrite).not.toHaveBeenCalled();expect(bridge.writeChunk).not.toHaveBeenCalled();
+ });
+ it('propagates native copy failure without falling back to a JavaScript upload',async()=>{
+  bridge.copyCameraCapture.mockRejectedValueOnce(new Error('Gallery full'));
+  await expect(saveAndroidCameraCapture(new File(['video'],'camera.mp4',{type:'video/mp4'}),'file:///cache/camera-captures/camera.mp4')).rejects.toThrow('Gallery full');
+  expect(bridge.beginWrite).not.toHaveBeenCalled();expect(bridge.writeChunk).not.toHaveBeenCalled();
+ });
  it('enables the native Back callback while subscribed and disables it on cleanup',async()=>{
   const onBack=vi.fn(),dispose=listenForAndroidBack(onBack);await vi.waitFor(()=>expect(backBridge.setEnabled).toHaveBeenCalledWith({enabled:true}));
   const [,listener]=backBridge.addListener.mock.calls[0];listener();expect(onBack).toHaveBeenCalledOnce();dispose();

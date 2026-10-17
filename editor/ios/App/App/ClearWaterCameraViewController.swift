@@ -719,22 +719,119 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         let types: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera]
         let devices = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .back).devices +
             AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .front).devices
-        guard state == "ready", let device = devices.first(where: { $0.uniqueID == id }) else { completion(.failure(CameraError.unavailable)); return }
+        guard state == "ready", !closeRequested, !backgrounded, !sessionInterrupted, session.isRunning,
+              let device = devices.first(where: { $0.uniqueID == id }) else { completion(.failure(CameraError.unavailable)); return }
+        if cameraInput?.device.uniqueID == id { completion(.success(nativeInfo())); return }
         setState("starting")
-        releaseHardwareWhiteBalance()
+        // Keep the existing white balance until the new camera is confirmed running.
         sessionQueue.async { [weak self] in
-            guard let self else { return }
-            self.session.stopRunning(); self.session.beginConfiguration()
+            guard let self else { DispatchQueue.main.async { completion(.failure(CameraError.cancelled)) }; return }
+            guard !self.closeRequested, !self.backgrounded else {
+                DispatchQueue.main.async { completion(.failure(CameraError.cancelled)) }; return
+            }
+            guard let oldInput = self.cameraInput else {
+                DispatchQueue.main.async {
+                    guard !self.closeRequested, !self.backgrounded else {
+                        completion(.failure(CameraError.cancelled)); return
+                    }
+                    self.fail(self.text("The camera could not restart.", "The camera could not restart."))
+                    completion(.failure(CameraError.unavailable))
+                    self.closeAfterRuntimeFailure()
+                }
+                return
+            }
+            let oldPosition = self.cameraPosition
+            let oldPhotoDimensions = self.photoOutput.maxPhotoDimensions
+            let previousCandidateFormat = device.activeFormat
+            let previousCandidateMinimumDuration = device.activeVideoMinFrameDuration
+            let previousCandidateMaximumDuration = device.activeVideoMaxFrameDuration
+            let previousCandidateAutomaticHDR = device.automaticallyAdjustsVideoHDREnabled
+            let previousCandidateHDR = device.isVideoHDREnabled
+            let previousCandidateColorSpace = device.activeColorSpace
+            var newInput: AVCaptureDeviceInput?
+            var configurationOpen = false
+            var sessionStopped = false
+            var deviceFormatChanged = false
+            var lifecycleCancelled = false
             do {
-                if let old = self.cameraInput { self.session.removeInput(old) }
                 let input = try AVCaptureDeviceInput(device: device)
+                newInput = input
+                guard !self.closeRequested, !self.backgrounded else {
+                    lifecycleCancelled = true; throw CameraError.cancelled
+                }
+                self.session.stopRunning(); sessionStopped = true
+                self.session.beginConfiguration(); configurationOpen = true
+                self.session.removeInput(oldInput)
                 guard self.session.canAddInput(input) else { throw CameraError.unavailable }
-                self.session.addInput(input); self.cameraInput = input; self.cameraPosition = device.position
+                self.session.addInput(input)
+                deviceFormatChanged = true
                 try self.configureDeviceFormat(device)
                 let hasPhoto = self.configurePhotoDimensions(for: device)
-                self.observeSystemPressure(device); self.session.commitConfiguration(); self.requestOrientationUpdate(); self.session.startRunning()
-                DispatchQueue.main.async { self.photoCaptureAvailable = hasPhoto; self.setState("ready"); completion(.success(self.nativeInfo())) }
-            } catch { self.session.commitConfiguration(); DispatchQueue.main.async { self.setState("ready"); completion(.failure(error)) } }
+                self.session.commitConfiguration(); configurationOpen = false
+                guard !self.closeRequested, !self.backgrounded else {
+                    lifecycleCancelled = true; throw CameraError.cancelled
+                }
+                self.session.startRunning()
+                guard self.session.isRunning, !self.sessionInterrupted else { throw CameraError.unavailable }
+                self.cameraInput = input; self.cameraPosition = device.position
+                self.observeSystemPressure(device)
+                self.resetHardwareWhiteBalance(on: oldInput.device)
+                self.requestOrientationUpdate()
+                DispatchQueue.main.async {
+                    guard !self.closeRequested, !self.backgrounded, !self.sessionInterrupted,
+                          self.session.isRunning, self.state == "starting" else {
+                        completion(.failure(CameraError.cancelled)); return
+                    }
+                    self.releaseHardwareWhiteBalance()
+                    self.photoCaptureAvailable = hasPhoto
+                    self.setState("ready")
+                    completion(.success(self.nativeInfo()))
+                }
+            } catch {
+                var restored = true
+                if sessionStopped {
+                    // Reattach the previous input before ending the configuration transaction.
+                    if !configurationOpen { self.session.beginConfiguration() }
+                    if let newInput, self.session.inputs.contains(where: { $0 === newInput }) { self.session.removeInput(newInput) }
+                    if !self.session.inputs.contains(where: { $0 === oldInput }), self.session.canAddInput(oldInput) {
+                        self.session.addInput(oldInput)
+                    }
+                    restored = self.session.inputs.contains(where: { $0 === oldInput })
+                    if restored { self.photoOutput.maxPhotoDimensions = oldPhotoDimensions }
+                    self.session.commitConfiguration()
+                    self.cameraInput = restored ? oldInput : nil
+                    self.cameraPosition = oldPosition
+                }
+                if deviceFormatChanged {
+                    do {
+                        try device.lockForConfiguration()
+                        device.activeFormat = previousCandidateFormat
+                        device.activeVideoMinFrameDuration = previousCandidateMinimumDuration
+                        device.activeVideoMaxFrameDuration = previousCandidateMaximumDuration
+                        device.automaticallyAdjustsVideoHDREnabled = false
+                        if device.activeFormat.supportedColorSpaces.contains(previousCandidateColorSpace) { device.activeColorSpace = previousCandidateColorSpace }
+                        if device.activeFormat.isVideoHDRSupported { device.isVideoHDREnabled = previousCandidateHDR }
+                        device.automaticallyAdjustsVideoHDREnabled = previousCandidateAutomaticHDR
+                        device.unlockForConfiguration()
+                    } catch {}
+                }
+                if restored && sessionStopped && !self.closeRequested && !self.backgrounded { self.session.startRunning() }
+                let running = restored && self.session.isRunning
+                let cancelled = lifecycleCancelled
+                if sessionStopped { self.requestOrientationUpdate() }
+                DispatchQueue.main.async {
+                    guard !cancelled, !self.closeRequested, !self.backgrounded else {
+                        completion(.failure(CameraError.cancelled)); return
+                    }
+                    if running && self.session.isRunning && !self.sessionInterrupted && self.state == "starting" {
+                        self.setState("ready")
+                    } else if (!restored || !self.sessionInterrupted) && self.state == "starting" {
+                        self.fail(self.text("The camera could not restart.", "The camera could not restart."))
+                        self.closeAfterRuntimeFailure()
+                    }
+                    completion(.failure(error))
+                }
+            }
         }
     }
     func embeddedSampleFrame() -> [String: Any]? {
@@ -1207,9 +1304,18 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         recipeLock.lock(); currentRecipe.manual.neutral = [1, 1, 1]; recipeLock.unlock()
         frameLock.lock(); latestSource = nil; latestSourceSize = nil; latestRendered = nil; frameLock.unlock()
         sessionQueue.async { [weak self] in
-            guard let device = self?.cameraInput?.device else { return }
-            do { try device.lockForConfiguration(); if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }; device.unlockForConfiguration() } catch {}
+            guard let self, let device = self.cameraInput?.device else { return }
+            self.resetHardwareWhiteBalance(on: device)
         }
+    }
+    private func resetHardwareWhiteBalance(on device: AVCaptureDevice) {
+        do {
+            try device.lockForConfiguration()
+            defer { device.unlockForConfiguration() }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+        } catch {}
     }
     private func enterBackground() {
         backgrounded = true

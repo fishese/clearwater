@@ -22,7 +22,7 @@ try {
     ];
     window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 4 });
     const cameraMethods = ['getLaunchMode', 'startSession', 'setPreviewBounds', 'setCorrection', 'listLenses', 'setLens', 'setZoom', 'sampleFrame', 'capturePhoto', 'releaseCapture', 'startRecording', 'stopRecording', 'stopSession'];
-    const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
+    const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'copyCameraCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
     const backMethods = ['setEnabled', 'exitApp'];
     const header = (name, methods, hasListener = false) => ({ name, methods: [...methods.map(method => ({ name: method, rtype: 'promise' })), ...(hasListener ? [{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }] : [])] });
     window.Capacitor = {
@@ -72,6 +72,12 @@ try {
             const uri = `content://mock/gallery/${Object.keys(window.gallery).length + 1}`;
             window.gallery[uri] = { name: options.name, type: options.type, bytes: [] };
             return { uri, name: options.name, destination: `Pictures/ClearWater/${options.name}` };
+          }
+          if (method === 'copyCameraCapture') {
+            if (window.nativeCameraState.failVideoCopy) { delete window.gallery[options.uri]; throw new Error('Gallery copy failed'); }
+            if (options.sourceUri !== 'mock-native://video' || !window.gallery[options.uri]) throw new Error('Unowned video source');
+            window.gallery[options.uri].bytes = window.nativeVideoBytes;
+            return {};
           }
           if (method === 'beginWrite') { const id = `write-${crypto.randomUUID()}`; window.galleryWrites[id] = { uri: options.uri, chunks: [] }; return { id }; }
           if (method === 'writeChunk') { window.galleryWrites[options.id].chunks.push(options.data); return {}; }
@@ -150,6 +156,11 @@ try {
   await page.getByRole('button', { name: /Rear ultra wide/ }).click();
   assert.equal(await zoom.innerText(), '0.5×', 'displayed magnification uses the reported native lens factor');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setLens')));
+  assert.equal(await page.getByRole('button',{name:/Five A\+ assist/}).getAttribute('aria-pressed'),'false','AI assist is off for the live Balanced check');
+  await page.waitForFunction(() => {const calls=window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera');const sample=calls.findIndex(call=>call.method==='sampleFrame');return sample>=0&&calls.slice(sample+1).some(call=>call.method==='setCorrection');});
+  const liveCorrection = await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera'&&call.method==='setCorrection').at(-1).options.recipe);
+  assert.equal(liveCorrection.engine,'balanced','sampled native frames continue Balanced correction with AI assist off');
+  assert.equal(liveCorrection.auto.gains.length,3,'sampled native frames continue automatic white balance with AI assist off');
   await page.locator('.camera-feature-button').nth(1).click();
   await page.waitForFunction(() => window.nativeCameraState.recipe?.hints?.filter === 'yes');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setPreviewBounds')));
@@ -198,6 +209,37 @@ try {
   assert.deepEqual(await page.evaluate(() => window.nativeFileReadCalls), [], 'failed finalized media is not read as a capture');
   assert.equal(await page.evaluate(() => Object.keys(window.gallery).length), 1, 'failed video creates no gallery entry');
   assert.equal(await page.evaluate(() => window.nativeCameraState.released), 'mock-native://photo', 'failed video leaves no temp capture to release');
+
+  const chunksBeforeVideo = await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='writeChunk').length);
+  await page.evaluate(() => {
+    window.nativeVideoBytes = [0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109];
+    window.nativeFiles['mock-native://video'] = `data:video/mp4;base64,${btoa(String.fromCharCode(...window.nativeVideoBytes))}`;
+    window.emitNative('ClearWaterCamera', 'recordingFinished', {uri:'mock-native://video',name:'clearwater-camera-00000000-0000-4000-8000-000000000002.mp4',type:'video/mp4',width:390,height:844});
+  });
+  await page.waitForFunction(() => window.nativeCameraState.released === 'mock-native://video');
+  const videoSave = await page.evaluate(() => ({copy:window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='copyCameraCapture'),chunks:window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='writeChunk').length,gallery:Object.values(window.gallery).filter(item=>item.type==='video/mp4')}));
+  assert.equal(videoSave.copy.length,1,'native copy publishes the recorded video');
+  assert.equal(videoSave.copy[0].options.sourceUri,'mock-native://video','copy uses the exact camera-owned temporary URI');
+  assert.deepEqual(videoSave.gallery[0].bytes,[0,0,0,20,102,116,121,112,105,115,111,109]);
+  assert.equal(videoSave.chunks,chunksBeforeVideo,'video bytes are not uploaded back through JavaScript');
+
+  await page.evaluate(() => {
+    window.nativeCameraState.failVideoCopy = true;
+    window.nativeFiles['mock-native://video-failure'] = window.nativeFiles['mock-native://video'];
+    window.emitNative('ClearWaterCamera', 'recordingFinished', {uri:'mock-native://video-failure',name:'clearwater-camera-00000000-0000-4000-8000-000000000003.mp4',type:'video/mp4',width:390,height:844});
+  });
+  await page.getByRole('alert').filter({hasText:'Saved in collection. Could not save on phone.'}).waitFor();
+  assert.equal(await page.evaluate(() => Object.values(window.gallery).filter(item=>item.type==='video/mp4').length),1,'failed native copy removes its new gallery destination');
+  await page.waitForFunction(() => window.nativeMockCalls.some(call=>call.plugin==='ClearWaterCamera'&&call.method==='releaseCapture'&&call.options.uri==='mock-native://video-failure'));
+  const archivedAfterFailure = await page.evaluate(async () => {
+    const opened=indexedDB.open('clearwater-library',2);
+    const db=await new Promise((resolve,reject)=>{opened.onsuccess=()=>resolve(opened.result);opened.onerror=()=>reject(opened.error);});
+    const tx=db.transaction('camera-originals');const request=tx.objectStore('camera-originals').getAll();
+    const originals=await new Promise(resolve=>{request.onsuccess=()=>resolve(request.result);});db.close();
+    return originals.filter(item=>item.file?.type==='video/mp4').length;
+  });
+  assert.equal(archivedAfterFailure,2,'both videos retain their editable private source after gallery failure');
+  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera'&&call.method==='releaseCapture'&&call.options.uri==='mock-native://video-failure').length),1,'failed gallery video temp is released only after the private archive survives');
 
   await page.locator('.camera-close-button').click();
   await page.waitForFunction(() => document.querySelector('.camera-page') === null);
@@ -291,7 +333,7 @@ try {
   });
   assert.equal(await page.evaluate(() => window.nativeGetUserMediaCalls ?? 0), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS mocked CameraX launch, transparent preview, native zoom/lens, corrected photo save, finalize errors and bounded serialized resume lifecycle');
+  console.log('PASS mocked CameraX launch, Balanced correction with AI off, native zoom/lens, corrected photo save, direct video copy and rollback, finalize errors and serialized resume lifecycle');
 } finally {
   await browser.close();
 }

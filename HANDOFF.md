@@ -1,5 +1,13 @@
 # Handoff
 
+## Post-release fixes: validation in progress (17 October 2026)
+
+Authorized after the review: repair iOS lens-switch rollback; replace full-original gallery tile loading with bounded, lazy thumbnails; remove the redundant Android recorded-video upload to the gallery using a native copy. Keep the existing durable private camera archive. Automatic white balance and Balanced restoration must continue with AI disabled; no camera sampling/white-balance gating is authorized. Use lower capable agents for involved changes. Preserve user `.gitignore` and IDE changes, and use `reference/i18n-glossary.md` only for any new UI wording rather than re-auditing translations.
+
+Implementation is on `codex/post-release-fixes`. Shared suite: 166 tests pass. Production build, Android Java compile, native camera bridge (including AI-off Balanced analysis, direct video copy and failure rollback), private archive, and iOS shell checks pass. Rotated JPEG/portrait PNG thumbnails, lazy batch loading, editor state and mobile layout production regressions also pass; macOS iOS CI remains pending. No physical camera test has been run for these fixes.
+
+Continuation heartbeat `resume-clearwater-review-after-quota-reset` remains active to resume quota-interrupted unfinished work; preserve its current configured schedule. The published release remains unchanged. Native iOS compilation/tests require macOS CI; browser bridge checks do not replace native validation.
+
 ## Published coordinated release (17 October 2026)
 
 PR #2 is merged as 966660b and the user reports the iPhone tests passed. The user has now explicitly authorized building Android and publishing the coordinated APK/IPA release. This supersedes the older pending-merge/publication notes below. Release version is 1.0.4: Android code 23, iOS bundle version 2. Native behavior and signing identities are unchanged. Main passed 164 shared tests and 22 hosted native tests before the release version/label changes.

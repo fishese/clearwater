@@ -467,3 +467,4 @@ body.native-camera .camera-close-button{background:#101c20e8}
  .studio{height:auto;grid-template-rows:calc(100dvh - 56px) auto}
  .library{overflow:visible}
 }
+.photo-select .gallery-placeholder{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#789a92;pointer-events:none}

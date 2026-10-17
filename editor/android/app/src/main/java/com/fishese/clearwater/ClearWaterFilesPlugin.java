@@ -199,6 +199,22 @@ public class ClearWaterFilesPlugin extends Plugin {
         uri=Uri.fromFile(target);captureCreated.add(uri.toString());
         JSObject result=new JSObject();result.put("uri",uri.toString());result.put("name",name);result.put("destination",target.getAbsolutePath());call.resolve(result);
     }catch(Exception error){if(uri!=null)deleteCapture(uri);call.reject("Could not create a camera capture.",error);}}); }
+    @PluginMethod public void copyCameraCapture(PluginCall call) { io.execute(()->{Uri target=null;try {
+        String targetValue=call.getString("uri"),sourceUri=call.getString("sourceUri");
+        if(sourceUri==null||targetValue==null||!captureCreated.remove(targetValue))throw new IOException("Only a newly created gallery capture can receive a camera video.");
+        target=Uri.parse(targetValue);
+        try(OutputStream output="file".equals(target.getScheme())?new FileOutputStream(new File(target.getPath()),false):getContext().getContentResolver().openOutputStream(target,"wt")) {
+            if(output==null)throw new IOException("Could not open the gallery capture.");
+            ClearWaterCameraPlugin.copyOwnedVideoCapture(getContext(),sourceUri,output);
+            output.flush();
+        }
+        if("content".equals(target.getScheme())){
+            ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.IS_PENDING,0);
+            if(getContext().getContentResolver().update(target,values,null,null)!=1)throw new IOException("Could not publish the gallery capture.");
+        }
+        if(!rememberCameraCapture(targetValue))throw new IOException("Could not save camera capture ownership.");
+        call.resolve();
+    }catch(Exception error){if(target!=null)deleteCapture(target);call.reject("Could not copy the camera video to the gallery.",error);}}); }
     @PluginMethod public void beginWrite(PluginCall call) { io.execute(()->{try {
         String value=call.getString("uri");boolean isCapture=captureCreated.remove(value);if(!isCapture&&!created.remove(value))throw new IOException("Only newly created photos can be written.");
         Uri uri=Uri.parse(value);boolean mediaStore=isCapture&&"content".equals(uri.getScheme());OutputStream stream;

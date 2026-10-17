@@ -18,7 +18,7 @@ export interface CameraHandle {
 }
 
 export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
-export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string }
+export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string; nativeCaptureUri?:string }
 
 interface CameraProps {
   onCapture: (file: File, recipe: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult>;
@@ -106,7 +106,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const strengthRef = useRef(80);
   const whiteBalanceLocked = useRef(false);
   const savingRef = useRef(false);
-  const saveCaptureRef = useRef<(file: File, frozen: Recipe, details?: CameraCaptureDetails) => Promise<void>>(async () => {});
+  const saveCaptureRef = useRef<(file: File, frozen: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult|undefined>>(async () => undefined);
   const frozenRecipeRef = useRef<Recipe | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef(0);
@@ -580,8 +580,10 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       const frozen = structuredClone(frozenRecipeRef.current ?? recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1)));
         const save = capture.iosCaptureId
           ? Promise.resolve(new File([],capture.name,{type:capture.type,lastModified:Date.now()})).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,iosCaptureId:capture.iosCaptureId}))
-          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true}));
-        void save.catch(() => setError('Could not save video capture.')).finally(() => void nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {}));
+          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,...(isAndroid()?{nativeCaptureUri:capture.uri}:{})}));
+        void save.then(saved=>{
+          if(capture.iosCaptureId||saved?.collection||saved?.device)return nativeCamera.releaseCapture({uri:capture.uri}).catch(()=>{});
+        }).catch(() => setError('Could not save video capture.'));
     }));
     attach(nativeCamera.addListener('cameraError', event => {
       if (!aliveRef.current) return;
@@ -660,6 +662,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setSaveStatus(result.device?'Saved on phone.':result.collection?'Saved in collection.':'');
       if(result.deviceExpected&&!result.device)setError(result.collection?'Saved in collection. Could not save on phone.':'Capture could not be saved. Keep the app open.');
       else if(!result.collection)setError(result.device?'Saved on phone. Could not save in collection.':'Capture could not be saved. Keep the app open.');
+      return result;
     }catch{if(aliveRef.current)setError('Capture could not be saved. Keep the app open.');}
     finally{savingRef.current=false;if(aliveRef.current)setSavePending(false);}
   },[onCapture]);
