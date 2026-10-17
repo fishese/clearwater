@@ -2,7 +2,22 @@
 
 Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
-## Recommendation
+## Active follow-up plan — 17 October 2026
+
+Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.5 remains the published native release. This section is the resumable progress tracker; the older plan below is historical.
+
+Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
+
+| Item | Plan and acceptance criteria | Status |
+| --- | --- | --- |
+| Android folder import | Trace enumeration and lazy loading; show all supported entries with selection/next/previous, without eagerly decoding every original. Test multiple files, existing imports and read failures. Verify on Android where possible. | Pending investigation |
+| iOS camera launch | Reuse `clearwater://camera` cold/warm routing; add long-press home-screen Camera action and discoverable Shortcuts launch support. Confirm ordinary editor launch, single delivery and busy-state handling. Assess a widget separately; prefer a Shortcuts widget using the launch action if a native extension adds disproportionate signing/build complexity. | Pending implementation |
+| Per-device lenses | Discover selectable cameras from Android CameraX/Camera2 and iOS AVFoundation, keeping front/back and physical lenses distinct from digital zoom stops. Preserve ultra-wide support, honest magnification labels, rollback and orientation. Avoid a device database unless native detection cannot supply the needed information. | Pending investigation |
+| Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | Pending |
+
+Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable release publication is not part of this follow-up yet.
+
+## Recommendation (historical)
 
 Build a local-first photo editor with a shared TypeScript web interface and processing recipe, packaged for Android using Capacitor. Use native Kotlin adapters for Android import, incoming shares, durable file storage, export, HEIC decoding, and eventually video. The web version can retain the main editing functions as a PWA. Do not make cloud inference or accounts a prerequisite.
 
