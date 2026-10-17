@@ -22,12 +22,12 @@
     "notes": "Int8 weight-only, fp32 compute. This is the plain 256 export, not the reflect-pad 16 alternative."
   },
   "fivea": {
-    "sha256": "157a81b40235f4130563fa8b196407d40a0966fa95a02dc0fdb39fe0e3b1df48",
-    "bytes": 854937,
-    "max_abs_parity_error": 0.0,
+    "sha256": "7d4a8ae12bd7b871486f8e506970a75ff381ae0fa617e3d159589d2e65a83b6b",
+    "bytes": 81476,
+    "max_abs_parity_error": 2.580881118774414e-05,
     "parity_tolerance": 0.0001,
-    "parity_samples": 33,
-    "parity_reference": "fivea_256_slim_reflect.onnx (fp32 ONNX, itself <1e-4 vs PyTorch)",
+    "parity_samples": 1,
+    "parity_reference": "previous bundled edge-fix fivea.onnx sha256 157a81b40235f4130563fa8b196407d40a0966fa95a02dc0fdb39fe0e3b1df48, contract ramp (i%251)/250 at 256",
     "checkpoint_sha256": "e2dfc7df5fb4df44a1ba7be38744b5a6b34fad48a210c06df164bd610cd6d495",
     "input": {
       "name": "input",
@@ -41,7 +41,7 @@
       "dtype": "float32",
       "range": "unit"
     },
-    "notes": "alpha-0.1 edge-fix: reflect padding on the two 3x3 convs plus the (0,0) inverse-DFT-origin pixel replaced by (1,1). fp32. onnxruntime-web reports a fixed [1,3,256,256] output."
+    "notes": "alpha-0.1 edge-fix. DFT tables are computed in-graph (Range/Sin/Cos) and pyramid pools divide H and W by 2, 4 and 8, so the file is 81,476 bytes with dynamic spatial dims. The editor still runs 256x256. Reflect padding and the (0,0) pixel replaced by (1,1) are unchanged. Versus the previous bundled edge-fix file: 2.58e-5 on the contract ramp and about 1.7e-5 on real photos. A flat 0.4 input can differ by 3.87e-4 on the border only; the corner fix stays exact."
   },
   "shallow": {
     "sha256": "4620236a16750eba3387be109ce45b9ccdb0786df12d13835c317bd05718c18b",
