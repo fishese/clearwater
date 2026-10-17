@@ -67,7 +67,7 @@ try {
     context.fillStyle = gradient; context.fillRect(0,0,2000,1000);
     const blob = await new Promise(resolve => canvas.toBlob(resolve,'image/jpeg',.85));
     const db = await new Promise((resolve,reject) => {
-      const request = indexedDB.open('clearwater-library',2);
+      const request = indexedDB.open('clearwater-library');
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains('photos')) request.result.createObjectStore('photos',{keyPath:'id'});
         if (!request.result.objectStoreNames.contains('camera-originals')) request.result.createObjectStore('camera-originals',{keyPath:'id'});

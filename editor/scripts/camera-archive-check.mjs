@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {resolve} from 'node:path';
 import {build} from 'esbuild';
-import {chromium} from 'playwright';
+import {chromium,webkit} from 'playwright';
 
 const editorRoot=resolve(import.meta.dirname,'..');
 const bundle=await build({
@@ -10,22 +10,27 @@ const bundle=await build({
 });
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRYkAAAAASUVORK5CYII=','base64');
 const sourceBytes=Array.from(png),replacementBytes=Array.from(Buffer.from('edited-pixels'));
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=process.env.CHECK_BROWSER==='webkit'?await webkit.launch({headless:true}):await chromium.launch({channel:'msedge',headless:true});
 try{
   const page=await browser.newPage();
-  await page.route('https://camera-archive-check.test/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Camera archive check</title>'}));
-  await page.goto('https://camera-archive-check.test/');
+  await page.route('http://127.0.0.1:4174/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Camera archive check</title>'}));
+  await page.goto('http://127.0.0.1:4174/');
   await page.evaluate(async({sourceBytes})=>{
     const file=(name,bytes,type)=>new File([new Uint8Array(bytes)],name,{type});
     const request=indexedDB.open('clearwater-library',1);
-    const db=await new Promise((resolve,reject)=>{request.onupgradeneeded=()=>request.result.createObjectStore('photos',{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    const db=await new Promise((resolve,reject)=>{request.onupgradeneeded=()=>request.result.createObjectStore('photos',{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error??new Error('IndexedDB open failed'));});
     await new Promise((resolve,reject)=>{
       const tx=db.transaction('photos','readwrite'),store=tx.objectStore('photos');
-      store.put({id:'legacy-photo',file:file('legacy.png',sourceBytes,'image/png'),recipe:{exposure:1},addedAt:1});
-      store.put({id:'pending-share',file:file('share.png',sourceBytes,'image/png'),pendingShare:true,addedAt:9});
-      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+      const legacy=store.put({id:'legacy-photo',file:file('legacy.png',sourceBytes,'image/png'),recipe:{exposure:1},addedAt:1});
+      const shared=store.put({id:'pending-share',file:file('share.png',sourceBytes,'image/png'),pendingShare:true,addedAt:9});
+      legacy.onerror=()=>reject(new Error(`Legacy File put failed: ${legacy.error?.name}: ${legacy.error?.message}`));
+      shared.onerror=()=>reject(new Error(`Pending File put failed: ${shared.error?.name}: ${shared.error?.message}`));
+      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error??new Error('IndexedDB seed transaction failed'));tx.onabort=()=>reject(tx.error??new Error('IndexedDB seed transaction aborted'));
     });
     db.close();
+    const v2=indexedDB.open('clearwater-library',2);
+    await new Promise((resolve,reject)=>{v2.onupgradeneeded=()=>v2.result.createObjectStore('camera-originals',{keyPath:'id'});v2.onsuccess=resolve;v2.onerror=()=>reject(v2.error??new Error('v2 upgrade failed'));});
+    v2.result.close();
   },{sourceBytes});
   await page.addScriptTag({content:bundle.outputFiles[0].text});
 
@@ -34,9 +39,71 @@ try{
     const photos=await CameraArchiveCheck.listPhotos();
     return {version,stores,photos:photos.map(photo=>photo.id)};
   });
-  assert.equal(migration.version,2,'the v1 database should migrate to v2');
-  assert.deepEqual(migration.stores,['camera-originals','photos']);
-  assert.deepEqual(migration.photos,['legacy-photo'],'v1 files survive and pending shares remain hidden');
+  assert.equal(migration.version,3,'the v2 database should migrate to v3');
+  assert.deepEqual(migration.stores,['camera-originals','photo-metadata','photos']);
+  assert.deepEqual(migration.photos,['legacy-photo'],'v2 files survive and pending shares remain hidden');
+
+  const imported=await page.evaluate(async({sourceBytes})=>{
+    const originalPut=IDBObjectStore.prototype.put;
+    let fileWrites=0;
+    IDBObjectStore.prototype.put=function(value,...args){if(value?.file instanceof File)fileWrites++;return originalPut.call(this,value,...args);};
+    try{
+      const file=(name,bytes)=>new File([new Uint8Array(bytes)],name,{type:'image/png'});
+      await CameraArchiveCheck.savePhoto({id:'to-delete',file:file('delete.png',sourceBytes),addedAt:2});
+      await CameraArchiveCheck.deletePhoto('to-delete');
+      fileWrites=0;
+      await CameraArchiveCheck.savePhoto({id:'legacy-photo',file:file('replacement.png',[1,2,3]),recipe:{exposure:2},addedAt:3});
+      await CameraArchiveCheck.savePhoto({id:'legacy-photo',file:file('empty.png',[]),recipe:{exposure:3},addedAt:4});
+      const listed=(await CameraArchiveCheck.listPhotos()).find(photo=>photo.id==='legacy-photo');
+      const db=await CameraArchiveCheck.openDB();
+      const rows=await new Promise((resolve,reject)=>{const tx=db.transaction(['photos','photo-metadata'],'readonly'),raw=tx.objectStore('photos').get('legacy-photo'),meta=tx.objectStore('photo-metadata').get('legacy-photo');tx.oncomplete=()=>resolve({raw:raw.result,meta:meta.result});tx.onerror=()=>reject(tx.error);});
+      db.close();
+      return {fileWrites,bytes:Array.from(new Uint8Array(await listed.file.arrayBuffer())),size:rows.raw.file.size,recipe:listed.recipe,rawRecipe:rows.raw.recipe,metaRecipe:rows.meta.recipe};
+    }finally{IDBObjectStore.prototype.put=originalPut;}
+  },{sourceBytes});
+  assert.equal(imported.fileWrites,0,'deleting one photo and editing another never re-puts a stored File');
+  assert.deepEqual(imported.bytes,sourceBytes,'imported source bytes remain intact after edits');
+  assert.equal(imported.size,sourceBytes.length,'the source Blob retains its size after another photo is deleted');
+  assert.deepEqual(imported.recipe,{exposure:3},'latest recipe comes from the metadata sidecar');
+  assert.deepEqual(imported.rawRecipe,{exposure:1},'legacy File rows are never rewritten');
+  assert.deepEqual(imported.metaRecipe,{exposure:3});
+  const failedWrite=await page.evaluate(async({sourceBytes})=>{
+    const originalPut=IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put=function(value,...args){if(this.name==='photo-metadata'&&value?.id==='legacy-photo')throw new DOMException('Metadata write blocked','UnknownError');return originalPut.call(this,value,...args);};
+    try{
+      const file=new File([new Uint8Array(sourceBytes)],'legacy.png',{type:'image/png'});
+      const failure=await Promise.race([
+        CameraArchiveCheck.savePhoto({id:'legacy-photo',file,recipe:{exposure:99}}).then(()=>null,error=>error?.name??'error'),
+        new Promise(resolve=>setTimeout(()=>resolve('timeout'),2000)),
+      ]);
+      return failure;
+    }finally{IDBObjectStore.prototype.put=originalPut;}
+  },{sourceBytes});
+  assert.equal(failedWrite,'AbortError','a synchronous metadata put failure aborts and rejects the save');
+  await page.reload();
+  await page.addScriptTag({content:bundle.outputFiles[0].text});
+  const afterReload=await page.evaluate(async()=>{
+    const photo=(await CameraArchiveCheck.listPhotos()).find(photo=>photo.id==='legacy-photo');
+    return {bytes:Array.from(new Uint8Array(await photo.file.arrayBuffer())),recipe:photo.recipe};
+  });
+  assert.deepEqual(afterReload.bytes,sourceBytes,'imported source bytes survive a fresh IndexedDB read');
+  assert.deepEqual(afterReload.recipe,{exposure:3},'sidecar edits survive reload');
+
+  const promoted=await page.evaluate(async({sourceBytes})=>{
+    const file=new File([new Uint8Array(sourceBytes)],'shared.png',{type:'image/png'});
+    await CameraArchiveCheck.savePhoto({id:'promoted-share',file,pendingShare:true,addedAt:5});
+    await CameraArchiveCheck.promoteSharedPhotos(['promoted-share']);
+    await CameraArchiveCheck.savePhoto({id:'promoted-share',file,recipe:{exposure:4},addedAt:5});
+    const visible=(await CameraArchiveCheck.listPhotos()).some(photo=>photo.id==='promoted-share');
+    await CameraArchiveCheck.clearPhotos();
+    const remaining=(await CameraArchiveCheck.listPhotos()).some(photo=>photo.id==='promoted-share');
+    const db=await CameraArchiveCheck.openDB();
+    const raw=await new Promise((resolve,reject)=>{const request=db.transaction('photos').objectStore('photos').get('promoted-share');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});db.close();
+    return {visible,remaining,raw:raw??null};
+  },{sourceBytes});
+  assert.equal(promoted.visible,true,'a promoted share stays visible after an edit');
+  assert.equal(promoted.remaining,false,'clear removes a promoted share even when its raw row says pending');
+  assert.equal(promoted.raw,null,'clear removes the original Blob of a promoted share');
 
   const lifecycle=await page.evaluate(async({sourceBytes,replacementBytes})=>{
     const file=(name,bytes)=>new File([new Uint8Array(bytes)],name,{type:'image/png',lastModified:1234});
@@ -82,7 +149,7 @@ try{
     };
   },{sourceBytes,replacementBytes});
   assert.equal(lifecycle.metadataHasNoFile,true,'camera metadata rows do not retain duplicate source files');
-  assert.equal(lifecycle.archivedName,'IMG_gallery_1.png','archive file names follow the enhanced gallery name');
+  assert.equal(lifecycle.archivedName,'raw-camera.png','archive retains its original File without rewriting its Blob');
   assert.deepEqual(lifecycle.archivedBytes,sourceBytes,'later edits must not replace archived source bytes');
   assert.deepEqual(lifecycle.originalBytes,sourceBytes,'joined collection photos return original source bytes');
   assert.deepEqual(lifecycle.recoveredBytes,sourceBytes,'the archive remains recoverable after collection clearing');
@@ -99,5 +166,5 @@ try{
   assert.equal(lifecycle.retainedAfterRemove,true,'removing collection metadata keeps the camera original');
   assert.equal(lifecycle.deletedPhoto,null,'explicit deletion removes the metadata row');
   assert.equal(lifecycle.deletedOriginal,null,'explicit deletion removes the camera archive');
-  console.log('PASS v1 IndexedDB migration, camera archive/name alias, metadata-only edits, original-byte preservation, clear/recovery, pending-share retention, newest-first camera originals, collection-only removal, and full deletion.');
+  console.log('PASS v2-to-v3 IndexedDB upgrade, delete-then-edit without File rewrites, source bytes and recipes after reload, failed-write rejection, share promotion/clear, camera archive/name alias, original-byte preservation, clear/recovery, pending-share retention, and full deletion.');
 }finally{await browser.close();}
