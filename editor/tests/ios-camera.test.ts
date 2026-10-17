@@ -50,11 +50,24 @@ describe('iOS private capture adapter',()=>{
   vi.unstubAllGlobals();
  });
 
+ it('accepts a complete full-response private video when the local file scheme ignores Range',async()=>{
+  const video=descriptor({kind:'video',name:'capture.mp4',type:'video/mp4',bytes:4});
+  state.camera.getCapture.mockResolvedValue({capture:video});
+  const fetchMock=vi.fn().mockResolvedValue({status:200,ok:true,headers:new Headers(),blob:async()=>new Blob([Uint8Array.of(0,1,2,3)])});
+  vi.stubGlobal('fetch',fetchMock);
+  const file=await readIOSCaptureFile(video);
+  expect(file.size).toBe(4);
+  expect(fetchMock).toHaveBeenCalledWith('capacitor:file:///private/captures/original.jpg',{signal:undefined,headers:{Range:'bytes=0-'}});
+  vi.unstubAllGlobals();
+ });
+
  it('rejects status-zero, missing-range, and truncated private video responses',async()=>{
   const video=descriptor({kind:'video',name:'capture.mp4',type:'video/mp4',sourceUrl:'file:///private/captures/enhanced.mp4',bytes:4});
   state.camera.getCapture.mockResolvedValue({capture:video});
   const fetchMock=vi.fn().mockResolvedValue({status:0,ok:false,headers:new Headers(),blob:async()=>new Blob([])});
   vi.stubGlobal('fetch',fetchMock);
+  await expect(readIOSCaptureFile(video)).rejects.toThrow('Could not read this private camera source');
+  fetchMock.mockResolvedValueOnce({status:206,ok:true,headers:new Headers(),blob:async()=>new Blob([Uint8Array.of(0,1,2,3)])});
   await expect(readIOSCaptureFile(video)).rejects.toThrow('Could not read this private camera source');
   fetchMock.mockResolvedValueOnce({status:206,ok:false,headers:new Headers({'Content-Range':'bytes 0-1/4'}),blob:async()=>new Blob([Uint8Array.of(0,1)])});
   await expect(readIOSCaptureFile(video)).rejects.toThrow('incomplete');
