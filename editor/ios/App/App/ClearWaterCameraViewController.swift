@@ -5,6 +5,28 @@ import ImageIO
 import MetalKit
 import UIKit
 
+/// Optical magnification relative to the standard wide camera. A virtual
+/// camera's switch points describe its constituents more accurately than
+/// comparing whichever video formats happen to be active at discovery time.
+enum ClearWaterLensGeometry {
+    static func virtualRatios(_ switchFactors: [Double], wideIndex: Int, deviceCount: Int) -> [Double]? {
+        guard deviceCount > 1, switchFactors.count == deviceCount - 1,
+              (0..<deviceCount).contains(wideIndex),
+              switchFactors.allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+        let factors = [1.0] + switchFactors
+        let wide = factors[wideIndex]
+        return factors.map { $0 / wide }
+    }
+
+    static func fieldOfViewRatio(wide: Double, lens: Double) -> Double? {
+        guard wide.isFinite, lens.isFinite, wide > 0, lens > 0,
+              wide < 180, lens < 180 else { return nil }
+        let radians = Double.pi / 360
+        let ratio = tan(wide * radians) / tan(lens * radians)
+        return ratio.isFinite && ratio > 0 ? ratio : nil
+    }
+}
+
 enum ClearWaterCameraOrientation {
     static func angleDegrees(for orientation: UIDeviceOrientation) -> CGFloat? {
         switch orientation {
@@ -113,6 +135,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private let videoOutput = AVCaptureVideoDataOutput()
     private let audioOutput = AVCaptureAudioDataOutput()
     private var cameraInput: AVCaptureDeviceInput?
+    // Main-thread list of devices rejected by this session's capture format.
+    private var unavailableLensIDs = Set<String>()
     private var audioInput: AVCaptureDeviceInput?
     private var pressureObservation: NSKeyValueObservation?
     private var observers: [NSObjectProtocol] = []
@@ -377,6 +401,8 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         if device.activeFormat.isVideoHDRSupported { device.isVideoHDREnabled = false }
         if device.activeFormat.supportedColorSpaces.contains(.sRGB) { device.activeColorSpace = .sRGB }
         else { throw CameraError.unavailable }
+        device.videoZoomFactor = max(device.minAvailableVideoZoomFactor,
+            min(1, device.maxAvailableVideoZoomFactor))
     }
     private func supportedPhotoPixelCount(for format: AVCaptureDevice.Format) -> Int {
         let limit = 12_500_000
@@ -451,7 +477,10 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     }
     private func selectCamera() throws -> AVCaptureDevice {
         let discovery = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera], mediaType: .video, position: cameraPosition)
-        guard let camera = discovery.devices.first else { throw CameraError.unavailable }
+        let fallback = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInUltraWideCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera],
+            mediaType: .video, position: cameraPosition).devices.first
+        guard let camera = discovery.devices.first ?? fallback
+            else { throw CameraError.unavailable }
         return camera
     }
     private func addAudioIfGranted() throws {
@@ -690,18 +719,59 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 "minZoom": device?.minAvailableVideoZoomFactor ?? 1, "maxZoom": device?.maxAvailableVideoZoomFactor ?? 1,
                 "lensId": device?.uniqueID ?? "", "lenses": availableLenses()]
     }
+    private func selectableLensDevices() -> [AVCaptureDevice] {
+        let physicalTypes: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera]
+        let back = AVCaptureDevice.DiscoverySession(deviceTypes: physicalTypes, mediaType: .video, position: .back).devices
+            .filter { [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera].contains($0.deviceType) }
+        let front = AVCaptureDevice.DiscoverySession(deviceTypes: physicalTypes, mediaType: .video, position: .front).devices
+        // TrueDepth and wide often expose the same front image. Keep the wide
+        // input when both are available, but retain TrueDepth as a fallback.
+        let frontWide = front.filter { $0.deviceType == .builtInWideAngleCamera }
+        let chosenFront = frontWide.isEmpty ? front.filter { $0.deviceType == .builtInTrueDepthCamera } : frontWide
+        return (back + chosenFront).filter { !unavailableLensIDs.contains($0.uniqueID) }
+    }
+
     private func availableLenses() -> [[String: Any]] {
-        let types: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera]
-        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .back).devices +
-            AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .front).devices
+        let devices = selectableLensDevices()
+        let virtualTypes: [AVCaptureDevice.DeviceType] = [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera]
+        let virtualDevices = AVCaptureDevice.DiscoverySession(deviceTypes: virtualTypes, mediaType: .video, position: .back).devices
+            .sorted { $0.constituentDevices.count > $1.constituentDevices.count }
+        var opticalRatios: [String: Double] = [:]
+        for virtual in virtualDevices {
+            let constituents = virtual.constituentDevices
+            guard let wideIndex = constituents.firstIndex(where: { $0.deviceType == .builtInWideAngleCamera }),
+                  let ratios = ClearWaterLensGeometry.virtualRatios(
+                    virtual.virtualDeviceSwitchOverVideoZoomFactors.map(\.doubleValue),
+                    wideIndex: wideIndex, deviceCount: constituents.count) else { continue }
+            for (device, ratio) in zip(constituents, ratios) where opticalRatios[device.uniqueID] == nil {
+                opticalRatios[device.uniqueID] = ratio
+            }
+        }
+        let wideField = devices.first(where: { $0.position == .back && $0.deviceType == .builtInWideAngleCamera })?
+            .activeFormat.videoFieldOfView
         return devices.map { device in
-            let facingDevices = devices.filter { $0.position == device.position }
-            let wide = facingDevices.first(where: { $0.deviceType == .builtInWideAngleCamera })?.activeFormat.videoFieldOfView ?? 0
-            let field = device.activeFormat.videoFieldOfView
-            let radians = Double.pi / 360
-            let intrinsic = wide > 0 && field > 0 ? tan(Double(wide) * radians) / tan(Double(field) * radians) : 1.0
-            let label = String(format: "%.1fx", intrinsic)
-            return ["id": device.uniqueID, "label": label, "facing": device.position == .front ? "user" : "environment", "intrinsicZoom": intrinsic]
+            let label: String
+            switch device.deviceType {
+            case .builtInUltraWideCamera: label = "Ultra-wide"
+            case .builtInTelephotoCamera: label = "Telephoto"
+            case .builtInWideAngleCamera: label = device.position == .front ? "Front camera" : "Wide"
+            default: label = "Front camera"
+            }
+            let ratio: Double?
+            if device.position == .front || device.deviceType == .builtInWideAngleCamera {
+                ratio = 1
+            } else if let native = opticalRatios[device.uniqueID] {
+                ratio = native
+            } else if let wideField, let measured = ClearWaterLensGeometry.fieldOfViewRatio(
+                wide: Double(wideField), lens: Double(device.activeFormat.videoFieldOfView)) {
+                ratio = measured
+            } else {
+                ratio = nil
+            }
+            var item: [String: Any] = ["id": device.uniqueID, "label": label,
+                "facing": device.position == .front ? "user" : "environment"]
+            if let ratio { item["intrinsicZoom"] = ratio }
+            return item
         }
     }
     func embeddedSetZoom(_ ratio: CGFloat, completion: @escaping (Result<CGFloat, Error>) -> Void) {
@@ -716,9 +786,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         }
     }
     func embeddedSetLens(_ id: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        let types: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera, .builtInTrueDepthCamera, .builtInDualCamera, .builtInDualWideCamera, .builtInTripleCamera]
-        let devices = AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .back).devices +
-            AVCaptureDevice.DiscoverySession(deviceTypes: types, mediaType: .video, position: .front).devices
+        let devices = selectableLensDevices()
         guard state == "ready", !closeRequested, !backgrounded, !sessionInterrupted, session.isRunning,
               let device = devices.first(where: { $0.uniqueID == id }) else { completion(.failure(CameraError.unavailable)); return }
         if cameraInput?.device.uniqueID == id { completion(.success(nativeInfo())); return }
@@ -748,6 +816,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             let previousCandidateAutomaticHDR = device.automaticallyAdjustsVideoHDREnabled
             let previousCandidateHDR = device.isVideoHDREnabled
             let previousCandidateColorSpace = device.activeColorSpace
+            let previousCandidateZoom = device.videoZoomFactor
             var newInput: AVCaptureDeviceInput?
             var configurationOpen = false
             var sessionStopped = false
@@ -811,6 +880,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                         device.automaticallyAdjustsVideoHDREnabled = false
                         if device.activeFormat.supportedColorSpaces.contains(previousCandidateColorSpace) { device.activeColorSpace = previousCandidateColorSpace }
                         if device.activeFormat.isVideoHDRSupported { device.isVideoHDREnabled = previousCandidateHDR }
+                        device.videoZoomFactor = previousCandidateZoom
                         device.automaticallyAdjustsVideoHDREnabled = previousCandidateAutomaticHDR
                         device.unlockForConfiguration()
                     } catch {}
@@ -825,6 +895,9 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                     }
                     if running && self.session.isRunning && !self.sessionInterrupted && self.state == "starting" {
                         self.setState("ready")
+                        self.unavailableLensIDs.insert(id)
+                        completion(.success(self.nativeInfo()))
+                        return
                     } else if (!restored || !self.sessionInterrupted) && self.state == "starting" {
                         self.fail(self.text("The camera could not restart.", "The camera could not restart."))
                         self.closeAfterRuntimeFailure()

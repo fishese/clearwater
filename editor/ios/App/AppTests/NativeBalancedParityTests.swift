@@ -7,6 +7,22 @@ import XCTest
 @testable import App
 
 final class NativeBalancedParityTests: XCTestCase {
+    func testVirtualCameraSwitchPointsDescribePhysicalLensRatios() throws {
+        let ratios = try XCTUnwrap(ClearWaterLensGeometry.virtualRatios([2, 6], wideIndex: 1, deviceCount: 3))
+        XCTAssertEqual(ratios[0], 0.5, accuracy: 0.0001)
+        XCTAssertEqual(ratios[1], 1, accuracy: 0.0001)
+        XCTAssertEqual(ratios[2], 3, accuracy: 0.0001)
+        XCTAssertNil(ClearWaterLensGeometry.virtualRatios([2, 6], wideIndex: 1, deviceCount: 2))
+    }
+
+    func testLensFieldOfViewRatioIsOptical() throws {
+        let wide = 70.0, tele = 25.0
+        let expected = tan(wide * .pi / 360) / tan(tele * .pi / 360)
+        XCTAssertEqual(try XCTUnwrap(ClearWaterLensGeometry.fieldOfViewRatio(wide: wide, lens: tele)),
+                       expected, accuracy: 0.0001)
+        XCTAssertNil(ClearWaterLensGeometry.fieldOfViewRatio(wide: wide, lens: 0))
+    }
+
     private struct FixtureFile: Decodable { let cases: [Fixture] }
     private struct Fixture: Decodable {
         let name: String; let width: Int; let height: Int

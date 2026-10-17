@@ -2,7 +2,28 @@
 
 Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
-## Recommendation
+## Active follow-up plan — 18 October 2026
+
+Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.5 remains the published native release. This section is the resumable progress tracker; the older plan below is historical.
+
+Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
+
+| Item | Plan and acceptance criteria | Status |
+| --- | --- | --- |
+| Urgent iPhone Safari | Integrate `3d3d403`, fix repeated persistence warnings after removal, and audit related save/preset paths. Preserve native-platform storage behavior and user files. | `3d3d403` merged in `a0f6d51`; storage sidecar committed `0ab462d`, Safari save/preset flow `64df1fb`; Edge IndexedDB migration/delete/edit/reload and share regressions pass. Physical Safari confirmation pending |
+| Android folder import | Trace enumeration and lazy loading; show all supported entries with selection/next/previous, without eagerly decoding every original. Test multiple files, existing imports and read failures. Verify on Android where possible. | Committed `e2c3ad7`; lazy listing, return-to-collection, reuse/edit retention and missing-file recovery browser checks pass. Physical SAF picker verification pending |
+| iOS camera launch | Reuse `clearwater://camera` cold/warm routing; add long-press home-screen Camera action and discoverable Shortcuts launch support. Confirm ordinary editor launch, single delivery and busy-state handling. Assess a widget separately; prefer a Shortcuts widget using the launch action if a native extension adds disproportionate signing/build complexity. | Committed `c94bd74` / `d6e86cc`; home quick actions and App Shortcuts (also usable from Shortcuts widget). iOS CI passed; physical iPhone launch checks pending |
+| Per-device lenses | Discover selectable cameras from Android CameraX/Camera2 and iOS AVFoundation, keeping front/back and physical lenses distinct from digital zoom stops. Preserve ultra-wide support, honest magnification labels, rollback and orientation. Avoid a device database unless native detection cannot supply the needed information. | Committed `7b0d8e4`; Android optics tests/compile and iOS CI passed. Device lens selection checks pending; phone off ADB on resume |
+| Cross-platform media reliability | Review import, load, export, save/share readiness across Android web, Safari web and both native apps; fix confirmed issues with regressions. | Committed `9f03c4e` bounded/stale video loads, `64df1fb` consistent export gating and decode-only preview, `e6659d1` complete iOS HTTP 200 video responses. 177 shared tests pass |
+| Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | iOS run 39041096683 passed: 30 native tests and unsigned device package. Android debug rebuild passed at `04bb6e8`; ADB has no connected device. Main hotfix PR #5 merged as `370ddf5`; Pages run 39079668206 passed and live site responds HTTP 200. Unsigned iOS package run 39079696983 passed; 30 native tests passed earlier on unchanged native sources |
+
+Urgent web reliability fixes are deployed. Remaining acceptance work is physical Android folder/lens checks, physical iPhone launch/lens/Safari checks, with both debug Android and unsigned iOS packages now built. Debug APK: `editor/android/app/build/outputs/apk/debug/app-debug.apk`. No stable native release was published.
+
+Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable release publication is not part of this follow-up yet.
+
+Recovery checkpoint: prior uncommitted native work was saved in `stash@{0}` while the urgent Safari change was authored on main. It has been restored onto this branch after merging main; the backup stash is intentionally retained. Do not apply it a second time. User `.gitignore` and IDE changes remain unrelated. Lower-model agents completed the reliability fixes after quota reset. The native iOS launch tests passed. Windows Playwright WebKit cannot seed a File into IndexedDB and the synthetic full-photo fixture does not become ready; WebKit share-wrapper checks pass, but do not claim physical Safari reproduction. The collection remains available and existing originals are preserved.
+
+## Recommendation (historical)
 
 Build a local-first photo editor with a shared TypeScript web interface and processing recipe, packaged for Android using Capacitor. Use native Kotlin adapters for Android import, incoming shares, durable file storage, export, HEIC decoding, and eventually video. The web version can retain the main editing functions as a PWA. Do not make cloud inference or accounts a prerequisite.
 
@@ -134,3 +155,5 @@ Validation: supported orientations and dimensions; no original modification; red
 
 The user supplied the TechRxiv PDF locally after the initial review. All seven pages have now been read, including visual comparisons and tables. ADCCA-GAN is added as an optional evaluation candidate, pending reproducible code/weights and licensing. The photo MVP, filter/surface handling, manual controls and separate-model evaluation remain the recommended first steps. Detailed findings and reported metrics are in analysis/ADCCA_GAN_REVIEW.md. No neural inference has been run.
 
+
+Resume checkpoint (18 October): main Safari hotfix is incorporated; native feature commits are pushed to `codex/native-camera-followups`. Safari fixes are still uncommitted. WebKit 2370 is installed, but the Windows runner rejects the first File/Blob IndexedDB write before application code; record that limitation separately from Chromium persistence tests. No native follow-up is published. Phone is currently not connected; continue non-device work.
