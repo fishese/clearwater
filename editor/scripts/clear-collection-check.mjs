@@ -28,7 +28,7 @@ try{
 
   await page.evaluate(()=>{
     const prototype=IDBDatabase.prototype,transaction=prototype.transaction;let fail=true;
-    prototype.transaction=function(stores,mode,...rest){if(fail&&stores==='photos'&&mode==='readwrite'){fail=false;throw new DOMException('Storage unavailable','InvalidStateError');}return transaction.call(this,stores,mode,...rest);};
+    prototype.transaction=function(stores,mode,...rest){if(fail&&(stores==='photos'||Array.isArray(stores)&&stores.includes('photos'))&&mode==='readwrite'){fail=false;throw new DOMException('Storage unavailable','InvalidStateError');}return transaction.call(this,stores,mode,...rest);};
   });
   await page.getByRole('button',{name:'Clear collection',exact:true}).click();
   await page.getByRole('dialog',{name:'Clear collection?'}).getByRole('button',{name:'Clear collection',exact:true}).click();
@@ -41,7 +41,7 @@ try{
     const open=(name,version,upgrade)=>new Promise((resolve,reject)=>{const request=indexedDB.open(name,version);request.onupgradeneeded=()=>upgrade(request.result);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
     const custom=await open('clearwater-custom-model',1,db=>db.createObjectStore('model'));
     await new Promise((resolve,reject)=>{const tx=custom.transaction('model','readwrite');tx.objectStore('model').put({sentinel:'keep model storage'},'clear-check');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});custom.close();
-    const db=await open('clearwater-library',2,db=>db.createObjectStore('photos',{keyPath:'id'}));
+    const db=await open('clearwater-library',3,db=>db.createObjectStore('photos',{keyPath:'id'}));
     await new Promise((resolve,reject)=>{const tx=db.transaction('photos','readwrite');tx.objectStore('photos').put({id:'clear-check-pending-share',file:new File(['shared bytes'],'shared-after-clear.jpg',{type:'image/jpeg'}),addedAt:Date.now(),pendingShare:true});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
   });
   await page.getByRole('button',{name:'Clear collection',exact:true}).click();

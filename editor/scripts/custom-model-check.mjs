@@ -38,10 +38,10 @@ try {
  },undefined,{timeout:120000});
  await page.waitForFunction(async()=>{
   const db=await new Promise(resolve=>{const request=indexedDB.open('clearwater-library');request.onsuccess=()=>resolve(request.result);});
-  const rows=await new Promise(resolve=>{const request=db.transaction('photos').objectStore('photos').getAll();request.onsuccess=()=>resolve(request.result);});db.close();return rows.some(row=>row.file.name==='first.png'&&row.recipe?.engine==='wave');
+  const rows=await new Promise(resolve=>{const tx=db.transaction(['photos','photo-metadata']),photos=tx.objectStore('photos').getAll(),updates=tx.objectStore('photo-metadata').getAll();tx.oncomplete=()=>resolve(photos.result.map(row=>({...row,...updates.result.find(meta=>meta.id===row.id)})));});db.close();return rows.some(row=>row.file.name==='first.png'&&row.recipe?.engine==='wave');
  },undefined,{timeout:120000});
  await page.waitForTimeout(600); // let the debounced recipe write settle before reload
- assert.equal(await page.evaluate(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('clearwater-library');request.onsuccess=()=>resolve(request.result);});const rows=await new Promise(resolve=>{const request=db.transaction('photos').objectStore('photos').getAll();request.onsuccess=()=>resolve(request.result);});db.close();return rows.find(row=>row.file.name==='first.png')?.recipe?.engine;}),'wave','the active Wave recipe has finished persisting before reload');
+ assert.equal(await page.evaluate(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open('clearwater-library');request.onsuccess=()=>resolve(request.result);});const rows=await new Promise(resolve=>{const tx=db.transaction(['photos','photo-metadata']),photos=tx.objectStore('photos').getAll(),updates=tx.objectStore('photo-metadata').getAll();tx.oncomplete=()=>resolve(photos.result.map(row=>({...row,...updates.result.find(meta=>meta.id===row.id)})));});db.close();return rows.find(row=>row.file.name==='first.png')?.recipe?.engine;}),'wave','the active Wave recipe has finished persisting before reload');
  await page.reload();
  await ready();
  await openEngine();
@@ -62,7 +62,7 @@ try {
  await engine.selectOption('balanced');
  await page.waitForFunction(async()=>{
   const db=await new Promise(resolve=>{const request=indexedDB.open('clearwater-library');request.onsuccess=()=>resolve(request.result);});
-  const rows=await new Promise(resolve=>{const request=db.transaction('photos').objectStore('photos').getAll();request.onsuccess=()=>resolve(request.result);});db.close();return rows.some(row=>row.file.name==='first.png'&&row.recipe?.engine==='balanced');
+  const rows=await new Promise(resolve=>{const tx=db.transaction(['photos','photo-metadata']),photos=tx.objectStore('photos').getAll(),updates=tx.objectStore('photo-metadata').getAll();tx.oncomplete=()=>resolve(photos.result.map(row=>({...row,...updates.result.find(meta=>meta.id===row.id)})));});db.close();return rows.some(row=>row.file.name==='first.png'&&row.recipe?.engine==='balanced');
  },undefined,{timeout:120000});
  await page.waitForTimeout(600); // let the debounced Balanced recipe write settle
  await page.reload();await ready();
