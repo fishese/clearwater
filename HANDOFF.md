@@ -1,5 +1,11 @@
 # Handoff
 
+## Coordinated 1.0.5 release authorized (17 October 2026)
+
+The user accepts the current zoom fix for the initial build and explicitly authorizes publishing the updated signed Android release APK, web editor and unsigned iOS IPA. Prepare 1.0.5 (Android code 24, iOS build 3), merge PR #3 preserving history, and build both packages from the resulting main commit. Keep stable latest download asset names. Existing Android signing configuration remains ignored. The native iOS source is unchanged since successful run 39002124652 (22 tests); version/shared-UI changes need a fresh device build/package check.
+
+Device-specific physical/logical lens discovery is deferred to the next version. The current preset grid deliberately uses the same capability-based zoom stops as tap cycling; magnification stops do not by themselves establish which physical lenses the platform exposes.
+
 ## Android camera zoom chooser follow-up (17 October 2026)
 
 The long-press menu now exposes the same capability-based zoom presets as short-tap cycling, including 5x and 10x when supported; physical camera lens choices remain separate. The popup is bounded to available preview space, supports vertical touch scrolling, and leaves white-balance picker touches unobstructed when closed. The earlier four lens entries were not the complete set of cycling zoom presets.
