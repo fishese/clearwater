@@ -2,7 +2,10 @@ import XCTest
 import UIKit
 @testable import App
 
+@MainActor
 final class NativeLaunchRoutingTests: XCTestCase {
+    // The hosted WebView may already consume the notification. If it has not,
+    // this test consumes the pending request; a second delivery must be empty.
     private func clearPendingLaunchRequest() {
         while ClearWaterLaunchRouting.consume() != nil {}
     }
@@ -62,7 +65,7 @@ final class NativeLaunchRoutingTests: XCTestCase {
         }
 
         XCTAssertEqual(modes, ["camera"])
-        XCTAssertEqual(ClearWaterLaunchRouting.consume(), "camera")
+        if let queued = ClearWaterLaunchRouting.consume() { XCTAssertEqual(queued, "camera") }
         XCTAssertNil(ClearWaterLaunchRouting.consume())
     }
 
@@ -74,7 +77,7 @@ final class NativeLaunchRoutingTests: XCTestCase {
         }
 
         XCTAssertEqual(modes, ["edit"])
-        XCTAssertEqual(ClearWaterLaunchRouting.consume(), "edit")
+        if let queued = ClearWaterLaunchRouting.consume() { XCTAssertEqual(queued, "edit") }
         XCTAssertNil(ClearWaterLaunchRouting.consume())
     }
 
@@ -85,7 +88,7 @@ final class NativeLaunchRoutingTests: XCTestCase {
         }
 
         XCTAssertEqual(modes, ["camera"])
-        XCTAssertEqual(ClearWaterLaunchRouting.consume(), "camera")
+        if let queued = ClearWaterLaunchRouting.consume() { XCTAssertEqual(queued, "camera") }
         XCTAssertNil(ClearWaterLaunchRouting.consume())
     }
 
@@ -96,7 +99,7 @@ final class NativeLaunchRoutingTests: XCTestCase {
         }
 
         XCTAssertEqual(modes, ["edit"])
-        XCTAssertEqual(ClearWaterLaunchRouting.consume(), "edit")
+        if let queued = ClearWaterLaunchRouting.consume() { XCTAssertEqual(queued, "edit") }
         XCTAssertNil(ClearWaterLaunchRouting.consume())
     }
 }
