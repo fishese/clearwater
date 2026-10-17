@@ -24,10 +24,13 @@ describe('photo source persistence',()=>{
   const original=new File(['original-camera-roll-bytes'],'imported.jpg',{type:'image/jpeg'});
   const photo:StoredPhoto={id:'imported-photo',file:original,addedAt:1};
   await savePhoto(photo);
+  const firstRow=stores.get('photos')?.get(photo.id);
   await savePhoto({...photo,file:new File(['different-bytes'],'imported.jpg',{type:'image/jpeg'}),recipe:{version:1} as any});
   await savePhoto({...photo,file:new File([],'imported.jpg',{type:'image/jpeg'}),recipe:{version:2} as any});
   const saved=stores.get('photos')?.get(photo.id) as StoredPhoto;
+  const metadata=stores.get('photo-metadata')?.get(photo.id) as StoredPhoto;
+  expect(saved).toBe(firstRow);
   expect(await saved.file.text()).toBe('original-camera-roll-bytes');
-  expect(saved.recipe?.version).toBe(2);
+  expect(metadata.recipe?.version).toBe(2);
  });
 });

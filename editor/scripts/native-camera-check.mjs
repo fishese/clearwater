@@ -253,7 +253,7 @@ try {
   await page.locator('.camera-photo').click();
   await page.getByRole('status').filter({ hasText: 'Saved on phone.' }).waitFor({ timeout: 30000 });
   const capture = await page.evaluate(async () => {
-    const opened = indexedDB.open('clearwater-library', 2);
+    const opened = indexedDB.open('clearwater-library');
     const db = await new Promise((resolve, reject) => { opened.onsuccess = () => resolve(opened.result); opened.onerror = () => reject(opened.error); });
     const tx = db.transaction(['photos', 'camera-originals']);
     const photosRequest = tx.objectStore('photos').getAll();
@@ -317,7 +317,7 @@ try {
   assert.equal(await page.evaluate(() => Object.values(window.gallery).filter(item=>item.type==='video/mp4').length),1,'failed native copy removes its new gallery destination');
   await page.waitForFunction(() => window.nativeMockCalls.some(call=>call.plugin==='ClearWaterCamera'&&call.method==='releaseCapture'&&call.options.uri==='mock-native://video-failure'));
   const archivedAfterFailure = await page.evaluate(async () => {
-    const opened=indexedDB.open('clearwater-library',2);
+    const opened=indexedDB.open('clearwater-library');
     const db=await new Promise((resolve,reject)=>{opened.onsuccess=()=>resolve(opened.result);opened.onerror=()=>reject(opened.error);});
     const tx=db.transaction('camera-originals');const request=tx.objectStore('camera-originals').getAll();
     const originals=await new Promise(resolve=>{request.onsuccess=()=>resolve(request.result);});db.close();

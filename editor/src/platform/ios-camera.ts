@@ -119,12 +119,12 @@ export async function readIOSCaptureFile(descriptor:IOSCaptureDescriptor,variant
  const isVideo=current.kind==='video';
  const response=await fetch(Capacitor.convertFileSrc(uri),{signal,...(isVideo?{headers:{Range:'bytes=0-'}}:{})});
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
- if(isVideo?response.status!==206:!response.ok)throw new Error('Could not read this private camera source.');
- if(isVideo){const contentRange=response.headers.get('Content-Range');if(!contentRange||!/^bytes 0-\d+\/(\d+|\*)$/.test(contentRange))throw new Error('Could not read this private camera source.');}
+ if(isVideo?!(response.status===206||(response.status===200&&response.ok)):!response.ok)throw new Error('Could not read this private camera source.');
+ if(isVideo&&response.status===206){const contentRange=response.headers.get('Content-Range');if(!contentRange||!/^bytes 0-\d+\/(\d+|\*)$/.test(contentRange))throw new Error('Could not read this private camera source.');}
  const blob=await response.blob();
  if(signal?.aborted)throw new DOMException('The operation was aborted.','AbortError');
  if(blob.size<=0||blob.size>512*1024*1024)throw new Error('This camera source is empty or exceeds the 512 MB safety ceiling.');
- if(blob.size!==current.bytes||(isVideo&&response.headers.get('Content-Range')?.match(/\/(\d+)$/)?.[1]!==String(current.bytes)))throw new Error('This private camera source is incomplete.');
+ if(blob.size!==current.bytes||(isVideo&&response.status===206&&response.headers.get('Content-Range')?.match(/\/(\d+)$/)?.[1]!==String(current.bytes)))throw new Error('This private camera source is incomplete.');
  return new File([blob],current.name,{type:current.type,lastModified:current.addedAt});
 }
 
