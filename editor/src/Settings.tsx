@@ -9,7 +9,7 @@ import {cameraQualityProfile} from './core/camera-quality';
 import {cameraRecordingBudget,getCameraSettings,setCameraMinutes,setCameraQuality,subscribeCameraSettings,type CameraQuality,type CameraRecordingMinutes} from './core/camera-settings';
 import {getIOSCameraPreferences,setIOSMicrophoneEnabled,setIOSSaveEnhancedPhotos,subscribeIOSCameraPreferences} from './platform/ios-camera';
 
-const modelSizes:Record<BundledModelId,string>={wwe:'0.9 MB',fivea:'0.9 MB',shallow:'230 KB'};
+const modelSizes:Record<BundledModelId,string>={wwe:'0.9 MB',fivea:'81 KB',shallow:'230 KB'};
 const models:[OfflineModel,string,string][]=BUNDLED_MODEL_IDS.map(id=>[id,BUNDLED_MODELS[id].label,modelSizes[id]]);
 export default function Settings({onClose,parentAbout,onRestoreCamera,onRestoreIOSCaptures,onDeleteIOSCaptures,restoringCamera=false}:{onClose:()=>void;parentAbout:boolean;onRestoreCamera?:()=>void;onRestoreIOSCaptures?:()=>void;onDeleteIOSCaptures?:()=>void;restoringCamera?:boolean}){
  useLanguage();
