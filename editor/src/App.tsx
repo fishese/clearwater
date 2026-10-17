@@ -1,5 +1,5 @@
 import {t,message,useLanguage} from './i18n';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Trash2, Settings as SettingsIcon, Camera as CameraIcon, Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut, Maximize2, Minimize2, RefreshCw, Play, Pause } from 'lucide-react';
 import { isAIEngine } from './core/bundled-models';
 import { clamp, makePhotoRecipe, makeVideoRecipe, parseRecipe, suggest } from './core/engine';
@@ -117,6 +117,7 @@ export default function App() {
   photoRef.current=photos;activeRef.current=active;librarySwitchLock.current=exporting||saving||!!pendingCaptureRemoval||customOpen||customLoading||hdrConverting;
   const exportingRef=useRef(exporting);exportingRef.current=exporting;
   const photo=photos.find(p=>p.id===active),recipe=photo?.recipe;
+  const photosById=useMemo(()=>new Map(photos.map(p=>[p.id,p])),[photos]);
   const video=!!photo&&isVideo(photo.file),exportFormat=video?'mp4':format;
   const pauseVideoPreview=useCallback(()=>{
     previewPlayback.current.playing=false;
@@ -237,9 +238,12 @@ export default function App() {
     try {
       let id=folder.loaded.get(index);
       if(!id||!photoRef.current.some(p=>p.id===id)){
+        id=photoRef.current.find(p=>p.sourceUri===folder.photos[index].uri)?.id;
+      }
+      if(!id){
         const file=await readAndroidFolderPhoto(folder.photos[index]);if(token!==folderRequest.current)return;
         id=addFiles([file],true,undefined,folder.photos[index].uri)[0];if(!id)throw new Error(t("This file could not be opened."));folder.loaded.set(index,id);
-      }else {setReady(false);setActive(id);}
+      }else {folder.loaded.set(index,id);if(id!==activeRef.current){setReady(false);setActive(id);}}
       setFolderBrowser({...folder,index});
     }catch(error){if(token===folderRequest.current){setFolderBrowser({...folder,index});setReady(false);setActive(null);notify(error instanceof Error?error.message:t("Could not open this file. Use Next or Previous to continue."));}}
     finally{if(token===folderRequest.current)setFolderLoading(false);}
@@ -892,9 +896,9 @@ export default function App() {
     <input ref={importInput} className="visually-hidden" type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,video/mp4,video/quicktime,.heic,.heif,.dng,.mp4,.mov" aria-label={t("Choose photos")} onChange={e=>{addFiles(Array.from(e.target.files??[]));e.target.value='';}}/>
     <input ref={recipeInput} className="visually-hidden" type="file" accept="application/json,.json" aria-label={t("Choose recipe")} onChange={readRecipe}/>
     <main className="studio">
-      <aside className="library"><div className="section-title collection-heading"><span>{t("YOUR PHOTOS")}</span><span className="count">{photos.length.toString().padStart(2,'0')}</span><button className={`clear-collection-button ${photos.length>=100?'large-collection':''}`} type="button" disabled={clearBlocked||photos.length===0} title={photos.length>=100?t("Large collection"):undefined} aria-describedby={photos.length>=100?'large-collection-hint':undefined} onClick={openClearCollection}>{t("Clear collection")}</button>{photos.length>=100&&<span id="large-collection-hint" className="visually-hidden">{t("Large collection")}</span>}</div>
+      <aside className="library"><div className={`section-title collection-heading ${folderBrowser?'folder-collection-heading':''}`}>{folderBrowser?<><button className="folder-collection-back" type="button" disabled={folderLoading||exporting||!!busy} title={t("YOUR PHOTOS")} onClick={()=>setFolderBrowser(null)}><ChevronLeft size={14}/>{t("YOUR PHOTOS")}</button><span className="count">{folderBrowser.photos.length.toString().padStart(2,'0')}</span><span className="folder-collection-name" title={folderBrowser.name}>{folderBrowser.name}</span></>:<><span>{t("YOUR PHOTOS")}</span><span className="count">{photos.length.toString().padStart(2,'0')}</span><button className={`clear-collection-button ${photos.length>=100?'large-collection':''}`} type="button" disabled={clearBlocked||photos.length===0} title={photos.length>=100?t("Large collection"):undefined} aria-describedby={photos.length>=100?'large-collection-hint':undefined} onClick={openClearCollection}>{t("Clear collection")}</button>{photos.length>=100&&<span id="large-collection-hint" className="visually-hidden">{t("Large collection")}</span>}</>}</div>
         <button className="import-tile" disabled={exporting||folderLoading} onClick={()=>importInput.current?.click()}><ImagePlus size={22}/><span>{t("Add to your collection")}</span><small>{t("Photos · DNG · MP4 · MOV")}</small></button>
-        <div className="photo-grid">{photos.map(p=><GalleryTile key={p.id} photo={p} selected={p.id===active} selectionDisabled={exporting||folderLoading||busy!==''||customOpen||customLoading} removalDisabled={exporting||customOpen||customLoading} actions={galleryActions}/>)}</div>
+        <div className="photo-grid">{folderBrowser?folderBrowser.photos.map((entry,index)=>{const loaded=photosById.get(folderBrowser.loaded.get(index)??'');return <div className={`photo-tile folder-photo-tile ${index===folderBrowser.index?'selected':''}`} key={entry.uri}><button className="photo-select" title={entry.name} aria-label={entry.name} disabled={exporting||folderLoading||busy!==''||customOpen||customLoading} onClick={()=>void browseFolderPhoto(folderBrowser,index)}>{loaded?.thumbnail?<img src={loaded.thumbnail} alt="" loading="lazy" decoding="async"/>:<ImagePlus className="gallery-placeholder" size={22} aria-hidden="true"/>}{index===folderBrowser.index&&<span className="selected-check"><Check size={12}/></span>}<span>{entry.name.replace(/\.[^.]+$/,'')}</span></button></div>;}):photos.map(p=><GalleryTile key={p.id} photo={p} selected={p.id===active} selectionDisabled={exporting||folderLoading||busy!==''||customOpen||customLoading} removalDisabled={exporting||customOpen||customLoading} actions={galleryActions}/>)}</div>
         {samples.length>0&&<><div className="section-title sample-heading"><span>{t("YOUR DIVE SAMPLES")}</span><span className="count">09</span></div><div className="sample-list">{samples.map((s,i)=><button key={s.name} disabled={exporting||sampleBusy||busy!==''} onClick={()=>sample(s.name)}><img src={'/__thumb/'+encodeURIComponent(s.name)} alt=""/><span><strong>{s.label}</strong><small>{t("Dive study")} {String(i+1).padStart(2,'0')}</small></span><Plus size={13}/></button>)}</div></>}
       </aside>
       <section className="workspace">
