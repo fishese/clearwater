@@ -3,6 +3,7 @@ import {Capacitor,registerPlugin} from '@capacitor/core';
 const MAX_SHARE_BYTES=512*1024*1024;
 const CHUNK_BYTES=256*1024;
 const allowedMime=new Set(['image/jpeg','image/png','video/mp4']);
+const recipeMime='application/json';
 
 interface SharePlugin {
   beginShare(options:{name:string;type:string;size:number}):Promise<{id:string}>;
@@ -12,13 +13,14 @@ interface SharePlugin {
 }
 const nativeShare=registerPlugin<SharePlugin>('ClearWaterShare');
 
-function validate(file:Blob,name:string){
+function validate(file:Blob,name:string,allowWebRecipe=false){
   if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>MAX_SHARE_BYTES)throw new Error('This file is too large to share.');
   if(name.length<1||name.length>220||name==='.'||name==='..'||/[\\/\u0000-\u001f\u007f]/.test(name)||name.trim()!==name)throw new Error('This file name cannot be shared.');
   const type=(file.type||mimeFromName(name)).toLowerCase().split(';',1)[0].trim();
-  if(!allowedMime.has(type))throw new Error('This file type cannot be shared.');
+  const recipe=allowWebRecipe&&type===recipeMime&&name==='clearwater-recipe.json';
+  if(!allowedMime.has(type)&&!recipe)throw new Error('This file type cannot be shared.');
   const lower=name.toLowerCase();
-  const extensionMatches=type==='image/jpeg'?(lower.endsWith('.jpg')||lower.endsWith('.jpeg')):type==='image/png'?lower.endsWith('.png'):lower.endsWith('.mp4');
+  const extensionMatches=recipe?lower.endsWith('.json'):type==='image/jpeg'?(lower.endsWith('.jpg')||lower.endsWith('.jpeg')):type==='image/png'?lower.endsWith('.png'):lower.endsWith('.mp4');
   if(!extensionMatches)throw new Error('The file name and type do not match.');
   return type;
 }
@@ -42,14 +44,16 @@ export function isIOSWebBrowser(platform:string,userAgent:string,navigatorPlatfo
 }
 
 export function supportsFileShare():boolean{
-  if(Capacitor.getPlatform()==='android')return Capacitor.isPluginAvailable('ClearWaterShare');
+  const platform=Capacitor.getPlatform();
+  if(platform==='android')return Capacitor.isPluginAvailable('ClearWaterShare');
   const nav=navigator as WebShareNavigator;
-  return typeof nav.share==='function'&&typeof nav.canShare==='function';
+  const iosWeb=isIOSWebBrowser(platform,navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
+  return typeof nav.share==='function'&&(typeof nav.canShare==='function'||iosWeb);
 }
 
 /** Hand a rendered file to the browser share sheet. iOS Safari often reports canShare(files) as false for a file that share() still accepts. */
 export async function shareWebFile(blob:Blob,name:string,nav:WebShareNavigator,iosWeb:boolean):Promise<void>{
-  const type=validate(blob,name);
+  const type=validate(blob,name,true);
   if(typeof nav.share!=='function')throw new Error('File sharing is not available in this browser.');
   const file=new File([blob],name,{type});
   let canShareFiles=false;
@@ -60,8 +64,9 @@ export async function shareWebFile(blob:Blob,name:string,nav:WebShareNavigator,i
 
 /** Stage an immutable export in app-private storage, then hand it to Android's chooser. */
 export async function shareExport(blob:Blob,name:string):Promise<void>{
-  const type=validate(blob,name);
-  if(Capacitor.getPlatform()==='android'){
+  const platform=Capacitor.getPlatform();
+  const type=validate(blob,name,platform!=='android');
+  if(platform==='android'){
     const {id}=await nativeShare.beginShare({name,type,size:blob.size});
     try{
       const reader=blob.stream().getReader();let carry=new Uint8Array(0);

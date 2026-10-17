@@ -30,6 +30,8 @@ try {
     const blob = new Blob([bytes], { type: 'image/jpeg' });
     const supported = supportsFileShare();
     await shareExport(blob, 'restored-photo.jpg');
+    let recipeDeniedOnAndroid = false;
+    try { await shareExport(new Blob(['{}'], { type: 'application/json' }), 'clearwater-recipe.json'); } catch { recipeDeniedOnAndroid = true; }
     let badNameRejected = false;
     try { await shareExport(blob, '../private.jpg'); } catch { badNameRejected = true; }
     window.shareMock.failChunk = true;
@@ -43,13 +45,14 @@ try {
     Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { sharedOnWeb.push({ name: data.files[0].name, type: data.files[0].type, size: data.files[0].size }); } });
     const webSupported = supportsFileShare();
     await shareExport(blob, 'restored-photo.jpg');
-    return { supported, webSupported, sharedOnWeb, badNameRejected, failedShareRejected, calls: window.shareMock.calls, chunks: window.shareMock.chunks };
+    return { supported, webSupported, sharedOnWeb, badNameRejected, failedShareRejected, recipeDeniedOnAndroid, calls: window.shareMock.calls, chunks: window.shareMock.chunks };
   });
   assert.equal(result.supported, true);
   assert.equal(result.webSupported, true);
   assert.deepEqual(result.sharedOnWeb, [{ name: 'restored-photo.jpg', type: 'image/jpeg', size: 700_123 }]);
   assert.equal(result.badNameRejected, true, 'path-like names fail before staging');
   assert.equal(result.failedShareRejected, true, 'bridge write errors reject and cancel staging');
+  assert.equal(result.recipeDeniedOnAndroid, true, 'recipe JSON stays outside the native Android share MIME set');
   const nativeCalls = result.calls.filter(call => call.method !== '');
   assert.equal(nativeCalls[0].method, 'beginShare');
   assert.equal(nativeCalls[0].options.size, 700_123);
