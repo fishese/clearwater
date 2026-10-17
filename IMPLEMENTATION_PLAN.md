@@ -4,7 +4,7 @@ Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / 
 
 ## Active follow-up plan — 18 October 2026
 
-Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.5 remains the published native release. This section is the resumable progress tracker; the older plan below is historical.
+Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.6 is now the published native release (source `7085d63`). This section is the resumable progress tracker; the older plan below is historical.
 
 Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
 
@@ -17,9 +17,9 @@ Commit each completed item separately, including its validation and remaining de
 | Cross-platform media reliability | Review import, load, export, save/share readiness across Android web, Safari web and both native apps; fix confirmed issues with regressions. | Committed `9f03c4e` bounded/stale video loads, `64df1fb` consistent export gating and decode-only preview, `e6659d1` complete iOS HTTP 200 video responses. 177 shared tests pass |
 | Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | iOS run 39041096683 passed: 30 native tests and unsigned device package. Android debug rebuild passed at `04bb6e8`; ADB has no connected device. Main hotfix PR #5 merged as `370ddf5`; Pages run 39079668206 passed and live site responds HTTP 200. Unsigned iOS package run 39079696983 passed; 30 native tests passed earlier on unchanged native sources |
 
-Urgent web reliability fixes are deployed. Remaining acceptance work is physical Android folder/lens checks, physical iPhone launch/lens/Safari checks, with both debug Android and unsigned iOS packages now built. Debug APK: `editor/android/app/build/outputs/apk/debug/app-debug.apk`. No stable native release was published.
+Urgent web reliability fixes are deployed. Remaining acceptance work is physical Android folder/lens checks, physical iPhone launch/lens/Safari checks, with both debug Android and unsigned iOS packages now built. Debug APK: `editor/android/app/build/outputs/apk/debug/app-debug.apk`. User subsequently authorized publication: v1.0.6 published with signed APKs and unsigned IPA, all binary hashes verified. Connected S24 Ultra lens investigation is next.
 
-Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable release publication is not part of this follow-up yet.
+Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable publication was subsequently authorized and completed on 18 October.
 
 Recovery checkpoint: prior uncommitted native work was saved in `stash@{0}` while the urgent Safari change was authored on main. It has been restored onto this branch after merging main; the backup stash is intentionally retained. Do not apply it a second time. User `.gitignore` and IDE changes remain unrelated. Lower-model agents completed the reliability fixes after quota reset. The native iOS launch tests passed. Windows Playwright WebKit cannot seed a File into IndexedDB and the synthetic full-photo fixture does not become ready; WebKit share-wrapper checks pass, but do not claim physical Safari reproduction. The collection remains available and existing originals are preserved.
 

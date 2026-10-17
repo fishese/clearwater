@@ -1,6 +1,10 @@
 # Maintenance
 
-## Current published release (17 October 2026)
+## Current published release (18 October 2026)
+
+v1.0.6 is published as latest from `7085d63` (PR #6). Android versionCode 25 retains the existing release certificate; iOS build 4 is unsigned and requires iOS 26+. Release includes canonical and versioned APK/IPA assets, checksums, provenance, LICENSE and NOTICE. Android debug/release builds and bundled asset/model checks passed. iOS packaging run 39080478751 passed, and all five uploaded binary digests match local SHA-256. Pages deployment passed. The native lens options on Galaxy S24 Ultra are being investigated after publication at the user's request; do not treat optical labels or physical lens selection as device-verified yet.
+
+## Earlier published release checkpoint (17 October 2026)
 
 The working iOS implementation is merged into main (PR #2 / 966660b), and the user confirmed iPhone acceptance before authorizing coordinated v1.0.4 publication. Older feature-branch/pending-approval passages are historical checkpoints. Android v1.0.4 uses versionCode 23; iOS v1.0.4 uses CFBundleVersion 2 and requires iOS 26.0+. Both native platforms keep their existing identity and offline models. Preserve the signed Android certificate; iOS is distributed unsigned for local sideload signing. The web-only download section states the iOS requirement. v1.0.4 is published as latest from 1c429d0, with versioned/canonical APK and unsigned IPA assets, SHA-256 sidecars and release-provenance.json. Both canonical links returned anonymous HTTP 200, and the public IOS_IPA_URL variable is enabled. Every future latest release must carry both canonical binaries or update the platform URLs deliberately.
 
