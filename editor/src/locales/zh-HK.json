@@ -373,6 +373,7 @@
   "Analysis cancelled.": "已取消分析。",
   "Could not decode an AI sample frame.": "未能解碼 AI 取樣幀。",
   "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.": "影片解碼器沒有回應，裝置可能不支援此編碼。請使用 H.264 SDR 副本。",
+  "The video file stopped responding while reading its tracks. Reopen it or try a shorter H.264 SDR copy.": "讀取影片軌道時沒有回應。請重新開啟檔案，或使用較短的 H.264 SDR 副本。",
   "Could not decode this video frame.": "未能解碼此影片幀。",
   "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.": "瀏覽器無法解碼影片作編輯，請使用新版 Chrome／Edge 或 Android 程式。",
   "This first video version supports clips up to 512 MB.": "影片檔案上限為 512 MB。",

@@ -373,6 +373,7 @@
   "Analysis cancelled.": "Analysis cancelled.",
   "Could not decode an AI sample frame.": "Could not decode an AI sample frame.",
   "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.": "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.",
+  "The video file stopped responding while reading its tracks. Reopen it or try a shorter H.264 SDR copy.": "The video file stopped responding while reading its tracks. Reopen it or try a shorter H.264 SDR copy.",
   "Could not decode this video frame.": "Could not decode this video frame.",
   "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.": "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.",
   "This first video version supports clips up to 512 MB.": "Video clips can be up to 512 MB.",
