@@ -27,6 +27,19 @@
         <key>CFBundleURLName</key><string>com.fishese.clearwater.launch</string>
         <key>CFBundleURLSchemes</key><array><string>clearwater</string></array>
     </dict></array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key><string>com.fishese.clearwater.camera</string>
+			<key>UIApplicationShortcutItemTitle</key><string>Open Camera</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key><string>camera</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key><string>com.fishese.clearwater.edit</string>
+			<key>UIApplicationShortcutItemTitle</key><string>Open Editor</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key><string>photo.on.rectangle</string>
+		</dict>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>

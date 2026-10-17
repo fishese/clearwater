@@ -11,6 +11,10 @@
 		B10000010000000000000002 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000020000000000000003 /* XCTest.framework */; };
 		A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000001 /* ClearWaterBridgeViewController.swift */; };
 		A10000010000000000000002 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = A10000030000000000000001 /* InfoPlist.strings */; };
+		A20000010000000000000001 /* ClearWaterLaunchIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000020000000000000001 /* ClearWaterLaunchIntents.swift */; };
+		A20000010000000000000002 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = A20000030000000000000001 /* Localizable.strings */; };
+		A20000010000000000000003 /* AppShortcuts.strings in Resources */ = {isa = PBXBuildFile; fileRef = A20000030000000000000002 /* AppShortcuts.strings */; };
+		A20000010000000000000004 /* NativeLaunchRoutingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000020000000000000002 /* NativeLaunchRoutingTests.swift */; };
 		A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000002 /* ClearWaterExportPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
@@ -39,6 +43,14 @@
 		B10000020000000000000003 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		A10000020000000000000001 /* ClearWaterBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterBridgeViewController.swift; sourceTree = "<group>"; };
 		A10000020000000000000002 /* ClearWaterExportPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterExportPlugin.swift; sourceTree = "<group>"; };
+		A20000020000000000000001 /* ClearWaterLaunchIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClearWaterLaunchIntents.swift; sourceTree = "<group>"; };
+		A20000020000000000000002 /* NativeLaunchRoutingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeLaunchRoutingTests.swift; sourceTree = "<group>"; };
+		A20000040000000000000001 /* en Localizable */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A20000040000000000000002 /* zh-HK Localizable */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-HK"; path = "zh-HK.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		A20000040000000000000003 /* ja Localizable */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A20000040000000000000004 /* en AppShortcuts */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
+		A20000040000000000000005 /* zh-HK AppShortcuts */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-HK"; path = "zh-HK.lproj/AppShortcuts.strings"; sourceTree = "<group>"; };
+		A20000040000000000000006 /* ja AppShortcuts */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/AppShortcuts.strings; sourceTree = "<group>"; };
 		A10000040000000000000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A10000040000000000000002 /* zh-HK */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-HK"; path = "zh-HK.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A10000040000000000000003 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
@@ -66,6 +78,26 @@
 		C10000020000000000000011 /* NativeCaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCaptureStoreTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXVariantGroup section */
+		A20000030000000000000001 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A20000040000000000000001 /* en Localizable */,
+				A20000040000000000000002 /* zh-HK Localizable */,
+				A20000040000000000000003 /* ja Localizable */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+		A20000030000000000000002 /* AppShortcuts.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				A20000040000000000000004 /* en AppShortcuts */,
+				A20000040000000000000005 /* zh-HK AppShortcuts */,
+				A20000040000000000000006 /* ja AppShortcuts */,
+			);
+			name = AppShortcuts.strings;
+			sourceTree = "<group>";
+		};
 		A10000030000000000000001 /* InfoPlist.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
@@ -121,6 +153,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000020000000000000001 /* NativeSceneBridgeTests.swift */,
+				A20000020000000000000002 /* NativeLaunchRoutingTests.swift */,
 				C10000020000000000000007 /* NativeBalancedParityTests.swift */,
 				C10000020000000000000008 /* balanced-parity-fixtures.json */,
 				C10000020000000000000010 /* NativeMovieWriterTests.swift */,
@@ -133,6 +166,7 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
+				A20000020000000000000001 /* ClearWaterLaunchIntents.swift */,
 				A10000020000000000000001 /* ClearWaterBridgeViewController.swift */,
 				A10000020000000000000002 /* ClearWaterExportPlugin.swift */,
 				C10000020000000000000001 /* ClearWaterCameraPlugin.swift */,
@@ -143,6 +177,8 @@
 				C10000020000000000000006 /* ClearWaterBalanced.metal */,
 				C10000020000000000000009 /* ClearWaterMovieWriter.swift */,
 				A10000030000000000000001 /* InfoPlist.strings */,
+				A20000030000000000000001 /* Localizable.strings */,
+				A20000030000000000000002 /* AppShortcuts.strings */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -264,6 +300,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000002 /* InfoPlist.strings in Resources */,
+				A20000010000000000000002 /* Localizable.strings in Resources */,
+				A20000010000000000000003 /* AppShortcuts.strings in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
@@ -289,6 +327,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000001 /* ClearWaterBridgeViewController.swift in Sources */,
+				A20000010000000000000001 /* ClearWaterLaunchIntents.swift in Sources */,
 				A10000010000000000000003 /* ClearWaterExportPlugin.swift in Sources */,
 				C10000010000000000000001 /* ClearWaterCameraPlugin.swift in Sources */,
 				C10000010000000000000002 /* ClearWaterCameraViewController.swift in Sources */,
@@ -307,6 +346,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000010000000000000001 /* NativeSceneBridgeTests.swift in Sources */,
+				A20000010000000000000004 /* NativeLaunchRoutingTests.swift in Sources */,
 				C10000010000000000000007 /* NativeBalancedParityTests.swift in Sources */,
 				C10000010000000000000010 /* NativeMovieWriterTests.swift in Sources */,
 				C10000010000000000000011 /* NativeCaptureStoreTests.swift in Sources */,
