@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
 try {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 640 }, isMobile: true, hasTouch: true });
   await context.addInitScript(() => {
     window.androidBridge = {};
     window.nativeMockCalls = [];
@@ -19,10 +19,11 @@ try {
       { id: 'rear-ultrawide', label: 'Rear ultra wide', facing: 'environment', intrinsicZoom: 0.5 },
       { id: 'rear-wide', label: 'Rear wide', facing: 'environment', intrinsicZoom: 1 },
       { id: 'front-main', label: 'Front camera', facing: 'user', intrinsicZoom: 1 },
+      ...Array.from({ length: 8 }, (_, index) => ({ id: `rear-extra-${index}`, label: `Rear lens ${index + 1}`, facing: 'environment', intrinsicZoom: 1 })),
     ];
-    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 4 });
+    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 10 });
     const cameraMethods = ['getLaunchMode', 'startSession', 'setPreviewBounds', 'setCorrection', 'listLenses', 'setLens', 'setZoom', 'sampleFrame', 'capturePhoto', 'releaseCapture', 'startRecording', 'stopRecording', 'stopSession'];
-    const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
+    const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'copyCameraCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
     const backMethods = ['setEnabled', 'exitApp'];
     const header = (name, methods, hasListener = false) => ({ name, methods: [...methods.map(method => ({ name: method, rtype: 'promise' })), ...(hasListener ? [{ name: 'addListener', rtype: 'callback' }, { name: 'removeListener', rtype: 'promise' }] : [])] });
     window.Capacitor = {
@@ -52,7 +53,7 @@ try {
           if (method === 'setCorrection') { state.recipe = options.recipe; return {}; }
           if (method === 'listLenses') return { lenses };
           if (method === 'setLens') { state.lensId = options.lensId; state.zoom = 1; return window.nativeCameraInfo(); }
-          if (method === 'setZoom') { state.zoom = Math.max(1, Math.min(4, options.ratio)); return { zoom: state.zoom }; }
+          if (method === 'setZoom') { state.zoom = Math.max(1, Math.min(10, options.ratio)); return { zoom: state.zoom }; }
           if (method === 'sampleFrame') return { data: window.nativeSampleData, width: 8, height: 8 };
           if (method === 'capturePhoto') return { uri: 'mock-native://photo', name: 'clearwater-camera-00000000-0000-4000-8000-000000000001.jpg', type: 'image/jpeg', width: 1600, height: 1200 };
           if (method === 'releaseCapture') { state.released = options.uri; return {}; }
@@ -72,6 +73,12 @@ try {
             const uri = `content://mock/gallery/${Object.keys(window.gallery).length + 1}`;
             window.gallery[uri] = { name: options.name, type: options.type, bytes: [] };
             return { uri, name: options.name, destination: `Pictures/ClearWater/${options.name}` };
+          }
+          if (method === 'copyCameraCapture') {
+            if (window.nativeCameraState.failVideoCopy) { delete window.gallery[options.uri]; throw new Error('Gallery copy failed'); }
+            if (options.sourceUri !== 'mock-native://video' || !window.gallery[options.uri]) throw new Error('Unowned video source');
+            window.gallery[options.uri].bytes = window.nativeVideoBytes;
+            return {};
           }
           if (method === 'beginWrite') { const id = `write-${crypto.randomUUID()}`; window.galleryWrites[id] = { uri: options.uri, chunks: [] }; return { id }; }
           if (method === 'writeChunk') { window.galleryWrites[options.id].chunks.push(options.data); return {}; }
@@ -132,24 +139,113 @@ try {
   const zoom = page.locator('.camera-zoom-button');
   await zoom.click();
   assert.equal(await zoom.innerText(), '2×', 'native zoom tap uses the next standard CameraX stop');
-  await page.mouse.move((await zoom.boundingBox()).x + 20, (await zoom.boundingBox()).y + 20);
-  await page.mouse.down(); await page.waitForTimeout(600); await page.mouse.up();
+  const touch = await context.newCDPSession(page);
+  const zoomBounds = await zoom.boundingBox();
+  const zoomTouch = { x: zoomBounds.x + zoomBounds.width / 2, y: zoomBounds.y + zoomBounds.height / 2, id: 1 };
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.locator('#camera-zoom-chooser').waitFor();
+  assert.equal(await zoom.innerText(), '2×', 'long press opens the chooser without cycling zoom');
   for (const [language, frontLabel] of [['en', 'Front camera'], ['zh-HK', '前置鏡頭'], ['ja', '前面カメラ']]) {
     await page.evaluate(language => {
       localStorage.setItem('clearwater-language', language);
       window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
     }, language);
     const lensLabels = await page.locator('.camera-lens-choice span').allTextContents();
-    assert.deepEqual(lensLabels, ['Rear ultra wide · 0.5×', 'Rear wide · 1×', `${frontLabel} · 1×`], `${language} front camera label`);
+    assert.deepEqual(lensLabels.slice(0, 3), ['Rear ultra wide · 0.5×', 'Rear wide · 1×', `${frontLabel} · 1×`], `${language} front camera label`);
   }
   await page.evaluate(() => {
     localStorage.setItem('clearwater-language', 'en');
     window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
   });
+  assert.deepEqual(await page.locator('.camera-zoom-preset').allTextContents(), ['1×', '2×', '3×', '5×', '10×'], 'chooser exposes every cycling zoom stop, including 5× and 10×');
+  assert.equal(await page.locator('.camera-zoom-preset[aria-pressed="true"]').innerText(), '2×', 'active zoom preset is marked');
+  const scrollArea = page.locator('#camera-zoom-chooser');
+  const scrollGeometry = await scrollArea.evaluate(element => {
+    const stage = element.closest('.camera-stage');
+    const bounds = element.getBoundingClientRect();
+    return { stageBottom: stage.getBoundingClientRect().bottom, chooserBottom: bounds.bottom, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight };
+  });
+  assert.ok(scrollGeometry.scrollHeight > scrollGeometry.clientHeight, 'extra native lenses overflow the chooser');
+  assert.ok(scrollGeometry.chooserBottom <= scrollGeometry.stageBottom + 1, 'chooser fits inside the touchable camera stage');
+  const zoomAndLensCalls = () => page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && ['setZoom', 'setLens'].includes(call.method)).length);
+  const callsBeforePan = await zoomAndLensCalls();
+  const swipeChooser = async (reset = true) => {
+    const bounds = await scrollArea.boundingBox();
+    const x = bounds.x + bounds.width / 2;
+    const startY = bounds.y + bounds.height - 30;
+    if (reset) await scrollArea.evaluate(element => { element.scrollTop = 0; });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: startY, id: 1 }] });
+    for (let distance = 25; distance <= 180; distance += 25) {
+      await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: startY - distance, id: 1 }] });
+    }
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForFunction(() => document.querySelector('#camera-zoom-chooser')?.scrollTop > 20);
+  };
+  await swipeChooser();
+  assert.ok(await scrollArea.evaluate(element => element.scrollTop > 20), 'a native Chromium touch swipe scrolls the portrait lens chooser');
+  assert.equal(await zoomAndLensCalls(), callsBeforePan, 'panning over chooser buttons does not activate zoom or a lens');
+  for (let index = 0; index < 4; index++) await swipeChooser(false);
+  const lastLensVisible = await scrollArea.evaluate(element => {
+    const last = element.querySelector('.camera-lens-choice:last-child');
+    return last.getBoundingClientRect().bottom <= element.getBoundingClientRect().bottom && element.scrollTop + element.clientHeight >= element.scrollHeight - 2;
+  });
+  assert.ok(lastLensVisible, 'repeated native touch swipes reveal the final lens choice');
+  assert.equal(await zoomAndLensCalls(), callsBeforePan, 'scrolling to the last lens does not select a lens');
+  await page.setViewportSize({ width: 844, height: 390 });
+  const landscapeGeometry = await scrollArea.evaluate(element => ({ chooser: element.getBoundingClientRect(), viewportHeight: window.innerHeight, scroll: element.scrollHeight, client: element.clientHeight }));
+  assert.ok(landscapeGeometry.chooser.height > 180 && landscapeGeometry.chooser.bottom <= landscapeGeometry.viewportHeight, 'landscape chooser uses the available screen height');
+  assert.ok(landscapeGeometry.scroll > landscapeGeometry.client, 'landscape chooser remains scrollable');
+  await swipeChooser();
+  assert.ok(await scrollArea.evaluate(element => element.scrollTop > 20), 'a native Chromium touch swipe scrolls the landscape lens chooser');
+  await page.setViewportSize({ width: 390, height: 640 });
+  await scrollArea.evaluate(element => { element.scrollTop = 0; });
+  const sliderBounds = await page.locator('.camera-zoom-slider input').boundingBox();
+  const sliderY = sliderBounds.y + sliderBounds.height / 2;
+  const sliderStartX = sliderBounds.x + sliderBounds.width * 0.25;
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: sliderStartX, y: sliderY, id: 1 }] });
+  for (let fraction = 0.35; fraction <= 0.85; fraction += 0.1) {
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: sliderBounds.x + sliderBounds.width * fraction, y: sliderY, id: 1 }] });
+  }
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForFunction(() => window.nativeCameraState.zoom > 2.5);
+  assert.ok(await page.evaluate(() => window.nativeCameraState.zoom > 2.5), 'horizontal touch drag still changes the zoom slider');
+  await page.locator('.camera-zoom-preset').filter({ hasText: '10×' }).click();
+  assert.equal(await zoom.innerText(), '10×', '10× preset updates the displayed magnification');
+  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio), 10, '10× preset applies native CameraX zoom');
+  assert.equal(await scrollArea.count(), 0, 'selecting a zoom preset closes the chooser');
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await scrollArea.waitFor();
+  await page.locator('.camera-zoom-preset').filter({ hasText: '5×' }).click();
+  assert.equal(await zoom.innerText(), '5×', '5× preset updates the displayed magnification');
+  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio), 5, '5× preset applies native CameraX zoom');
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await scrollArea.waitFor();
   await page.getByRole('button', { name: /Rear ultra wide/ }).click();
   assert.equal(await zoom.innerText(), '0.5×', 'displayed magnification uses the reported native lens factor');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setLens')));
+  await page.getByRole('button', { name: 'White balance', exact: true }).click();
+  const previewHit = await page.evaluate(() => {
+    const button = document.querySelector('.camera-zoom-button').getBoundingClientRect();
+    const tools = document.querySelector('.camera-zoom-tools').getBoundingClientRect();
+    const preview = document.querySelector('.camera-preview');
+    const rect = preview.getBoundingClientRect();
+    const x = Math.max(tools.left + 4, rect.left + 4);
+    const y = button.bottom + 20;
+    return { hitPreview: document.elementFromPoint(x, y) === preview, insideTools: x < tools.right && y < tools.bottom, insidePreview: x < rect.right && y < rect.bottom };
+  });
+  assert.ok(previewHit.insideTools && previewHit.insidePreview && previewHit.hitPreview, 'closed zoom overlay passes picker touches through to the preview');
+  await page.getByRole('button', { name: 'Cancel picker' }).click();
+  assert.equal(await page.getByRole('button',{name:/Five A\+ assist/}).getAttribute('aria-pressed'),'false','AI assist is off for the live Balanced check');
+  await page.waitForFunction(() => {const calls=window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera');const sample=calls.findIndex(call=>call.method==='sampleFrame');return sample>=0&&calls.slice(sample+1).some(call=>call.method==='setCorrection');});
+  const liveCorrection = await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera'&&call.method==='setCorrection').at(-1).options.recipe);
+  assert.equal(liveCorrection.engine,'balanced','sampled native frames continue Balanced correction with AI assist off');
+  assert.equal(liveCorrection.auto.gains.length,3,'sampled native frames continue automatic white balance with AI assist off');
   await page.locator('.camera-feature-button').nth(1).click();
   await page.waitForFunction(() => window.nativeCameraState.recipe?.hints?.filter === 'yes');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setPreviewBounds')));
@@ -198,6 +294,37 @@ try {
   assert.deepEqual(await page.evaluate(() => window.nativeFileReadCalls), [], 'failed finalized media is not read as a capture');
   assert.equal(await page.evaluate(() => Object.keys(window.gallery).length), 1, 'failed video creates no gallery entry');
   assert.equal(await page.evaluate(() => window.nativeCameraState.released), 'mock-native://photo', 'failed video leaves no temp capture to release');
+
+  const chunksBeforeVideo = await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='writeChunk').length);
+  await page.evaluate(() => {
+    window.nativeVideoBytes = [0, 0, 0, 20, 102, 116, 121, 112, 105, 115, 111, 109];
+    window.nativeFiles['mock-native://video'] = `data:video/mp4;base64,${btoa(String.fromCharCode(...window.nativeVideoBytes))}`;
+    window.emitNative('ClearWaterCamera', 'recordingFinished', {uri:'mock-native://video',name:'clearwater-camera-00000000-0000-4000-8000-000000000002.mp4',type:'video/mp4',width:390,height:844});
+  });
+  await page.waitForFunction(() => window.nativeCameraState.released === 'mock-native://video');
+  const videoSave = await page.evaluate(() => ({copy:window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='copyCameraCapture'),chunks:window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterFiles'&&call.method==='writeChunk').length,gallery:Object.values(window.gallery).filter(item=>item.type==='video/mp4')}));
+  assert.equal(videoSave.copy.length,1,'native copy publishes the recorded video');
+  assert.equal(videoSave.copy[0].options.sourceUri,'mock-native://video','copy uses the exact camera-owned temporary URI');
+  assert.deepEqual(videoSave.gallery[0].bytes,[0,0,0,20,102,116,121,112,105,115,111,109]);
+  assert.equal(videoSave.chunks,chunksBeforeVideo,'video bytes are not uploaded back through JavaScript');
+
+  await page.evaluate(() => {
+    window.nativeCameraState.failVideoCopy = true;
+    window.nativeFiles['mock-native://video-failure'] = window.nativeFiles['mock-native://video'];
+    window.emitNative('ClearWaterCamera', 'recordingFinished', {uri:'mock-native://video-failure',name:'clearwater-camera-00000000-0000-4000-8000-000000000003.mp4',type:'video/mp4',width:390,height:844});
+  });
+  await page.getByRole('alert').filter({hasText:'Saved in collection. Could not save on phone.'}).waitFor();
+  assert.equal(await page.evaluate(() => Object.values(window.gallery).filter(item=>item.type==='video/mp4').length),1,'failed native copy removes its new gallery destination');
+  await page.waitForFunction(() => window.nativeMockCalls.some(call=>call.plugin==='ClearWaterCamera'&&call.method==='releaseCapture'&&call.options.uri==='mock-native://video-failure'));
+  const archivedAfterFailure = await page.evaluate(async () => {
+    const opened=indexedDB.open('clearwater-library',2);
+    const db=await new Promise((resolve,reject)=>{opened.onsuccess=()=>resolve(opened.result);opened.onerror=()=>reject(opened.error);});
+    const tx=db.transaction('camera-originals');const request=tx.objectStore('camera-originals').getAll();
+    const originals=await new Promise(resolve=>{request.onsuccess=()=>resolve(request.result);});db.close();
+    return originals.filter(item=>item.file?.type==='video/mp4').length;
+  });
+  assert.equal(archivedAfterFailure,2,'both videos retain their editable private source after gallery failure');
+  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call=>call.plugin==='ClearWaterCamera'&&call.method==='releaseCapture'&&call.options.uri==='mock-native://video-failure').length),1,'failed gallery video temp is released only after the private archive survives');
 
   await page.locator('.camera-close-button').click();
   await page.waitForFunction(() => document.querySelector('.camera-page') === null);
@@ -291,7 +418,7 @@ try {
   });
   assert.equal(await page.evaluate(() => window.nativeGetUserMediaCalls ?? 0), 0);
   assert.deepEqual(errors, []);
-  console.log('PASS mocked CameraX launch, transparent preview, native zoom/lens, corrected photo save, finalize errors and bounded serialized resume lifecycle');
+  console.log('PASS mocked CameraX launch, Balanced correction with AI off, native zoom/lens, corrected photo save, direct video copy and rollback, finalize errors and serialized resume lifecycle');
 } finally {
   await browser.close();
 }

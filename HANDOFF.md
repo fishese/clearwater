@@ -1,5 +1,27 @@
 # Handoff
 
+## Coordinated 1.0.5 release authorized (17 October 2026)
+
+The user accepts the current zoom fix for the initial build and explicitly authorizes publishing the updated signed Android release APK, web editor and unsigned iOS IPA. Prepare 1.0.5 (Android code 24, iOS build 3), merge PR #3 preserving history, and build both packages from the resulting main commit. Keep stable latest download asset names. Existing Android signing configuration remains ignored. The native iOS source is unchanged since successful run 39002124652 (22 tests); version/shared-UI changes need a fresh device build/package check.
+
+Device-specific physical/logical lens discovery is deferred to the next version. The current preset grid deliberately uses the same capability-based zoom stops as tap cycling; magnification stops do not by themselves establish which physical lenses the platform exposes.
+
+## Android camera zoom chooser follow-up (17 October 2026)
+
+The long-press menu now exposes the same capability-based zoom presets as short-tap cycling, including 5x and 10x when supported; physical camera lens choices remain separate. The popup is bounded to available preview space, supports vertical touch scrolling, and leaves white-balance picker touches unobstructed when closed. The earlier four lens entries were not the complete set of cycling zoom presets.
+
+All 166 shared tests, production build, web camera controls and mocked iOS camera/editor checks pass. The expanded native-camera regression uses real Chromium touch events to check portrait/landscape scrolling to the last lens, 5x/10x native zoom calls, slider drag and picker hit testing. The rebuilt debug APK was installed over the existing Android app without clearing data; physical testing confirmed long press, scrolling to the bottom lens, and selection of 5x and 10x. Camera was returned to 1x with the chooser open. These changes remain in PR #3; no release publication.
+
+## Post-release fixes complete; device acceptance pending (17 October 2026)
+
+Authorized after the review: repair iOS lens-switch rollback; replace full-original gallery tile loading with bounded, lazy thumbnails; remove the redundant Android recorded-video upload to the gallery using a native copy. Keep the existing durable private camera archive. Automatic white balance and Balanced restoration must continue with AI disabled; no camera sampling/white-balance gating is authorized. Use lower capable agents for involved changes. Preserve user `.gitignore` and IDE changes, and use `reference/i18n-glossary.md` only for any new UI wording rather than re-auditing translations.
+
+Implemented in `f347353020ddfc32fe5d4954a968a01db1644206`, branch `codex/post-release-fixes`, [draft PR #3](https://github.com/fishese/clearwater/pull/3). Shared suite: 166 tests pass. Production build, Android Java/minified debug build and signature, native camera bridge (including AI-off Balanced analysis, direct video copy and failure rollback), private archive, iOS shell, editor state and mobile layout checks pass. The generated gallery regression verifies rotated JPEG/portrait PNG dimensions, bounded decoding and collection cleanup; only 2 of 30 gallery originals decoded initially in the final production run.
+
+[iOS CI run 39002124652](https://github.com/fishese/clearwater/actions/runs/39002124652) passed the unsigned physical-device build/package checks and 22 hosted native tests. Test builds remain 1.0.4 (Android code 23, iOS build 2), not a new release. Local debug APK: `editor/android/build/clearwater-f347353-debug.apk`, SHA-256 `7461a79ae84f25649c8e59133da8489d23f980063f8c16c9868a7d266f2c1359`. Unsigned IPA: `editor/ios/App/output/post-release-fixes/ClearWater-unsigned.ipa`, SHA-256 `2f12a4fc7c9db606e1dba566bd8a075d65dabfcf9866c3cdd4d123285d8dd4aa`, matching downloaded CI provenance. Windows lacks unzip for the package-check script; the full package check passed on macOS CI, and Python ZIP integrity/plist checks passed locally.
+
+No new physical camera acceptance has been performed. Real lens-switch failure recovery and slow/full-storage gallery copies remain device checks. PR #3 is unmerged; main and the published release remain unchanged. The quota-resume schedule can stop now implementation and automated validation are complete. User `.gitignore` and IDE changes remain untouched.
+
 ## Published coordinated release (17 October 2026)
 
 PR #2 is merged as 966660b and the user reports the iPhone tests passed. The user has now explicitly authorized building Android and publishing the coordinated APK/IPA release. This supersedes the older pending-merge/publication notes below. Release version is 1.0.4: Android code 23, iOS bundle version 2. Native behavior and signing identities are unchanged. Main passed 164 shared tests and 22 hosted native tests before the release version/label changes.

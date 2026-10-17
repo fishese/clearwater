@@ -72,6 +72,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -96,7 +99,24 @@ public class ClearWaterCameraPlugin extends Plugin {
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, Lens> lenses = new HashMap<>();
-    private final Map<String, File> temporaryCaptures = new HashMap<>();
+    private static final Map<String, File> temporaryCaptures = new HashMap<>();
+
+    /** Open only a live registered video before release can remove its ownership. */
+    static void copyOwnedVideoCapture(Context context, String sourceUri, OutputStream output) throws IOException {
+        FileInputStream input;
+        synchronized(temporaryCaptures) {
+            File source=temporaryCaptures.get(sourceUri);
+            File directory=new File(context.getCacheDir(),"camera-captures").getCanonicalFile();
+            if(source==null||!source.getCanonicalFile().getParentFile().equals(directory)||
+                !source.getName().endsWith(".mp4")||!Uri.fromFile(source).toString().equals(sourceUri)||
+                !source.isFile()||source.length()<=0)throw new IOException("That video is not an owned temporary camera capture.");
+            input=new FileInputStream(source);
+        }
+        try(input) {
+            byte[] buffer=new byte[65536];int count;
+            while((count=input.read(buffer))!=-1)output.write(buffer,0,count);
+        }
+    }
     private ProcessCameraProvider provider;
     private PreviewView previewView;
     private ViewGroup previewParent;
@@ -387,7 +407,7 @@ public class ClearWaterCameraPlugin extends Plugin {
                     if(orientation==ExifInterface.ORIENTATION_ROTATE_90||orientation==ExifInterface.ORIENTATION_ROTATE_270||orientation==ExifInterface.ORIENTATION_TRANSPOSE||orientation==ExifInterface.ORIENTATION_TRANSVERSE){int swap=photoWidth;photoWidth=photoHeight;photoHeight=swap;}
                 }catch(Exception error){Log.w("ClearWaterCamera","Could not read photo orientation metadata.",error);}
                 Log.i("ClearWaterCamera","photo saved JPEG="+jpegBounds.outWidth+"x"+jpegBounds.outHeight+" oriented="+photoWidth+"x"+photoHeight+" bytes="+output.length()+" lens="+captureLensId+" rotation="+captureRotation);
-                temporaryCaptures.put(Uri.fromFile(output).toString(),output);
+                synchronized(temporaryCaptures){temporaryCaptures.put(Uri.fromFile(output).toString(),output);}
                 JSObject value=new JSObject();value.put("uri",Uri.fromFile(output).toString());value.put("name",name);value.put("type","image/jpeg");value.put("width",photoWidth);value.put("height",photoHeight);value.put("lensId",captureLensId);call.resolve(value);
             }
             @Override public void onError(@NonNull ImageCaptureException error){if(output.exists())output.delete();fail(call,"Could not capture the photo.",error);}
@@ -396,9 +416,10 @@ public class ClearWaterCameraPlugin extends Plugin {
 
     @PluginMethod public void releaseCapture(PluginCall call) {
         if(Looper.myLooper()!=Looper.getMainLooper()){main.post(()->releaseCapture(call));return;}
-        String uri=call.getString("uri");File file=temporaryCaptures.remove(uri);
+        String uri=call.getString("uri");File file;
+        synchronized(temporaryCaptures){file=temporaryCaptures.remove(uri);}
         if(file==null){call.reject("That temporary camera capture is not owned by the app.");return;}
-        if(file.exists()&&!file.delete()){temporaryCaptures.put(uri,file);call.reject("Could not release the temporary camera capture.");return;}
+        if(file.exists()&&!file.delete()){synchronized(temporaryCaptures){temporaryCaptures.put(uri,file);}call.reject("Could not release the temporary camera capture.");return;}
         call.resolve();
     }
 
@@ -460,7 +481,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         recording=null;recordingFile=null;recordingActive=false;
         if(discard){if(file!=null&&file.exists())file.delete();}
         JSObject result=new JSObject();result.put("discarded",discard);result.put("width",videoWidth());result.put("height",videoHeight());
-        if(!discard&&file!=null&&file.isFile()&&file.length()>0){String uri=Uri.fromFile(file).toString();temporaryCaptures.put(uri,file);result.put("uri",uri);result.put("name",file.getName());result.put("type","video/mp4");}
+        if(!discard&&file!=null&&file.isFile()&&file.length()>0){String uri=Uri.fromFile(file).toString();synchronized(temporaryCaptures){temporaryCaptures.put(uri,file);}result.put("uri",uri);result.put("name",file.getName());result.put("type","video/mp4");}
         else if(event.hasError()&&!reachedFileLimit)result.put("error","Video recording failed (CameraX error "+event.getError()+").");
         notifyListeners("recordingFinished",result);
         if(sessionActive)try{bindIdle(null);}catch(Exception error){notifyCameraError("Could not restore the camera preview.",error);}
@@ -690,5 +711,5 @@ public class ClearWaterCameraPlugin extends Plugin {
 
     @Override protected void handleOnPause(){super.handleOnPause();if(provider!=null&&!recordingActive){bindGeneration++;closeEffect();provider.unbindAll();}}
     @Override protected void handleOnResume(){super.handleOnResume();if(sessionActive&&provider!=null&&!recordingActive)bindIdle(pendingBindCall);}
-    @Override protected void handleOnDestroy(){sessionGeneration++;bindGeneration++;sessionActive=false;if(recording!=null){recordingDiscard=true;recording.stop();}if(orientationListener!=null)orientationListener.disable();cleanupSessionResources();for(File file:temporaryCaptures.values())if(file!=null&&file.exists())file.delete();temporaryCaptures.clear();analysisExecutor.shutdownNow();super.handleOnDestroy();}
+    @Override protected void handleOnDestroy(){sessionGeneration++;bindGeneration++;sessionActive=false;if(recording!=null){recordingDiscard=true;recording.stop();}if(orientationListener!=null)orientationListener.disable();cleanupSessionResources();synchronized(temporaryCaptures){for(File file:temporaryCaptures.values())if(file!=null&&file.exists())file.delete();temporaryCaptures.clear();}analysisExecutor.shutdownNow();super.handleOnDestroy();}
 }

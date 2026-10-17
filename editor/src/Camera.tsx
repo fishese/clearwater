@@ -18,7 +18,7 @@ export interface CameraHandle {
 }
 
 export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
-export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string }
+export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string; nativeCaptureUri?:string }
 
 interface CameraProps {
   onCapture: (file: File, recipe: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult>;
@@ -106,7 +106,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const strengthRef = useRef(80);
   const whiteBalanceLocked = useRef(false);
   const savingRef = useRef(false);
-  const saveCaptureRef = useRef<(file: File, frozen: Recipe, details?: CameraCaptureDetails) => Promise<void>>(async () => {});
+  const saveCaptureRef = useRef<(file: File, frozen: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult|undefined>>(async () => undefined);
   const frozenRecipeRef = useRef<Recipe | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef(0);
@@ -580,8 +580,10 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       const frozen = structuredClone(frozenRecipeRef.current ?? recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1)));
         const save = capture.iosCaptureId
           ? Promise.resolve(new File([],capture.name,{type:capture.type,lastModified:Date.now()})).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,iosCaptureId:capture.iosCaptureId}))
-          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true}));
-        void save.catch(() => setError('Could not save video capture.')).finally(() => void nativeCamera.releaseCapture({ uri: capture.uri }).catch(() => {}));
+          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,...(isAndroid()?{nativeCaptureUri:capture.uri}:{})}));
+        void save.then(saved=>{
+          if(capture.iosCaptureId||saved?.collection||saved?.device)return nativeCamera.releaseCapture({uri:capture.uri}).catch(()=>{});
+        }).catch(() => setError('Could not save video capture.'));
     }));
     attach(nativeCamera.addListener('cameraError', event => {
       if (!aliveRef.current) return;
@@ -660,6 +662,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setSaveStatus(result.device?'Saved on phone.':result.collection?'Saved in collection.':'');
       if(result.deviceExpected&&!result.device)setError(result.collection?'Saved in collection. Could not save on phone.':'Capture could not be saved. Keep the app open.');
       else if(!result.collection)setError(result.device?'Saved on phone. Could not save in collection.':'Capture could not be saved. Keep the app open.');
+      return result;
     }catch{if(aliveRef.current)setError('Capture could not be saved. Keep the app open.');}
     finally{savingRef.current=false;if(aliveRef.current)setSavePending(false);}
   },[onCapture]);
@@ -1030,6 +1033,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const intrinsicZoom = activeNativeLens?.intrinsicZoom;
   const displayedZoom = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? zoom * intrinsicZoom : zoom;
   const zoomLabel = `${displayedZoom.toFixed(displayedZoom % 1 ? 1 : 0)}×`;
+  const zoomPresets = cameraZoomPresets(zoomRange);
   const canAdjustZoom = !!zoomRange && zoomRange.max > zoomRange.min;
   const hasCameraChoices = nativeActive ? nativeLenses.length > 1 : rearCameras.length > 1;
   const photoWidth = nativeActive ? nativeInfo?.photoWidth : videoRef.current?.videoWidth;
@@ -1096,6 +1100,14 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           {canAdjustZoom && zoomRange && <label className="camera-zoom-slider">{t('Zoom')} <output>{zoomLabel}</output>
             <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={nativeInterrupted||recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
           </label>}
+          {canAdjustZoom && zoomPresets.length > 0 && <div className="camera-zoom-presets" role="group" aria-label={t('Zoom')}>
+            {zoomPresets.map(preset => {
+              const factor = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? intrinsicZoom : 1;
+              const displayed = preset * factor;
+              const label = `${displayed.toFixed(displayed % 1 ? 1 : 0)}×`;
+              return <button type="button" key={preset} className="camera-zoom-preset" aria-label={t('Zoom {0}×', [label.slice(0,-1)])} aria-pressed={Math.abs(zoom - preset) < 0.001} disabled={!ready || nativeInterrupted || recording || starting || recordPending || photoPending || savePending} onClick={() => { setZoomChooserOpen(false); void applyCameraZoom(preset); }}>{label}</button>;
+            })}
+          </div>}
           {hasCameraChoices && <div className="camera-lens-choices" role="group" aria-label={t(nativeActive ? 'Camera lenses' : 'Rear cameras')}>
             {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
           </div>}
