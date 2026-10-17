@@ -1,5 +1,11 @@
 # Handoff
 
+## Android camera zoom chooser follow-up (17 October 2026)
+
+The long-press menu now exposes the same capability-based zoom presets as short-tap cycling, including 5x and 10x when supported; physical camera lens choices remain separate. The popup is bounded to available preview space, supports vertical touch scrolling, and leaves white-balance picker touches unobstructed when closed. The earlier four lens entries were not the complete set of cycling zoom presets.
+
+All 166 shared tests, production build, web camera controls and mocked iOS camera/editor checks pass. The expanded native-camera regression uses real Chromium touch events to check portrait/landscape scrolling to the last lens, 5x/10x native zoom calls, slider drag and picker hit testing. The rebuilt debug APK was installed over the existing Android app without clearing data; physical testing confirmed long press, scrolling to the bottom lens, and selection of 5x and 10x. Camera was returned to 1x with the chooser open. These changes remain in PR #3; no release publication.
+
 ## Post-release fixes complete; device acceptance pending (17 October 2026)
 
 Authorized after the review: repair iOS lens-switch rollback; replace full-original gallery tile loading with bounded, lazy thumbnails; remove the redundant Android recorded-video upload to the gallery using a native copy. Keep the existing durable private camera archive. Automatic white balance and Balanced restoration must continue with AI disabled; no camera sampling/white-balance gating is authorized. Use lower capable agents for involved changes. Preserve user `.gitignore` and IDE changes, and use `reference/i18n-glossary.md` only for any new UI wording rather than re-auditing translations.

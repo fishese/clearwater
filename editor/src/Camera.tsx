@@ -1033,6 +1033,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const intrinsicZoom = activeNativeLens?.intrinsicZoom;
   const displayedZoom = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? zoom * intrinsicZoom : zoom;
   const zoomLabel = `${displayedZoom.toFixed(displayedZoom % 1 ? 1 : 0)}×`;
+  const zoomPresets = cameraZoomPresets(zoomRange);
   const canAdjustZoom = !!zoomRange && zoomRange.max > zoomRange.min;
   const hasCameraChoices = nativeActive ? nativeLenses.length > 1 : rearCameras.length > 1;
   const photoWidth = nativeActive ? nativeInfo?.photoWidth : videoRef.current?.videoWidth;
@@ -1099,6 +1100,14 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           {canAdjustZoom && zoomRange && <label className="camera-zoom-slider">{t('Zoom')} <output>{zoomLabel}</output>
             <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={nativeInterrupted||recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
           </label>}
+          {canAdjustZoom && zoomPresets.length > 0 && <div className="camera-zoom-presets" role="group" aria-label={t('Zoom')}>
+            {zoomPresets.map(preset => {
+              const factor = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? intrinsicZoom : 1;
+              const displayed = preset * factor;
+              const label = `${displayed.toFixed(displayed % 1 ? 1 : 0)}×`;
+              return <button type="button" key={preset} className="camera-zoom-preset" aria-label={t('Zoom {0}×', [label.slice(0,-1)])} aria-pressed={Math.abs(zoom - preset) < 0.001} disabled={!ready || nativeInterrupted || recording || starting || recordPending || photoPending || savePending} onClick={() => { setZoomChooserOpen(false); void applyCameraZoom(preset); }}>{label}</button>;
+            })}
+          </div>}
           {hasCameraChoices && <div className="camera-lens-choices" role="group" aria-label={t(nativeActive ? 'Camera lenses' : 'Rear cameras')}>
             {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
           </div>}

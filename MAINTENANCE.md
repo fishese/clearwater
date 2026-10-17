@@ -150,6 +150,8 @@ Collection tiles must never use full original file URLs as image sources. `Galle
 
 iOS lens switching is transactional: retain the previous input until the candidate is running, restore the old input/photo dimensions on failure, and report ready only for a running session with an active lifecycle. Close/background/interruption must not be undone by a late lens-switch completion. Physical lens-switch failure/recovery still needs device testing; browser bridge checks cannot exercise AVFoundation.
 
+Camera zoom cycling and the long-press preset grid must use the same `cameraZoomPresets` values and active-lens display factor. Physical lens entries are separate from zoom presets. Keep the chooser within available bounds, test actual touch scrolling to its last choice, preserve horizontal slider dragging, and let picker touches pass through unused overlay space when closed. `native-camera-check.mjs` covers these cases, including 5x/10x selection on a capable mock.
+
 Run `node scripts/camera-save-check.mjs` for the mocked Android capture bridge: multi-chunk JPEG/MP4 byte integrity, commit/abort and invalid-input checks. This does not execute MediaStore itself; native compilation and real-device gallery tests remain separate.
 
 ## Offline settings regression checks
