@@ -2,7 +2,7 @@
 
 Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
-## Active follow-up plan — 17 October 2026
+## Active follow-up plan — 18 October 2026
 
 Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.5 remains the published native release. This section is the resumable progress tracker; the older plan below is historical.
 
@@ -10,12 +10,16 @@ Commit each completed item separately, including its validation and remaining de
 
 | Item | Plan and acceptance criteria | Status |
 | --- | --- | --- |
-| Android folder import | Trace enumeration and lazy loading; show all supported entries with selection/next/previous, without eagerly decoding every original. Test multiple files, existing imports and read failures. Verify on Android where possible. | Pending investigation |
-| iOS camera launch | Reuse `clearwater://camera` cold/warm routing; add long-press home-screen Camera action and discoverable Shortcuts launch support. Confirm ordinary editor launch, single delivery and busy-state handling. Assess a widget separately; prefer a Shortcuts widget using the launch action if a native extension adds disproportionate signing/build complexity. | Pending implementation |
-| Per-device lenses | Discover selectable cameras from Android CameraX/Camera2 and iOS AVFoundation, keeping front/back and physical lenses distinct from digital zoom stops. Preserve ultra-wide support, honest magnification labels, rollback and orientation. Avoid a device database unless native detection cannot supply the needed information. | Pending investigation |
-| Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | Pending |
+| Urgent iPhone Safari | Integrate `3d3d403`, fix repeated persistence warnings after removal, and audit related save/preset paths. Preserve native-platform storage behavior and user files. | `3d3d403` merged in `a0f6d51`; metadata sidecar and fresh-tap preset/share fixes implemented, validation in progress |
+| Android folder import | Trace enumeration and lazy loading; show all supported entries with selection/next/previous, without eagerly decoding every original. Test multiple files, existing imports and read failures. Verify on Android where possible. | Committed `e2c3ad7`; lazy listing, return-to-collection, reuse/edit retention and missing-file recovery browser checks pass. Physical SAF picker verification pending |
+| iOS camera launch | Reuse `clearwater://camera` cold/warm routing; add long-press home-screen Camera action and discoverable Shortcuts launch support. Confirm ordinary editor launch, single delivery and busy-state handling. Assess a widget separately; prefer a Shortcuts widget using the launch action if a native extension adds disproportionate signing/build complexity. | Committed `c94bd74` / `d6e86cc`; home quick actions and App Shortcuts (also usable from Shortcuts widget). iOS CI passed; physical iPhone launch checks pending |
+| Per-device lenses | Discover selectable cameras from Android CameraX/Camera2 and iOS AVFoundation, keeping front/back and physical lenses distinct from digital zoom stops. Preserve ultra-wide support, honest magnification labels, rollback and orientation. Avoid a device database unless native detection cannot supply the needed information. | Committed `7b0d8e4`; Android optics tests/compile and iOS CI passed. Device lens selection checks pending; phone off ADB on resume |
+| Cross-platform media reliability | Review import, load, export, save/share readiness across Android web, Safari web and both native apps; fix confirmed issues with regressions. | In progress: bounded video metadata load, preview versus encoder capability, export gating |
+| Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | iOS run 39041096683 passed: 30 native tests and unsigned device package. Android debug build completed; new storage changes must pass before phone install |
 
 Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable release publication is not part of this follow-up yet.
+
+Recovery checkpoint: prior uncommitted native work was saved in `stash@{0}` while the urgent Safari change was authored on main. It has been restored onto this branch after merging main; the backup stash is intentionally retained. Do not apply it a second time. User `.gitignore` and IDE changes remain unrelated. Earlier lower-model agents reached quota; resumed agents are handling Safari and final iOS launch tests.
 
 ## Recommendation (historical)
 
@@ -149,3 +153,5 @@ Validation: supported orientations and dimensions; no original modification; red
 
 The user supplied the TechRxiv PDF locally after the initial review. All seven pages have now been read, including visual comparisons and tables. ADCCA-GAN is added as an optional evaluation candidate, pending reproducible code/weights and licensing. The photo MVP, filter/surface handling, manual controls and separate-model evaluation remain the recommended first steps. Detailed findings and reported metrics are in analysis/ADCCA_GAN_REVIEW.md. No neural inference has been run.
 
+
+Resume checkpoint (18 October): main Safari hotfix is incorporated; native feature commits are pushed to `codex/native-camera-followups`. Safari fixes are still uncommitted. WebKit 2370 is installed, but the Windows runner rejects the first File/Blob IndexedDB write before application code; record that limitation separately from Chromium persistence tests. No native follow-up is published. Phone is currently not connected; continue non-device work.
