@@ -243,6 +243,7 @@
   "A simpler comparison engine: adjusts the average red, green and blue levels toward a neutral midtone, with bounded channel gains and extra red reconstruction when red is very weak.": "較簡單的比較引擎：在有限增益範圍內，將紅、綠、藍平均值調整至中性中間調；紅色極弱時額外重建紅色。",
   "a quick channel-balance experiment. It can brighten or neutralise a scene more than you want, particularly when the scene is naturally dark or warm. Dive hints do not alter this engine.": "快速測試色彩通道平衡。可能令場景過亮或過度中和，尤其是原本較暗或偏暖的場景。拍攝狀況不影響此引擎。",
   "Supplied AI model · about 0.9 MB": "附設 AI 模型 · 約 0.9 MB",
+  "Supplied AI model · about 81 KB": "附設 AI 模型 · 約 81 KB",
   "A compact neural network designed for underwater image enhancement with fewer learned parameters than larger networks. The researchers evaluated it on both synthetic and real underwater images.": "專為水下影像改善而設的輕量神經網絡，學習參數比大型網絡少。研究人員以合成及真實水下影像評估。",
   "Intended use:": "設計用途：",
   "improving the appearance of degraded underwater imagery. In ClearWater, try it as an alternative colour treatment for blue/green underwater scenes; compare subjects and neutral tones rather than assuming a more vivid result is more accurate.": "改善退化水下影像的外觀。在 ClearWater 可作為藍／綠色水域的另一種色彩處理；請比較主體及中性色調，鮮豔不代表準確。",

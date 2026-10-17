@@ -1,25 +1,28 @@
 import {describe,it,expect} from 'vitest';
 import {analyse,makeRecipe,parseRecipe,renderPixels,suggest} from '../src/core/engine';
-import {transferField} from '../src/core/neural-field';
+import {prepareGuidedField,transferField} from '../src/core/neural-field';
 import {DEFAULT_HINTS} from '../src/core/types';
 
 describe('AI finishing pipeline',()=>{
   const input=new Uint8ClampedArray([50,100,150,255,60,110,160,255,70,120,170,255,80,130,180,255]);
   it('keeps source detail, alpha, and global coordinates across export strips',()=>{
     const field=new Float32Array([.1,0,0,.1,0,0,.2,0,0,.2,0,0]);
-    const full=transferField(input,2,2,field,2);
-    const top=transferField(input.slice(0,8),2,1,field,2,0,2);
-    const bottom=transferField(input.slice(8),2,1,field,2,1,2);
-    const corner=transferField(input.slice(12),1,1,field,2,1,2,1,2);
+    const guided=prepareGuidedField(input,field,2);
+    const full=transferField(input,2,2,guided);
+    const top=transferField(input.slice(0,8),2,1,guided,0,2);
+    const bottom=transferField(input.slice(8),2,1,guided,1,2);
+    const corner=transferField(input.slice(12),1,1,guided,1,2,1,2);
     expect([...top,...bottom]).toEqual([...full]);
     expect([...corner]).toEqual([...full.slice(12)]);
-    expect(full[4]-full[0]).toBe(10);
+    // The green residual is zero. A shared luma adjustment can still move that channel by one 8-bit level.
+    expect(Math.abs(full[1]-input[1])).toBeLessThanOrEqual(1);
+    expect(Math.abs(full[5]-input[5])).toBeLessThanOrEqual(1);
     expect(full[3]).toBe(255);
   });
   for(const engine of ['shallow','fivea','wave'] as const)it(`${engine}: zero strength, manual refinement and recipe persistence`,()=>{
     const a=analyse(input,2,2),recipe=makeRecipe(a);
     recipe.engine=engine;recipe.auto=suggest(a,recipe.hints,engine);
-    const base=transferField(input,2,2,new Float32Array(12).fill(.1),2);
+    const base=transferField(input,2,2,prepareGuidedField(input,new Float32Array(12).fill(.1),2));
     recipe.strength=0;
     const zero=renderPixels(input,recipe,base);
     zero.forEach((v,i)=>expect(Math.abs(v-input[i])).toBeLessThanOrEqual(1));

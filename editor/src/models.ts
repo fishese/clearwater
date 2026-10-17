@@ -47,11 +47,12 @@ export async function registerCustomModel(bytes:ArrayBuffer,config:CustomModel) 
   sessions.set('wave',Promise.resolve(net));custom=config;
   if(previous)await (await previous).release();
 }
-export async function inferField(name:ModelName,source:OffscreenCanvas):Promise<Float32Array> {
+export async function inferField(name:ModelName,source:OffscreenCanvas,guideOut?:Uint8ClampedArray):Promise<Float32Array> {
   const net=await session(name),size=256,count=size*size;
   const canvas=new OffscreenCanvas(size,size),c=canvas.getContext('2d',{willReadFrequently:true})!;
   c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(source,0,0,size,size);
   const pixels=c.getImageData(0,0,size,size).data,input=new Float32Array(count*3);
+  if(guideOut&&guideOut.length===pixels.length)guideOut.set(pixels);
   const bundled=name==='wave'?undefined:BUNDLED_MODELS[name];
   const signedInput=name==='wave'?custom?.inputRange==='signed':bundled?.inputRange==='signed';
   const signedOutput=name==='wave'?custom?.outputRange==='signed':bundled?.outputRange==='signed';
