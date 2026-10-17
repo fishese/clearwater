@@ -6,6 +6,10 @@ Web app: https://fishese.github.io/clearwater/
 
 The expanded photo button hides the gallery and header. Wide screens retain a narrow adjustment column; phones show a collapsible adjustment drawer.
 
+## License
+
+ClearWater-owned code and assets are source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). See [NOTICE](NOTICE) for its scope, third-party exclusions, and the permission needed to exercise LGPL rights in combined builds. Third-party software terms and source references are in the [software notices](editor/public/licenses/README.txt); bundled model terms and provenance are in the [model notices](editor/public/models/README.md). User-provided photos, videos, and other media remain under their owners' rights.
+
 ## Development
 
 Use Node.js 24. In `editor`, run `npm ci`, then `npm run dev`. Run `npm test` and `npm run build` to verify changes. GitHub Actions builds and deploys the web editor on pushes to main, using `/clearwater/` as the base path.

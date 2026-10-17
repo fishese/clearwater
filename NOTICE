@@ -1,0 +1,30 @@
+# ClearWater license scope and third-party notices
+
+Required Notice: Copyright 2026 fishese and contributors.
+
+The PolyForm Noncommercial License 1.0.0 in LICENSE applies only to
+original ClearWater code and assets that their contributors have the
+right to license. It covers those ClearWater-owned portions of the
+1.0.5 source and web, Android, and iOS distributions. It does not
+relicense third-party software, libraries, codecs, model weights,
+artwork, fetched source material, or photos, videos, and other media
+provided by users. Those works retain their own rights and terms.
+
+Third-party software notices, license texts, and source references are
+in editor/public/licenses/README.txt and that directory. Bundled model
+provenance and separate permissions are in editor/public/models/README.md
+and that directory. A project-specific permission for a bundled model
+applies only to the use it expressly permits; the ClearWater license
+does not expand that permission.
+
+Some bundled components are licensed under LGPL version 3. With respect
+to ClearWater-owned material in a combined work containing those
+components, fishese and contributors grant recipients any additional
+permission under the ClearWater license needed to replace or modify the
+LGPL-covered components, reverse engineer for debugging those changes,
+recombine or relink the application with compatible modified versions,
+and install and execute the resulting modified combined work, as
+required by LGPL version 3 section 4. This permission applies even
+where the ClearWater license would otherwise restrict those acts. It
+does not narrow any rights recipients receive directly under the LGPL
+or change the licenses of the third-party components.
