@@ -1,12 +1,14 @@
 # Handoff
 
-## Post-release fixes: validation in progress (17 October 2026)
+## Post-release fixes complete; device acceptance pending (17 October 2026)
 
 Authorized after the review: repair iOS lens-switch rollback; replace full-original gallery tile loading with bounded, lazy thumbnails; remove the redundant Android recorded-video upload to the gallery using a native copy. Keep the existing durable private camera archive. Automatic white balance and Balanced restoration must continue with AI disabled; no camera sampling/white-balance gating is authorized. Use lower capable agents for involved changes. Preserve user `.gitignore` and IDE changes, and use `reference/i18n-glossary.md` only for any new UI wording rather than re-auditing translations.
 
-Implementation is on `codex/post-release-fixes`. Shared suite: 166 tests pass. Production build, Android Java compile, native camera bridge (including AI-off Balanced analysis, direct video copy and failure rollback), private archive, and iOS shell checks pass. Rotated JPEG/portrait PNG thumbnails, lazy batch loading, editor state and mobile layout production regressions also pass; macOS iOS CI remains pending. No physical camera test has been run for these fixes.
+Implemented in `f347353020ddfc32fe5d4954a968a01db1644206`, branch `codex/post-release-fixes`, [draft PR #3](https://github.com/fishese/clearwater/pull/3). Shared suite: 166 tests pass. Production build, Android Java/minified debug build and signature, native camera bridge (including AI-off Balanced analysis, direct video copy and failure rollback), private archive, iOS shell, editor state and mobile layout checks pass. The generated gallery regression verifies rotated JPEG/portrait PNG dimensions, bounded decoding and collection cleanup; only 2 of 30 gallery originals decoded initially in the final production run.
 
-Continuation heartbeat `resume-clearwater-review-after-quota-reset` remains active to resume quota-interrupted unfinished work; preserve its current configured schedule. The published release remains unchanged. Native iOS compilation/tests require macOS CI; browser bridge checks do not replace native validation.
+[iOS CI run 39002124652](https://github.com/fishese/clearwater/actions/runs/39002124652) passed the unsigned physical-device build/package checks and 22 hosted native tests. Test builds remain 1.0.4 (Android code 23, iOS build 2), not a new release. Local debug APK: `editor/android/build/clearwater-f347353-debug.apk`, SHA-256 `7461a79ae84f25649c8e59133da8489d23f980063f8c16c9868a7d266f2c1359`. Unsigned IPA: `editor/ios/App/output/post-release-fixes/ClearWater-unsigned.ipa`, SHA-256 `2f12a4fc7c9db606e1dba566bd8a075d65dabfcf9866c3cdd4d123285d8dd4aa`, matching downloaded CI provenance. Windows lacks unzip for the package-check script; the full package check passed on macOS CI, and Python ZIP integrity/plist checks passed locally.
+
+No new physical camera acceptance has been performed. Real lens-switch failure recovery and slow/full-storage gallery copies remain device checks. PR #3 is unmerged; main and the published release remain unchanged. The quota-resume schedule can stop now implementation and automated validation are complete. User `.gitignore` and IDE changes remain untouched.
 
 ## Published coordinated release (17 October 2026)
 
