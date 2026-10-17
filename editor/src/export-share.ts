@@ -29,10 +29,33 @@ function encodeBase64(bytes:Uint8Array){
   return btoa(binary);
 }
 
+export interface WebShareNavigator {
+  canShare?:(data:{files:File[]})=>boolean;
+  share?:(data:{files:File[]})=>Promise<void>;
+}
+
+/** iPhone and iPad browsers have no folder picker, and a scripted download does not save. The native shell is a separate platform. */
+export function isIOSWebBrowser(platform:string,userAgent:string,navigatorPlatform='',maxTouchPoints=0):boolean{
+  if(platform!=='web')return false;
+  if(/iPad|iPhone|iPod/.test(userAgent))return true;
+  return navigatorPlatform==='MacIntel'&&maxTouchPoints>1;
+}
+
 export function supportsFileShare():boolean{
   if(Capacitor.getPlatform()==='android')return Capacitor.isPluginAvailable('ClearWaterShare');
-  const nav=navigator as Navigator&{canShare?:(data:{files:File[]})=>boolean;share?:(data:{files:File[]})=>Promise<void>};
+  const nav=navigator as WebShareNavigator;
   return typeof nav.share==='function'&&typeof nav.canShare==='function';
+}
+
+/** Hand a rendered file to the browser share sheet. iOS Safari often reports canShare(files) as false for a file that share() still accepts. */
+export async function shareWebFile(blob:Blob,name:string,nav:WebShareNavigator,iosWeb:boolean):Promise<void>{
+  const type=validate(blob,name);
+  if(typeof nav.share!=='function')throw new Error('File sharing is not available in this browser.');
+  const file=new File([blob],name,{type});
+  let canShareFiles=false;
+  if(typeof nav.canShare==='function'){try{canShareFiles=nav.canShare({files:[file]})===true;}catch{canShareFiles=false;}}
+  if(!canShareFiles&&!iosWeb)throw new Error('This browser cannot share this file.');
+  await nav.share({files:[file]});
 }
 
 /** Stage an immutable export in app-private storage, then hand it to Android's chooser. */
@@ -56,9 +79,6 @@ export async function shareExport(blob:Blob,name:string):Promise<void>{
     }catch(error){try{await nativeShare.cancelShare({id});}catch{}throw error;}
     return;
   }
-  const nav=navigator as Navigator&{canShare?:(data:{files:File[]})=>boolean;share?:(data:{files:File[]})=>Promise<void>};
-  if(typeof nav.share!=='function'||typeof nav.canShare!=='function')throw new Error('File sharing is not available in this browser.');
-  const file=new File([blob],name,{type});
-  if(!nav.canShare({files:[file]}))throw new Error('This browser cannot share this file.');
-  await nav.share({files:[file]});
+  const nav=navigator as WebShareNavigator;
+  await shareWebFile(blob,name,nav,isIOSWebBrowser(Capacitor.getPlatform(),navigator.userAgent,navigator.platform,navigator.maxTouchPoints));
 }
