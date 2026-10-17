@@ -3,7 +3,7 @@ import type {Recipe} from './core/types';
 
 /** CSS viewport coordinates; native converts these to physical view pixels. */
 export interface NativeCameraBounds {x:number;y:number;width:number;height:number;pixelRatio?:number}
-export interface NativeCameraLens {id:string;label:string;facing:'environment'|'user';intrinsicZoom:number}
+export interface NativeCameraLens {id:string;label:string;facing:'environment'|'user';intrinsicZoom?:number}
 export interface NativeCameraPhotoInfoChanged {sessionGeneration:number;photoWidth:number;photoHeight:number}
 export interface NativeCameraInfo {
  width:number;height:number;photoWidth:number;photoHeight:number;sessionGeneration:number;

@@ -12,6 +12,8 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.ImageFormat;
 import android.hardware.display.DisplayManager;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.graphics.YuvImage;
 import android.net.Uri;
 import android.media.ExifInterface;
@@ -79,8 +81,11 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -98,7 +103,7 @@ public class ClearWaterCameraPlugin extends Plugin {
     private Executor mainExecutor;
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Map<String, Lens> lenses = new HashMap<>();
+    private final Map<String, Lens> lenses = new LinkedHashMap<>();
     private static final Map<String, File> temporaryCaptures = new HashMap<>();
 
     /** Open only a live registered video before release can remove its ownership. */
@@ -157,6 +162,8 @@ public class ClearWaterCameraPlugin extends Plugin {
     private String facing = "environment";
     private String quality = "standard";
     private String selectedLensId;
+    private String lastBoundLensId;
+    private boolean resetZoomForLensSwitch;
     private JSONObject recipe = new JSONObject();
     private String latestSampleData;
     private int latestSampleWidth;
@@ -201,15 +208,24 @@ public class ClearWaterCameraPlugin extends Plugin {
     private static final class Lens {
         final String id, label, facing;
         final String physicalCameraId;
+        final String logicalCameraId;
         final CameraInfo info;
         final float intrinsicZoom;
-        Lens(String id, String label, String facing, String physicalCameraId, CameraInfo info, float intrinsicZoom) {
-            this.id=id; this.label=label; this.facing=facing; this.physicalCameraId=physicalCameraId; this.info=info; this.intrinsicZoom=intrinsicZoom;
+        Lens(String id, String label, String facing, String physicalCameraId, String logicalCameraId, CameraInfo info, float intrinsicZoom) {
+            this.id=id; this.label=label; this.facing=facing; this.physicalCameraId=physicalCameraId;
+            this.logicalCameraId=logicalCameraId; this.info=info; this.intrinsicZoom=intrinsicZoom;
         }
         boolean physical() { return physicalCameraId != null; }
         CameraSelector selector() {
             if (physical()) return new CameraSelector.Builder()
                 .requireLensFacing("user".equals(facing) ? CameraSelector.LENS_FACING_FRONT : CameraSelector.LENS_FACING_BACK)
+                .addCameraFilter(cameraInfos -> {
+                    List<CameraInfo> matching=new ArrayList<>();
+                    for(CameraInfo candidate:cameraInfos)try {
+                        if(logicalCameraId.equals(Camera2CameraInfo.from(candidate).getCameraId()))matching.add(candidate);
+                    }catch(Exception ignored){}
+                    return matching;
+                })
                 .setPhysicalCameraId(physicalCameraId).build();
             return info.getCameraSelector();
         }
@@ -265,6 +281,7 @@ public class ClearWaterCameraPlugin extends Plugin {
                 provider = future.get();
                 enumerateLenses();
                 selectedLensId = lenses.containsKey(requestedLens) ? requestedLens : defaultLensId(facing);
+                resetZoomForLensSwitch = true;
                 if (selectedLensId == null) throw new IllegalStateException("No camera matching this direction is available.");
                 sessionActive = true;
                 ensureOrientationListener();orientationListener.enable();
@@ -286,30 +303,95 @@ public class ClearWaterCameraPlugin extends Plugin {
 
     private void enumerateLenses() {
         lenses.clear();
-        for (CameraInfo info : provider.getAvailableCameraInfos()) {
+        CameraManager cameraManager=(CameraManager)getContext().getSystemService(Context.CAMERA_SERVICE);
+        String defaultBackId=defaultCameraId(CameraSelector.DEFAULT_BACK_CAMERA);
+        String defaultFrontId=defaultCameraId(CameraSelector.DEFAULT_FRONT_CAMERA);
+        CameraCharacteristics defaultBackCharacteristics=cameraCharacteristics(cameraManager,defaultBackId);
+        CameraCharacteristics defaultFrontCharacteristics=cameraCharacteristics(cameraManager,defaultFrontId);
+        List<CameraInfo> available=provider.getAvailableCameraInfos();
+        List<CameraInfo> ordered=new ArrayList<>();
+        for(CameraInfo info:available)try {
+            String id=Camera2CameraInfo.from(info).getCameraId();
+            if(id.equals(defaultBackId)||id.equals(defaultFrontId))ordered.add(info);
+        }catch(Exception ignored){}
+        for(CameraInfo info:available)if(!ordered.contains(info))ordered.add(info);
+        Set<String> physicalIds=new HashSet<>();
+        for (CameraInfo info : ordered) {
             try {
                 String id=Camera2CameraInfo.from(info).getCameraId();
                 String lensFacing=info.getLensFacing()==CameraSelector.LENS_FACING_FRONT ? "user" : "environment";
                 float reportedIntrinsic=info.getIntrinsicZoomRatio();
-                float intrinsic=validIntrinsicZoom(reportedIntrinsic)?reportedIntrinsic:1f;
                 String logicalId="logical:"+id;
-                lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, false),lensFacing,null,info,intrinsic));
+                boolean primary=id.equals(defaultBackId)||id.equals(defaultFrontId);
+                CameraCharacteristics logicalCharacteristics=cameraCharacteristics(cameraManager,id);
+                float intrinsic=primary ? 1f : CameraLensGeometry.opticalRatio(reportedIntrinsic,
+                    CameraLensGeometry.relativeZoom("user".equals(lensFacing)?defaultFrontCharacteristics:defaultBackCharacteristics,
+                        logicalCharacteristics));
+                // A standalone CameraX camera is directly selectable. Prefer it
+                // to an equivalent physical selector advertised by a logical camera.
+                if(primary || !hasEquivalentLens(lensFacing,intrinsic,false)) {
+                    removeEquivalentPhysicalLenses(lensFacing,intrinsic);
+                    lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, !primary),lensFacing,null,id,info,intrinsic));
+                }
                 if (info.isLogicalMultiCameraSupported()) {
                     for (CameraInfo physical : info.getPhysicalCameraInfos()) {
-                        String physicalId=Camera2CameraInfo.from(physical).getCameraId();
-                        if (physicalId==null || physicalId.isEmpty()) continue;
-                        float reportedRatio=physical.getIntrinsicZoomRatio();
-                        float ratio=validIntrinsicZoom(reportedRatio)?reportedRatio:1f;
-                        String key="physical:"+id+":"+physicalId;
-                        lenses.put(key,new Lens(key,labelFor(reportedRatio, true),lensFacing,physicalId,info,ratio));
+                        try {
+                            String physicalId=Camera2CameraInfo.from(physical).getCameraId();
+                            if (physicalId==null || physicalId.isEmpty() || physicalIds.contains(physicalId) ||
+                                (logicalCharacteristics!=null && !logicalCharacteristics.getPhysicalCameraIds().contains(physicalId))) continue;
+                            float reportedRatio=physical.getIntrinsicZoomRatio();
+                            // CameraX returns 1 when optical metadata is missing;
+                            // do not call an unknown module a 1x wide lens.
+                            float ratio=CameraLensGeometry.opticalRatio(reportedRatio,Float.NaN);
+                            try {
+                                if(cameraManager!=null && logicalCharacteristics!=null) {
+                                    float measured=CameraLensGeometry.relativeZoom(logicalCharacteristics,
+                                        cameraManager.getCameraCharacteristics(physicalId));
+                                    if(validIntrinsicZoom(measured)&&validIntrinsicZoom(intrinsic))ratio=measured*intrinsic;
+                                }
+                            } catch(Exception ignored) { /* Use CameraX metadata if a physical ID is hidden. */ }
+                            physicalIds.add(physicalId);
+                            if(hasEquivalentLens(lensFacing,ratio,null))continue;
+                            String key="physical:"+id+":"+physicalId;
+                            lenses.put(key,new Lens(key,labelFor(ratio, true),lensFacing,physicalId,id,info,ratio));
+                        } catch(Exception ignored) { /* Keep other physical cameras selectable. */ }
                     }
                 }
             } catch (Exception ignored) { /* Keep other cameras available when one OEM camera reports incomplete metadata. */ }
         }
     }
 
+    private String defaultCameraId(CameraSelector selector) {
+        try { return Camera2CameraInfo.from(provider.getCameraInfo(selector)).getCameraId(); }
+        catch(Exception ignored) { return null; }
+    }
+
+    private CameraCharacteristics cameraCharacteristics(CameraManager manager,String id) {
+        if(manager==null||id==null)return null;
+        try{return manager.getCameraCharacteristics(id);}catch(Exception ignored){return null;}
+    }
+
+    private boolean hasEquivalentLens(String facing,float ratio,Boolean physicalOnly) {
+        if(!validIntrinsicZoom(ratio))return false;
+        for(Lens lens:lenses.values())if(facing.equals(lens.facing) &&
+            (physicalOnly==null||lens.physical()==physicalOnly) && validIntrinsicZoom(lens.intrinsicZoom) &&
+            Math.abs(lens.intrinsicZoom-ratio)/Math.max(lens.intrinsicZoom,ratio)<.08f)return true;
+        return false;
+    }
+
+    private void removeEquivalentPhysicalLenses(String facing,float ratio) {
+        if(!validIntrinsicZoom(ratio))return;
+        List<String> duplicates=new ArrayList<>();
+        for(Lens lens:lenses.values())if(lens.physical() && facing.equals(lens.facing) &&
+            validIntrinsicZoom(lens.intrinsicZoom) &&
+            Math.abs(lens.intrinsicZoom-ratio)/Math.max(lens.intrinsicZoom,ratio)<.08f)duplicates.add(lens.id);
+        for(String id:duplicates)lenses.remove(id);
+    }
+
     private String defaultLensId(String requestedFacing) {
         String desired="user".equals(requestedFacing)?"user":"environment";
+        String preferred=defaultCameraId("user".equals(desired)?CameraSelector.DEFAULT_FRONT_CAMERA:CameraSelector.DEFAULT_BACK_CAMERA);
+        if(preferred!=null && lenses.containsKey("logical:"+preferred))return "logical:"+preferred;
         Lens best=null;
         for (Lens item:lenses.values()) if (desired.equals(item.facing) && !item.physical()) {
             if (best==null || Math.abs(item.intrinsicZoom-1f)<Math.abs(best.intrinsicZoom-1f)) best=item;
@@ -330,7 +412,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         JSArray values=new JSArray();
         for (Lens lens:lenses.values()) {
             JSObject value=new JSObject(); value.put("id",lens.id); value.put("label",lens.label); value.put("facing",lens.facing);
-            value.put("intrinsicZoom",lens.intrinsicZoom);
+            if(validIntrinsicZoom(lens.intrinsicZoom))value.put("intrinsicZoom",lens.intrinsicZoom);
             values.put(value);
         }
         return values;
@@ -358,6 +440,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         String id=call.getString("lensId");
         if (!sessionActive || id==null || !lenses.containsKey(id)) { call.reject("That camera lens is unavailable."); return; }
         if (recordingActive) { call.reject("Stop recording before changing camera lenses."); return; }
+        resetZoomForLensSwitch=!id.equals(selectedLensId);
         selectedLensId=id; facing=lenses.get(id).facing;
         bindIdle(call);
     }
@@ -516,7 +599,8 @@ public class ClearWaterCameraPlugin extends Plugin {
             if(call!=null&&call!=pendingBindCall)return;
             if(!sessionActive||generation!=sessionGeneration){if(call!=null&&call==pendingBindCall){pendingBindCall=null;call.reject("Camera startup was cancelled.","CANCELLED");}return;}
             try {
-                float zoomToRestore=camera==null?1f:zoomRatio();
+                float zoomToRestore=resetZoomForLensSwitch?1f:camera==null?1f:zoomRatio();
+                resetZoomForLensSwitch=false;
                 synchronized(this){latestSampleData=null;}long frameGeneration=++analysisGeneration;
                 if(provider!=null)provider.unbindAll();closeEffect();
                 preview=new Preview.Builder().setTargetRotation(displayRotation()).build();
@@ -535,10 +619,30 @@ public class ClearWaterCameraPlugin extends Plugin {
                         UseCaseGroup group=new UseCaseGroup.Builder().addUseCase(preview).addUseCase(imageCapture).addUseCase(imageAnalysis).addEffect(media3Effect).build();
                         camera=provider.bindToLifecycle((LifecycleOwner)getActivity(),lensSelector(),group);
                         Log.i("ClearWaterCamera","camera use cases bound");
+                        lastBoundLensId=selectedLensId;
                         notifyPhotoInfoChanged();
                         restoreZoom(zoomToRestore);
                         if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;call.resolve(sessionInfo());}
-                    }catch(Exception error){closeEffect();sessionActive=false;cleanupSessionResources();if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not open the selected camera lens.",error);}else notifyCameraError("Could not open the selected camera lens.",error);}
+                    }catch(Exception error){
+                        closeEffect();
+                        // Some OEMs advertise a physical module but reject the
+                        // requested output combination. Remove that choice and
+                        // restore the previous live camera for the caller.
+                        if(call!=null&&call!=pendingSessionCall&&call==pendingBindCall&&
+                            lastBoundLensId!=null&&!lastBoundLensId.equals(selectedLensId)&&
+                            lenses.containsKey(lastBoundLensId)) {
+                            String unavailable=selectedLensId;
+                            lenses.remove(unavailable);
+                            selectedLensId=lastBoundLensId;
+                            facing=lenses.get(selectedLensId).facing;
+                            Log.w("ClearWaterCamera","Physical camera binding failed; restoring previous camera",error);
+                            bindIdle(call,generation);
+                            return;
+                        }
+                        sessionActive=false;cleanupSessionResources();
+                        if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not open the selected camera lens.",error);}
+                        else notifyCameraError("Could not open the selected camera lens.",error);
+                    }
                 });
             }catch(Exception error){sessionActive=false;cleanupSessionResources();if(call!=null&&call==pendingBindCall){pendingBindCall=null;if(call==pendingSessionCall)pendingSessionCall=null;fail(call,"Could not configure the camera.",error);}else notifyCameraError("Could not configure the camera.",error);}
         };
@@ -651,7 +755,7 @@ public class ClearWaterCameraPlugin extends Plugin {
     private void removePreviewView(){if(previewView!=null&&previewParent!=null)previewParent.removeView(previewView);previewView=null;previewParent=null;if(hasSavedWebViewBackground){WebView webView=getBridge()==null?null:getBridge().getWebView();if(webView!=null)webView.setBackground(savedWebViewBackground);savedWebViewBackground=null;hasSavedWebViewBackground=false;}if(changedKeepScreenOn){getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);changedKeepScreenOn=false;}keepScreenOnWasAlreadySet=false;}
     private void lockCameraPortrait(){android.app.Activity activity=getActivity();if(activity==null)return;if(!savedRequestedOrientation){previousRequestedOrientation=activity.getRequestedOrientation();savedRequestedOrientation=true;}if(activity.getRequestedOrientation()!=ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);}
     private void restoreRequestedOrientation(){if(!savedRequestedOrientation)return;android.app.Activity activity=getActivity();int restore=previousRequestedOrientation;savedRequestedOrientation=false;previousRequestedOrientation=ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;if(activity!=null&&activity.getRequestedOrientation()!=restore)try{activity.setRequestedOrientation(restore);}catch(RuntimeException error){Log.w("ClearWaterCamera","Could not restore the prior screen orientation.",error);}}
-    private void cleanupSessionResources(){analysisGeneration++;if(provider!=null)provider.unbindAll();closeEffect();camera=null;preview=null;imageCapture=null;if(imageAnalysis!=null)imageAnalysis.clearAnalyzer();imageAnalysis=null;videoCapture=null;removePreviewView();synchronized(this){latestSampleData=null;}restoreRequestedOrientation();}
+    private void cleanupSessionResources(){analysisGeneration++;if(provider!=null)provider.unbindAll();closeEffect();camera=null;lastBoundLensId=null;resetZoomForLensSwitch=false;preview=null;imageCapture=null;if(imageAnalysis!=null)imageAnalysis.clearAnalyzer();imageAnalysis=null;videoCapture=null;removePreviewView();synchronized(this){latestSampleData=null;}restoreRequestedOrientation();}
     private void restoreZoom(float ratio){if(camera==null||!Float.isFinite(ratio)||ratio<=0)return;try{camera.getCameraControl().setZoomRatio(ratio);}catch(Exception ignored){}}
     private void closeEffect(){
         Media3Effect retired=media3Effect;
