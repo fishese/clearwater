@@ -373,6 +373,7 @@
   "Analysis cancelled.": "分析を中止しました。",
   "Could not decode an AI sample frame.": "AIサンプルのフレームを読み込めません。",
   "The video decoder stopped responding. This device may not support this codec. Try an H.264 SDR copy.": "動画デコーダーが応答しません。コーデックが非対応の可能性があります。H.264 SDRのコピーをお試しください。",
+  "The video file stopped responding while reading its tracks. Reopen it or try a shorter H.264 SDR copy.": "動画トラックの読み取りが応答しません。ファイルを開き直すか、短いH.264 SDRのコピーをお試しください。",
   "Could not decode this video frame.": "この動画フレームを読み込めません。",
   "This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.": "このブラウザーでは動画編集できません。新しいChrome・EdgeかAndroidアプリをお試しください。",
   "This first video version supports clips up to 512 MB.": "動画ファイルの上限は512 MBです。",
