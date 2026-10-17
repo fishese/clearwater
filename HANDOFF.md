@@ -1,6 +1,14 @@
 # Handoff
 
-## Coordinated 1.0.5 release authorized (17 October 2026)
+## Coordinated 1.0.5 published and licensed (17 October 2026)
+
+Published [v1.0.5](https://github.com/fishese/clearwater/releases/tag/v1.0.5) as latest from merge commit `306aa9f198a52f13786ae39d030fbca69cb0bd35`; PR #3 is merged with history preserved. Android is 1.0.5 (24), iOS is 1.0.5 (3), unsigned arm64 for iOS 26+. [Pages run 39022283938](https://github.com/fishese/clearwater/actions/runs/39022283938) and [iOS package run 39022439849](https://github.com/fishese/clearwater/actions/runs/39022439849) passed. The live web editor has active canonical latest APK/IPA links in all three languages. Earlier pending-merge/release statements below are historical.
+
+All 14 release assets were checked against local SHA-256 digests before publication. Signed release APK: `ec7098f05485f16c68d26385b657540e6b31d300d1c60d4740d300dd4630a9fe`; debug APK: `5db82b630c68413d379de3b785efb34e61b0002a612f8686453670a0ec0ab41c`; unsigned IPA: `135cdd7e8010e6eb8e9d1c8b63d5c869eb7b9849d584b2c915f8e1b00edb24cd`. Both APKs match the previous signing track and contain the final web assets. Binary provenance/checksums and staging files are in ignored `editor/android/build/release-1.0.5`; final IPA download is in ignored `editor/ios/App/output/release-1.0.5`. The 166 shared tests and camera/gallery regressions pass; the 22 native iOS tests passed on unchanged Swift sources in run 39002124652. Physical Android scrolling and 5x/10x selection passed; broader device stress checks remain open.
+
+At the user's request, commit `88d49c93ae61cc911f27372a17eaaf02e3346c19` adds the canonical PolyForm Noncommercial 1.0.0 as root LICENSE, plus NOTICE and README scope. It covers original ClearWater work, including the original portions of the 1.0.5 distributions. Third-party libraries/models/artwork and user media retain their own rights; NOTICE preserves LGPL combined-work rights and does not expand model-specific permissions. LICENSE.txt and NOTICE.txt accompany the release. The build tag remains on its actual source commit; licensing was added afterward without rebuilding unchanged binaries.
+
+## Coordinated 1.0.5 release authorization (historical)
 
 The user accepts the current zoom fix for the initial build and explicitly authorizes publishing the updated signed Android release APK, web editor and unsigned iOS IPA. Prepare 1.0.5 (Android code 24, iOS build 3), merge PR #3 preserving history, and build both packages from the resulting main commit. Keep stable latest download asset names. Existing Android signing configuration remains ignored. The native iOS source is unchanged since successful run 39002124652 (22 tests); version/shared-UI changes need a fresh device build/package check.
 
