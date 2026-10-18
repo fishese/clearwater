@@ -2,7 +2,7 @@
 
 ## Current published release (18 October 2026)
 
-v1.0.7 is published as latest from `b2b4e1d` (PR #4). Android versionCode 26, iOS build 5. All uploaded APK/IPA hashes matched; Android signing identity is unchanged. Shared suite 182 tests passed; guided photo strip tests, direct WASM inference, WebKit sharing and production builds passed. Pages run 39116597145 and iOS package run 39116599851 succeeded. Guided upscaling is photo-only; the smaller Five A+ is 81,476 bytes. The unresolved Android lens follow-up remains excluded. A separate SDR Display P3 MOV import correction is now in progress.
+v1.0.7 is published as latest from `b2b4e1d` (PR #4). Android versionCode 26, iOS build 5. All uploaded APK/IPA hashes matched; Android signing identity is unchanged. Shared suite 182 tests passed; guided photo strip tests, direct WASM inference, WebKit sharing and production builds passed. Pages run 39116597145 and iOS package run 39116599851 succeeded. Guided upscaling is photo-only; the smaller Five A+ is 81,476 bytes. The unresolved Android lens follow-up remains excluded. A separate SDR Display P3 MOV import correction follows in af49cbe/f1a6121 and is not part of these release binaries. HDR classification uses transfer/Dolby Vision, not gamut or bit depth. Android staging validates ftyp and removes cancelled/failed state. 186 shared tests and production build passed; targeted Android container and native bridge tests passed. Final on-device HEVC colour/full-range validation remains pending.
 
 ## Earlier release 1.0.6 (18 October 2026)
 
