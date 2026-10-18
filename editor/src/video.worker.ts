@@ -4,6 +4,7 @@ import {isAIEngine} from './core/bundled-models';
 import {analyse,renderPixels,parseRecipe} from './core/engine';
 import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,patchMp4CreationDate,readMp4CreationDate,videoExportPlan,videoMetadataTags,videoSize,type VideoExportMode,type VideoInfo} from './core/media';
 import {fitColour,colourHistogram,colourAt,applyColour,sampleTimes,bracket,type ColourNode} from './core/video-colour';
+import {hasHdrTransfer,hasDolbyVisionMetadata,isDolbyVisionCodec} from './core/video-hdr';
 import {pickNeutralFromPixels} from './core/white-balance';
 import type {Recipe,CustomModel} from './core/types';
 import type {ModelName} from './models';
@@ -59,7 +60,9 @@ ctx.onmessage=async({data})=>{
    const width=await readLoad(video.getDisplayWidth(),deadline),height=await readLoad(video.getDisplayHeight(),deadline);checkLoad(gen);
    if(!Number.isFinite(duration)||duration<=0||duration>MAX_VIDEO_SECONDS+.01)throw new Error('Video clips can be up to 10 minutes long.');
    if(width*height>34_000_000)throw new Error('This video resolution is too large for the editor. Use a smaller copy.');
-   if(await readLoad(video.hasHighDynamicRange(),deadline)){
+   const colorSpace=await readLoad(video.getColorSpace(),deadline);
+   const codecString=await readLoad(video.getCodecParameterString(),deadline);
+   if(hasHdrTransfer(colorSpace)||isDolbyVisionCodec(codecString)||await readLoad(hasDolbyVisionMetadata(data.blob),deadline)){
     checkLoad(gen);
     if(gen===generation){opened.dispose();opening=undefined;send({type:'hdr-needed',gen,width,height,duration,name:typeof data.blob.name==='string'?data.blob.name:''});}
     return;

@@ -59,8 +59,9 @@ function base64Chunk(bytes:Uint8Array){
 export async function createAndroidHdrWorkingCopy(source:File,onProgress:(progress:number)=>void,onJob:(id:string)=>void):Promise<{id:string;file:File}> {
  if(!isAndroid())throw new Error('HDR video conversion is available in the Android app.');
  if(source.size<=0||source.size>512*1024*1024)throw new Error('HDR videos must be no larger than 512 MB.');
- const {id}=await hdr.beginHdrInput({name:source.name,size:source.size});onJob(id);let staged=false,outputReady=false;let listener:PluginListenerHandle|undefined;
+ const {id}=await hdr.beginHdrInput({name:source.name,size:source.size});let staged=false,outputReady=false;let listener:PluginListenerHandle|undefined;
  try{
+  onJob(id);
   for(let offset=0;offset<source.size;offset+=256*1024){if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');const bytes=new Uint8Array(await source.slice(offset,offset+256*1024).arrayBuffer());await hdr.writeHdrInputChunk({id,data:base64Chunk(bytes)});onProgress(Math.round((offset+bytes.length)/source.size*5));}
   if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');
   await hdr.finishHdrInput({id,abort:false});staged=true;

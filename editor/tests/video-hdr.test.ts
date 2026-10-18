@@ -2,7 +2,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {analyse,makeRecipe} from '../src/core/engine';
 
 const media=vi.hoisted(()=>{
- const track={hasHighDynamicRange:vi.fn(async()=>true),getDisplayWidth:vi.fn(async()=>3840),getDisplayHeight:vi.fn(async()=>2160),canDecode:vi.fn(async()=>false),getCodec:vi.fn(async()=> 'hevc')};
+ const track={getColorSpace:vi.fn(async()=>({primaries:'bt2020',transfer:'pq',matrix:'bt2020-ncl',fullRange:false})),getCodecParameterString:vi.fn(async()=> 'hev1.1.6.L150.B0'),getDisplayWidth:vi.fn(async()=>3840),getDisplayHeight:vi.fn(async()=>2160),canDecode:vi.fn(async()=>false),getCodec:vi.fn(async()=> 'hevc')};
  const input={getPrimaryVideoTrack:vi.fn(async()=>track),computeDuration:vi.fn(async()=>8),dispose:vi.fn()};
  return {track,input,inputQueue:[] as object[]};
 });
@@ -54,7 +54,7 @@ describe('video worker HDR import protocol',()=>{
   vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
   let releaseOld:(duration:number)=>void=()=>{};
   media.input.computeDuration.mockImplementationOnce(()=>new Promise<number>(resolve=>{releaseOld=resolve;}));
-  const newTrack={...media.track,hasHighDynamicRange:vi.fn(async()=>false),canDecode:vi.fn(async()=>true),
+  const newTrack={...media.track,getColorSpace:vi.fn(async()=>({primaries:'smpte432',transfer:'bt709',matrix:'smpte170m',fullRange:true})),canDecode:vi.fn(async()=>true),
    getDisplayWidth:vi.fn(async()=>2),getDisplayHeight:vi.fn(async()=>2),
    computePacketStats:vi.fn(async()=>({averagePacketRate:30})),getFirstTimestamp:vi.fn(async()=>0)};
   const newInput={getPrimaryVideoTrack:vi.fn(async()=>newTrack),computeDuration:vi.fn(async()=>8),
@@ -76,7 +76,7 @@ describe('video worker HDR import protocol',()=>{
  it('reports unsupported codecs as deterministic errors',async()=>{
   const messages:Record<string,unknown>[]=[];const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
   vi.stubGlobal('self',scope);vi.stubGlobal('VideoDecoder',function VideoDecoder(){});
-  media.track.hasHighDynamicRange.mockResolvedValueOnce(false);
+  media.track.getColorSpace.mockResolvedValueOnce({primaries:'bt709',transfer:'bt709',matrix:'bt709',fullRange:false});
   await import('../src/video.worker');
   const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
   await handler({data:{type:'load',gen:6,blob:new File([new Uint8Array(10)],'unsupported.mov')}});

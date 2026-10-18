@@ -7,6 +7,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
@@ -43,6 +44,7 @@ import java.util.concurrent.Executors;
 /** Android-only, app-private staging and HDR-to-SDR working-copy conversion. */
 @CapacitorPlugin(name = "ClearWaterHdr")
 public class ClearWaterHdrPlugin extends Plugin {
+    private static final String TAG = "ClearWaterHdr";
     private static final long MAX_INPUT_BYTES = 512L * 1024 * 1024;
     private static final long MAX_OUTPUT_BYTES = 256L * 1024 * 1024;
     private static final long MAX_DURATION_US = 600_000_000L;
@@ -63,10 +65,11 @@ public class ClearWaterHdrPlugin extends Plugin {
     }
 
     private static final class InputSession {
-        final File file;
+        File file;
         final FileOutputStream stream;
         final long expected;
         long written;
+        String extension;
         InputSession(File file, FileOutputStream stream, long expected) { this.file=file;this.stream=stream;this.expected=expected; }
     }
 
@@ -89,32 +92,61 @@ public class ClearWaterHdrPlugin extends Plugin {
 
     private void cleanStaleFiles() throws IOException {
         synchronized (jobs) {
-            if (!jobs.isEmpty() || !outputs.isEmpty() || !readyInputs.isEmpty() || !inputSessions.isEmpty())
-                throw new IOException("An HDR working copy is already in progress.");
+            File[] files = workingDirectory().listFiles();
+            if (files == null) throw new IOException("Could not inspect temporary video storage.");
+            Set<File> active = new HashSet<>();
+            for (InputSession session : inputSessions.values()) active.add(session.file);
+            active.addAll(readyInputs.values());
+            active.addAll(outputs.values());
+            for (ConversionJob job : jobs.values()) { active.add(job.input); active.add(job.output); }
+            for (File file : files) {
+                if (file.isFile() && !active.contains(file) && !file.delete())
+                    throw new IOException("Could not clear old temporary video data. Check available storage.");
+            }
         }
-        File directory = workingDirectory();
-        File[] files = directory.listFiles();
-        if (files != null) for (File file : files) {
-            if (file.isFile() && !file.delete()) throw new IOException("Could not clear old temporary video data.");
-        }
+    }
+
+    private static void rejectStaging(PluginCall call, String operation, String fallback, Exception error) {
+        String message = error instanceof IOException && error.getMessage() != null
+            ? error.getMessage() : fallback;
+        // Avoid logging paths, file names, and exception messages from the platform.
+        Throwable cause = error.getCause();
+        Log.w(TAG, operation + " failed (" + error.getClass().getSimpleName()
+            + (cause == null ? "" : "/" + cause.getClass().getSimpleName()) + "): " + message);
+        call.reject(message);
+    }
+
+    private static IOException storageFailure(String action, IOException cause) {
+        String raw = cause.getMessage();
+        String detail = raw == null ? "" : raw.toLowerCase(Locale.ROOT);
+        String reason;
+        if (detail.contains("enospc") || detail.contains("no space left")) reason = "no space left on this device";
+        else if (detail.contains("eacces") || detail.contains("permission denied")) reason = "storage access was denied";
+        else if (detail.contains("erofs") || detail.contains("read-only file system")) reason = "storage is read-only";
+        else if (detail.contains("emfile") || detail.contains("too many open files")) reason = "too many files are open";
+        else if (detail.contains("eio") || detail.contains("i/o error")) reason = "a storage I/O error occurred";
+        else reason = "temporary storage is unavailable";
+        return new IOException("Could not " + action + ": " + reason + ".", cause);
     }
 
     @PluginMethod public void beginHdrInput(PluginCall call) {
         io.execute(() -> {
             try {
                 long size = call.getLong("size", -1L);
-                String name = call.getString("name", "video.mp4").toLowerCase(Locale.ROOT);
-                String extension = name.endsWith(".mov") ? ".mov" : name.endsWith(".mp4") ? ".mp4" : null;
                 if (Build.VERSION.SDK_INT < 29) throw new IOException("HDR-to-SDR conversion requires Android 10 or later.");
                 if (size <= 0 || size > MAX_INPUT_BYTES) throw new IOException("Videos must be no larger than 512 MB.");
-                if (extension == null) throw new IOException("Only MP4 and MOV videos can be converted.");
                 cleanStaleFiles();
                 String id = UUID.randomUUID().toString();
-                File file = new File(workingDirectory(), "source-" + id + extension);
-                FileOutputStream stream = new FileOutputStream(file);
-                inputSessions.put(id, new InputSession(file, stream, size));
+                File file = new File(workingDirectory(), "source-" + id + ".stage");
+                FileOutputStream stream;
+                try { stream = new FileOutputStream(file); }
+                catch (IOException error) {
+                    file.delete();
+                    throw storageFailure("create temporary video storage", error);
+                }
+                synchronized (jobs) { inputSessions.put(id, new InputSession(file, stream, size)); }
                 JSObject result = new JSObject(); result.put("id", id); call.resolve(result);
-            } catch (Exception error) { call.reject("Could not prepare a temporary video copy.", error); }
+            } catch (Exception error) { rejectStaging(call, "begin", "Could not prepare temporary video storage. Check available storage.", error); }
         });
     }
 
@@ -126,26 +158,58 @@ public class ClearWaterHdrPlugin extends Plugin {
                 if (session == null || encoded == null || encoded.length() > 350000) throw new IOException("Invalid temporary video write.");
                 byte[] bytes = Base64.decode(encoded, Base64.NO_WRAP);
                 if (bytes.length > CHUNK_BYTES || session.written + bytes.length > session.expected) throw new IOException("Invalid temporary video size.");
-                session.stream.write(bytes); session.written += bytes.length; call.resolve();
-            } catch (Exception error) { call.reject("Could not stage the video for conversion.", error); }
+                if (session.written == 0) session.extension = HdrContainer.extension(bytes);
+                try { session.stream.write(bytes); }
+                catch (IOException error) { throw storageFailure("write temporary video data", error); }
+                session.written += bytes.length; call.resolve();
+            } catch (Exception error) {
+                String id = call.getString("id"); InputSession failed;
+                synchronized (jobs) {
+                    failed = id == null ? null : inputSessions.remove(id);
+                    if (id != null) pendingCancels.remove(id);
+                }
+                if (failed != null) {
+                    try { failed.stream.close(); } catch (IOException ignored) { }
+                    failed.file.delete();
+                }
+                rejectStaging(call, "write", "Could not stage the video for conversion.", error);
+            }
         });
     }
 
     @PluginMethod public void finishHdrInput(PluginCall call) {
         io.execute(() -> {
-            String id = call.getString("id"); InputSession session = inputSessions.remove(id);
+            String id = call.getString("id"); InputSession session;
+            synchronized (jobs) { session = id == null ? null : inputSessions.get(id); }
             if (session == null) { call.reject("Temporary video write is closed."); return; }
             boolean abort = call.getBoolean("abort", false);
             try {
-                session.stream.close();
-                if (abort || session.written != session.expected) {
-                    synchronized (jobs) { pendingCancels.remove(id); }
-                    session.file.delete();
-                    if (abort) call.resolve(); else call.reject("The temporary video copy is incomplete.");
+                try { session.stream.close(); }
+                catch (IOException error) { throw storageFailure("finish temporary video data", error); }
+                boolean cancelled;
+                boolean incomplete = session.written != session.expected || session.extension == null;
+                synchronized (jobs) {
+                    inputSessions.remove(id);
+                    cancelled = pendingCancels.remove(id);
+                    if (!abort && !cancelled && !incomplete) {
+                        File staged = new File(workingDirectory(), "source-" + id + session.extension);
+                        if (!session.file.renameTo(staged)) throw new IOException("Could not finish temporary video storage. Check available storage.");
+                        session.file = staged;
+                        readyInputs.put(id, staged);
+                    }
+                }
+                if (abort || cancelled || incomplete) {
+                    if (!session.file.delete()) Log.w(TAG, "finish could not remove temporary input");
+                    if (abort) call.resolve(); else if (cancelled) call.reject("HDR conversion was cancelled.");
+                    else call.reject("The temporary video copy is incomplete.");
                     return;
                 }
-                readyInputs.put(id, session.file); call.resolve();
-            } catch (Exception error) { session.file.delete(); call.reject("Could not finish staging the video.", error); }
+                call.resolve();
+            } catch (Exception error) {
+                synchronized (jobs) { inputSessions.remove(id); pendingCancels.remove(id); }
+                session.file.delete();
+                rejectStaging(call, "finish", "Could not finish staging the video.", error);
+            }
         });
     }
 
@@ -158,7 +222,7 @@ public class ClearWaterHdrPlugin extends Plugin {
             synchronized (jobs) {
                 input = readyInputs.get(id);
                 if (input == null || !input.isFile()) { call.reject("The staged video is missing."); return; }
-                if (pendingCancels.remove(id)) { input.delete(); call.reject("HDR conversion was cancelled."); return; }
+                if (pendingCancels.remove(id)) { readyInputs.remove(id); input.delete(); call.reject("HDR conversion was cancelled."); return; }
                 File output = new File(workingDirectory(), "sdr-working-copy-" + UUID.randomUUID() + ".mp4");
                 job = new ConversionJob(id, input, output, call);
                 jobs.put(id, job);
@@ -268,6 +332,7 @@ public class ClearWaterHdrPlugin extends Plugin {
 
     @PluginMethod public void cancelHdrConversion(PluginCall call) {
         String id = call.getString("id"); ConversionJob job;
+        if (id == null) { call.resolve(); return; }
         synchronized (jobs) {
             job = jobs.get(id);
             if (job == null) {
@@ -276,6 +341,19 @@ public class ClearWaterHdrPlugin extends Plugin {
                 else if (inputSessions.containsKey(id)) pendingCancels.add(id);
             }
         }
+        if (job == null) io.execute(() -> {
+            InputSession session; File ready;
+            synchronized (jobs) {
+                session = inputSessions.remove(id);
+                ready = readyInputs.remove(id);
+                pendingCancels.remove(id);
+            }
+            if (session != null) {
+                try { session.stream.close(); } catch (IOException ignored) { }
+                session.file.delete();
+            }
+            if (ready != null) ready.delete();
+        });
         if (job != null) main.post(() -> {
             if (job.finished) return;
             try { if (job.transformer != null) job.transformer.cancel(); } catch (Exception ignored) { }
@@ -298,7 +376,21 @@ public class ClearWaterHdrPlugin extends Plugin {
             try { if (job.transformer != null) job.transformer.cancel(); } catch (Exception ignored) { }
             finishConversion(job, false, null);
         });
-        io.shutdownNow();
+        io.execute(() -> {
+            synchronized (jobs) {
+                for (InputSession session : inputSessions.values()) {
+                    try { session.stream.close(); } catch (IOException ignored) { }
+                    session.file.delete();
+                }
+                inputSessions.clear();
+                for (File file : readyInputs.values()) file.delete();
+                readyInputs.clear();
+                for (File file : outputs.values()) file.delete();
+                outputs.clear();
+                pendingCancels.clear();
+            }
+        });
+        io.shutdown();
         super.handleOnDestroy();
     }
 }
