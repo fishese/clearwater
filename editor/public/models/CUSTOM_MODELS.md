@@ -37,7 +37,7 @@ Pre-processing (in the app, not your graph):
 
 Post-processing:
 - If output range is `signed`: `(v+1)/2`. Then clamp to [0,1].
-- The app computes a **residual field** `output − input` at 256×256. For photos, `transferField` lifts that residual with a colour guided filter (He et al.), radius 2 on the 256 grid and `eps` 1e-4, guided by the full-resolution photo. Luma of the departure from bilinear is kept at 1/4 and chroma in full, and each channel of that departure is clamped to ±0.12. The low-resolution filter setup is cached with the field. The model still controls colour/tone at 256×256 resolution; it **cannot add full-resolution detail** (denoising, sharpening, dehazing structure, super-resolution). Strength and manual adjustments are applied afterwards.
+- The app computes a **residual field** `output − input` at 256×256. For photos, `transferField` lifts that residual with a colour guided filter (He et al.), radius 2 on the 256 grid and `eps` 1e-4, guided by the full-resolution photo. Luma of the departure from bilinear is kept at 1/2 and chroma in full, and each channel of that departure is clamped to ±0.12. The low-resolution filter setup is cached with the field. The model still controls colour/tone at 256×256 resolution; it **cannot add full-resolution detail** (denoising, sharpening, dehazing structure, super-resolution). Strength and manual adjustments are applied afterwards.
 - Video (`src/video.worker.ts`) and the live camera assist: the same `inferField` runs on sampled frames; a global colour adjustment is fitted from each result. Those paths do not use the guided upsample.
 
 ## Op constraints

@@ -1,12 +1,12 @@
 /** Transfer a model's low-resolution RGB residual without discarding source detail.
  * The residual is an additive sRGB difference. A colour guided filter (He et al.),
  * radius 2 on the 256 grid, lifts it to full resolution. Luma of that departure
- * from bilinear is kept at 1/4; chroma is kept in full. This is colour enhancement,
+ * from bilinear is kept at 1/2; chroma is kept in full. This is colour enhancement,
  * not full-resolution neural denoising or restoration. */
 
 export const GUIDED_RADIUS = 2;
 export const GUIDED_EPS = 1e-4;
-export const GUIDED_LUMA_SCALE = 0.25;
+export const GUIDED_LUMA_SCALE = 0.5;
 /** Per-channel cap on how far the guided field may leave the bilinear field.
  * Tuned on 1600 px previews: p99 of the departure is about 0.03–0.05 and p99.9
  * about 0.06–0.10, while a few pixels reach 0.3–0.4. 0.12 sits in the untested

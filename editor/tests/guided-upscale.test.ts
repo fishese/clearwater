@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {GUIDED_DEVIATION_LIMIT,prepareGuidedField,transferField,transferFieldBilinear,type GuidedField} from '../src/core/neural-field';
+import {GUIDED_DEVIATION_LIMIT,GUIDED_LUMA_SCALE,prepareGuidedField,transferField,transferFieldBilinear,type GuidedField} from '../src/core/neural-field';
 
 function rgba(width:number,height:number,pixel:(x:number,y:number)=>[number,number,number,number]){
   const out=new Uint8ClampedArray(width*height*4);
@@ -71,7 +71,7 @@ describe('guided residual upscale',()=>{
     const capped=transferField(input,size,size,spike),kept=transferField(input,size,size,mild);
     expect(capped[0]).toBe(Math.round(GUIDED_DEVIATION_LIMIT*255));
     expect(capped[0]).toBeLessThan(64);
-    expect(kept[0]).toBe(Math.round(0.08*0.25*255));
+    expect(kept[0]).toBe(Math.round(0.08*GUIDED_LUMA_SCALE*255));
     expect(kept[0]).toBeLessThan(capped[0]);
   });
 });
