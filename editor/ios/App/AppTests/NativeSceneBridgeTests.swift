@@ -3,6 +3,7 @@ import UIKit
 import WebKit
 import CoreImage
 import ImageIO
+import CoreMedia
 @testable import App
 
 final class NativeSceneBridgeTests: XCTestCase {
