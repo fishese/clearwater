@@ -86,6 +86,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -333,13 +334,27 @@ public class ClearWaterCameraPlugin extends Plugin {
                     removeEquivalentPhysicalLenses(lensFacing,intrinsic);
                     lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, !primary),lensFacing,null,id,info,intrinsic));
                 }
-                if (info.isLogicalMultiCameraSupported()) {
-                    for (CameraInfo physical : info.getPhysicalCameraInfos()) {
+                Set<String> advertisedIds=Build.VERSION.SDK_INT>=Build.VERSION_CODES.P && logicalCharacteristics!=null
+                    ? logicalCharacteristics.getPhysicalCameraIds() : Collections.emptySet();
+                if (info.isLogicalMultiCameraSupported() || !advertisedIds.isEmpty()) {
+                    // CameraX can omit hidden physical modules from its CameraInfo
+                    // set even when Camera2 advertises them on the logical camera.
+                    // The Camera2 IDs are valid targets for setPhysicalCameraId.
+                    Map<String,Float> cameraXPhysicalRatios=new HashMap<>();
+                    try { for(CameraInfo physical:info.getPhysicalCameraInfos())try {
+                        String physicalId=Camera2CameraInfo.from(physical).getCameraId();
+                        if(physicalId!=null&&!physicalId.isEmpty())
+                            cameraXPhysicalRatios.put(physicalId,physical.getIntrinsicZoomRatio());
+                    }catch(Exception ignored){} }catch(Exception ignored){}
+                    Set<String> candidates=new TreeSet<>();
+                    candidates.addAll(advertisedIds);
+                    candidates.addAll(cameraXPhysicalRatios.keySet());
+                    for (String physicalId : candidates) {
                         try {
-                            String physicalId=Camera2CameraInfo.from(physical).getCameraId();
                             if (physicalId==null || physicalId.isEmpty() || physicalIds.contains(physicalId) ||
-                                (logicalCharacteristics!=null && !logicalCharacteristics.getPhysicalCameraIds().contains(physicalId))) continue;
-                            float reportedRatio=physical.getIntrinsicZoomRatio();
+                                (Build.VERSION.SDK_INT>=Build.VERSION_CODES.P && logicalCharacteristics!=null &&
+                                    !advertisedIds.contains(physicalId))) continue;
+                            float reportedRatio=cameraXPhysicalRatios.getOrDefault(physicalId,Float.NaN);
                             // CameraX returns 1 when optical metadata is missing;
                             // do not call an unknown module a 1x wide lens.
                             float ratio=CameraLensGeometry.opticalRatio(reportedRatio,Float.NaN);
