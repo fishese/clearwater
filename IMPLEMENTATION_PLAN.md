@@ -4,6 +4,11 @@ Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / 
 
 ## Active follow-up plan — 18 October 2026
 
+Current priority (18 October, resumed after quota): lens work is explicitly PAUSED because the phone is off ADB. User reports the newly listed telephoto selections do not change field of view. Prior successful binding/live preview was not proof of optical switching; actual sensor routing remains unresolved. Preserve `codex/android-lens-discovery-fix` / PR #8 separately and do not include it in the next release. Resume with same-scene 1×/telephoto preview comparison, CameraX selector/stream physical-ID propagation and logical zoom-reset investigation. No completed corrective field-of-view test was recorded before quota interruption. The user's `.gitignore` stash is separate; do not reapply automatically.
+
+Next release review: current main `3c56b8a` contains the user's iOS Chrome detection fix. Review branch `codex/review-photo-upscale` merges PR #4 head `175d4aa` with main; validate photo-only guided residual upscaling and smaller Five A+ model, repair substantive issues, then merge and publish web plus signed Android/unsigned iOS packages. Lower-cost agents split algorithm review and web/model-contract review. Preserve user translations and unrelated IDE files.
+
+
 Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.6 is now the published native release (source `7085d63`). This section is the resumable progress tracker; the older plan below is historical.
 
 Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
