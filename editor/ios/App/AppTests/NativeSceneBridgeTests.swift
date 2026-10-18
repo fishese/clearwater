@@ -6,6 +6,23 @@ import ImageIO
 @testable import App
 
 final class NativeSceneBridgeTests: XCTestCase {
+    func testCameraFormatPrefersStillFramingOverExtraVideoPixels() {
+        let photo = CMVideoDimensions(width: 4032, height: 3024)
+        let fullHeight = CMVideoDimensions(width: 1440, height: 1080)
+        let cropped = CMVideoDimensions(width: 1920, height: 1080)
+        XCTAssertTrue(ClearWaterCameraFrameMatch.prefers(video: fullHeight, photo: photo,
+            over: cropped, otherPhoto: photo))
+        XCTAssertFalse(ClearWaterCameraFrameMatch.prefers(video: cropped, photo: photo,
+            over: fullHeight, otherPhoto: photo))
+        // Preserve full-resolution stills before improving the preview aspect.
+        let smallerPhoto = CMVideoDimensions(width: 3264, height: 2448)
+        XCTAssertTrue(ClearWaterCameraFrameMatch.prefers(video: cropped, photo: photo,
+            over: fullHeight, otherPhoto: smallerPhoto))
+        // Cameras without a still-capable format retain the video resolution fallback.
+        XCTAssertTrue(ClearWaterCameraFrameMatch.prefers(video: cropped, photo: nil,
+            over: fullHeight, otherPhoto: nil))
+    }
+
     func testCameraSamplePreservesRawColoursAspectAndJPEGFormat() throws {
         let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
         let context = CIContext(options: [.workingColorSpace: space, .outputColorSpace: space])

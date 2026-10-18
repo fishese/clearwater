@@ -27,6 +27,23 @@ enum ClearWaterLensGeometry {
     }
 }
 
+enum ClearWaterCameraFrameMatch {
+    static func prefers(video: CMVideoDimensions, photo: CMVideoDimensions?, over otherVideo: CMVideoDimensions, otherPhoto: CMVideoDimensions?) -> Bool {
+        let photoPixels = photo.map { Int($0.width) * Int($0.height) } ?? 0
+        let otherPhotoPixels = otherPhoto.map { Int($0.width) * Int($0.height) } ?? 0
+        if photoPixels != otherPhotoPixels { return photoPixels > otherPhotoPixels }
+        // Video buffers drive the live preview, while AVCapturePhotoOutput uses
+        // the full still dimensions. Match their aspect ratios before using
+        // video pixel count so the preview shows the same vertical field of view.
+        if let photo, let otherPhoto {
+            let mismatch = abs(Double(video.width) / Double(video.height) - Double(photo.width) / Double(photo.height))
+            let otherMismatch = abs(Double(otherVideo.width) / Double(otherVideo.height) - Double(otherPhoto.width) / Double(otherPhoto.height))
+            if mismatch != otherMismatch { return mismatch < otherMismatch }
+        }
+        return Int(video.width) * Int(video.height) > Int(otherVideo.width) * Int(otherVideo.height)
+    }
+}
+
 enum ClearWaterCameraOrientation {
     static func angleDegrees(for orientation: UIDeviceOrientation) -> CGFloat? {
         switch orientation {
@@ -388,11 +405,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) &&
                 format.supportedColorSpaces.contains(.sRGB)
         }
-        if let best = supported.max(by: { a, b in
-            let da = CMVideoFormatDescriptionGetDimensions(a.formatDescription), db = CMVideoFormatDescriptionGetDimensions(b.formatDescription)
-            let aPhoto = supportedPhotoPixelCount(for: a), bPhoto = supportedPhotoPixelCount(for: b)
-            if aPhoto != bPhoto { return aPhoto < bPhoto }
-            return Int(da.width) * Int(da.height) < Int(db.width) * Int(db.height)
+        if let best = supported.reduce(nil as AVCaptureDevice.Format?, { best, candidate in
+            guard let best else { return candidate }
+            let video = CMVideoFormatDescriptionGetDimensions(candidate.formatDescription)
+            let otherVideo = CMVideoFormatDescriptionGetDimensions(best.formatDescription)
+            return ClearWaterCameraFrameMatch.prefers(video: video, photo: preferredPhotoDimensions(for: candidate),
+                over: otherVideo, otherPhoto: preferredPhotoDimensions(for: best)) ? candidate : best
         }) { device.activeFormat = best }
         guard device.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= 30 && $0.maxFrameRate >= 30 }) else { throw CameraError.unavailable }
         device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
@@ -404,18 +422,14 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         device.videoZoomFactor = max(device.minAvailableVideoZoomFactor,
             min(1, device.maxAvailableVideoZoomFactor))
     }
-    private func supportedPhotoPixelCount(for format: AVCaptureDevice.Format) -> Int {
+    private func preferredPhotoDimensions(for format: AVCaptureDevice.Format) -> CMVideoDimensions? {
         let limit = 12_500_000
         return format.supportedMaxPhotoDimensions
-            .map { Int($0.width) * Int($0.height) }
-            .filter { $0 > 0 && $0 <= limit }
-            .max() ?? 0
+            .filter { $0.width > 0 && $0.height > 0 && Int($0.width) * Int($0.height) <= limit }
+            .max(by: { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) })
     }
     private func configurePhotoDimensions(for device: AVCaptureDevice) -> Bool {
-        let candidates = device.activeFormat.supportedMaxPhotoDimensions.filter {
-            $0.width > 0 && $0.height > 0 && Int($0.width) * Int($0.height) <= 12_500_000
-        }
-        guard let chosen = candidates.max(by: { Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height) }) else { return false }
+        guard let chosen = preferredPhotoDimensions(for: device.activeFormat) else { return false }
         photoOutput.maxPhotoDimensions = chosen
         return true
     }
