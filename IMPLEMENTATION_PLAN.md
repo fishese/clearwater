@@ -6,6 +6,8 @@ Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / 
 
 Current branch: `codex/android-lens-discovery-fix` / PR #8, incorporating current main including photo-quality and SDR MOV repairs. Latest authorization: evaluate saved device evidence for a defensible lens fix; otherwise defer hardware testing and complete Settings APK/unsigned sideload IPA/PWA install entries plus iOS preview/still framing repair. Lower-cost agents own these three investigations. Phone is off ADB. Raw device evidence is retained only in ignored Android build output. Earlier binding success does not prove usable sensor output or optical zoom; do not merge lens changes as accepted.
 
+Settings install entries completed: web Settings offers browser/PWA installation, Android APK and configured unsigned iPhone IPA. The deferred install prompt is captured before Settings opens; manual instructions cover iOS, desktop Safari and other browsers. Native shells hide this section. Focused install tests and production build passed. EN/zh-HK/ja additions follow the glossary; existing user wording is preserved.
+
 The following 18 October checkpoints are historical; preserve them for continuity.
 
 
