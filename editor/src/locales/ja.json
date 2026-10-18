@@ -549,7 +549,7 @@
   "Use Share to add this page to your Home Screen. If unavailable, open it in Safari.": "共有メニューからこのページをホーム画面に追加してください。項目がない場合は Safari で開いてください。",
   "In Safari, choose File > Add to Dock.": "Safari で「ファイル」>「Dock に追加」を選んでください。",
   "Use your browser menu to install this site or add it to your Home Screen.": "ブラウザーのメニューからこのサイトをインストールするか、ホーム画面に追加してください。",
-  "Unsigned IPA · sign and install with a sideloading tool.": "未署名の IPA · サイドロードツールで署名してインストールしてください。",
+  "Unsigned sideload IPA": "未署名のサイドロード用 IPA",
   "Release notes": "リリースノート",
   "Saving…": "保存中…",
   "Save to gallery": "ギャラリーに保存",
