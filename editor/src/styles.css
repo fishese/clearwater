@@ -173,6 +173,14 @@ html:lang(ja) body{font-family:Inter,"Noto Sans JP","Yu Gothic",system-ui,sans-s
 
 /* Effects uses the same neutral panel treatment as the other settings groups. */
 
+.web-update-anchor{position:relative;display:inline-flex;align-items:center;flex-shrink:0}
+.web-update-hint{position:absolute;z-index:30;top:calc(100% + 9px);left:0;width:min(286px,calc(100vw - 24px));display:flex;align-items:center;gap:12px;padding:10px 11px;border:1px solid #45635b;border-radius:7px;background:#1c2d30;box-shadow:0 8px 24px #0007;color:#dcebe4;font-size:12px;line-height:1.5}
+.web-update-hint::before{content:'';position:absolute;top:-6px;left:10px;width:10px;height:10px;transform:rotate(45deg);border-top:1px solid #45635b;border-left:1px solid #45635b;background:#1c2d30}
+.web-update-hint-ok{flex-shrink:0;min-width:44px;min-height:40px;padding:4px 8px;border:1px solid #45635b;border-radius:5px;color:var(--jade);font-size:12px}
+.web-update-hint-ok:hover{background:#293e42}
+@media(max-width:650px){.web-update-hint{left:-100px}.web-update-hint::before{left:106px}}
+@media(max-width:370px){.web-update-hint{left:-32px}.web-update-hint::before{left:38px}}
+
 @media(max-width:650px){
  .compact-controls .light-clarity-grid .vertical-range{grid-template-rows:30px 100px 24px}
  .compact-controls .light-clarity-grid .vertical-range input{height:100px}
