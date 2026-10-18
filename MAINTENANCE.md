@@ -2,6 +2,10 @@
 
 ## Current published release (18 October 2026)
 
+v1.0.7 is published as latest from `b2b4e1d` (PR #4). Android versionCode 26, iOS build 5. All uploaded APK/IPA hashes matched; Android signing identity is unchanged. Shared suite 182 tests passed; guided photo strip tests, direct WASM inference, WebKit sharing and production builds passed. Pages run 39116597145 and iOS package run 39116599851 succeeded. Guided upscaling is photo-only; the smaller Five A+ is 81,476 bytes. The unresolved Android lens follow-up remains excluded. A separate SDR Display P3 MOV import correction is now in progress.
+
+## Earlier release 1.0.6 (18 October 2026)
+
 v1.0.6 is published as latest from `7085d63` (PR #6). Android versionCode 25 retains the existing release certificate; iOS build 4 is unsigned and requires iOS 26+. Release includes canonical and versioned APK/IPA assets, checksums, provenance, LICENSE and NOTICE. Android debug/release builds and bundled asset/model checks passed. iOS packaging run 39080478751 passed, and all five uploaded binary digests match local SHA-256. Pages deployment passed. The native lens options on Galaxy S24 Ultra are being investigated after publication at the user's request; do not treat optical labels or physical lens selection as device-verified yet.
 
 ## Earlier published release checkpoint (17 October 2026)
