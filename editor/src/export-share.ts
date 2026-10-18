@@ -36,11 +36,12 @@ export interface WebShareNavigator {
   share?:(data:{files:File[]})=>Promise<void>;
 }
 
-/** iPhone and iPad browsers have no folder picker, and a scripted download does not save. The native shell is a separate platform. */
+/** iPhone and iPad browsers have no folder picker, and a scripted download does not save. The native shell is a separate platform. Desktop and Android Chrome keep their own save path; iOS Chrome (CriOS) stays here. */
 export function isIOSWebBrowser(platform:string,userAgent:string,navigatorPlatform='',maxTouchPoints=0):boolean{
   if(platform!=='web')return false;
+  if(/Chrome\/|Chromium\/|Edg\/|OPR\/|Firefox\//.test(userAgent))return false;
   if(/iPad|iPhone|iPod/.test(userAgent))return true;
-  return navigatorPlatform==='MacIntel'&&maxTouchPoints>1;
+  return navigatorPlatform==='MacIntel'&&maxTouchPoints>1&&/Safari\//.test(userAgent)&&!/Android|Windows NT|CrOS|X11/.test(userAgent);
 }
 
 export function supportsFileShare():boolean{

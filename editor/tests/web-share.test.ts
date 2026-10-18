@@ -15,6 +15,29 @@ describe('iPhone Safari save',()=>{
     expect(isIOSWebBrowser('ios','Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148')).toBe(false);
   });
 
+  it('keeps iOS Chrome on the share sheet without treating PC or Android Chrome as iOS',async()=>{
+    const crios='Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1';
+    const ipadCriosDesktop='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Version/18.6 Mobile/15E148 Safari/604.1';
+    const windowsChrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+    const macChromeTouch='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36';
+    const androidChrome='Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
+    expect(isIOSWebBrowser('web',crios,'iPhone',5)).toBe(true);
+    expect(isIOSWebBrowser('web',ipadCriosDesktop,'MacIntel',5)).toBe(true);
+    expect(isIOSWebBrowser('web',windowsChrome,'Win32',0)).toBe(false);
+    expect(isIOSWebBrowser('web',macChromeTouch,'MacIntel',10)).toBe(false);
+    expect(isIOSWebBrowser('web',androidChrome,'Linux aarch64',5)).toBe(false);
+    expect(isIOSWebBrowser('android',androidChrome,'Linux aarch64',5)).toBe(false);
+    expect(isIOSWebBrowser('android',crios,'Linux aarch64',5)).toBe(false);
+    const share=vi.fn(async()=>{});
+    const nav={canShare:()=>false,share};
+    await expect(shareWebFile(jpeg(),'dive-restore.jpg',nav,isIOSWebBrowser('web',windowsChrome,'Win32',0))).rejects.toThrow('This browser cannot share this file.');
+    await expect(shareWebFile(jpeg(),'dive-restore.jpg',nav,isIOSWebBrowser('web',macChromeTouch,'MacIntel',10))).rejects.toThrow('This browser cannot share this file.');
+    await expect(shareWebFile(jpeg(),'dive-restore.jpg',nav,isIOSWebBrowser('web',androidChrome,'Linux aarch64',5))).rejects.toThrow('This browser cannot share this file.');
+    expect(share).not.toHaveBeenCalled();
+    await shareWebFile(jpeg(),'dive-restore.jpg',nav,isIOSWebBrowser('web',crios,'iPhone',5));
+    expect(share).toHaveBeenCalledOnce();
+  });
+
   it('opens the share sheet on iPhone Safari when canShare rejects the file',async()=>{
     const shared:Array<{name:string;type:string;size:number}>=[];
     const nav={
