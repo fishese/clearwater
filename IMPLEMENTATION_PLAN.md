@@ -4,6 +4,11 @@ Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / 
 
 ## Active follow-up plan — 18 October 2026
 
+Latest checkpoint: web update tip merged via PR #7 (`c6bc012`), Pages run 39098032471 passed and live bundle verified. Exact EN/zh-HK/ja notice appears on web only and OK remembers dismissal; normal update activation is unchanged and no collection/settings data is cleared. Already-open cached clients cannot be remotely forced to show it.
+
+Android lens follow-up `1a1abd8` uses Camera2 physical IDs omitted by CameraX, with an API 28 guard for minSdk 24 and stable ordering. Unit tests/debug build passed. Matching-debug update installed in place on Galaxy S24 Ultra R5CX20B0QTR; missing 2.7×/5.1× telephoto choices now appear and both bind, with live preview and transitions back to rear 1×. CameraService exposes logical ID0 only, so OEM active physical sensor routing is not independently proven. These are measured optical ratios, not Samsung marketing labels. Phone left at rear 1×. This follow-up is committed on `codex/android-lens-discovery-fix`; published v1.0.6 binaries remain unchanged.
+
+
 Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.6 is now the published native release (source `7085d63`). This section is the resumable progress tracker; the older plan below is historical.
 
 Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
