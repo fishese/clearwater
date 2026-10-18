@@ -37,14 +37,14 @@ Pre-processing (in the app, not your graph):
 
 Post-processing:
 - If output range is `signed`: `(v+1)/2`. Then clamp to [0,1].
-- The app computes a **residual field** `output − input` at 256×256 and bilinearly upsamples that residual onto the original-resolution pixels (`transferField`). So the model controls colour/tone at 256×256 resolution; it **cannot add full-resolution detail** (denoising, sharpening, dehazing structure, super-resolution). Strength and manual adjustments are applied afterwards.
-- Video (`src/video.worker.ts`): the same `inferField` runs on sampled frames; a global colour adjustment is fitted from each result and blended between samples.
+- The app computes a **residual field** `output − input` at 256×256. For photos, `transferField` lifts that residual with a colour guided filter (He et al.), radius 2 on the 256 grid and `eps` 1e-4, guided by the full-resolution photo. Luma of the departure from bilinear is kept at 1/2 and chroma in full, and each channel of that departure is clamped to ±0.12. The low-resolution filter setup is cached with the field. The model still controls colour/tone at 256×256 resolution; it **cannot add full-resolution detail** (denoising, sharpening, dehazing structure, super-resolution). Strength and manual adjustments are applied afterwards.
+- Video (`src/video.worker.ts`) and the live camera assist: the same `inferField` runs on sampled frames; a global colour adjustment is fitted from each result. Those paths do not use the guided upsample.
 
 ## Op constraints
 
 - Runs on onnxruntime-web's wasm (CPU) kernels, which cover the standard ONNX op set (Conv, BatchNormalization, InstanceNormalization, Resize, DepthToSpace/SpaceToDepth, Reduce*, Log/Exp, activations…). Custom ops / contrib-domain-only ops from other runtimes, and ops needing a GPU EP, will fail at step 5.
 - Use a recent standard opset (bundled models use **opset 17**). Avoid deprecated attributes (e.g. tf2onnx's `Resize coordinate_transformation_mode="tf_half_pixel_for_nn"`; for integer 2× nearest upsampling, `asymmetric` is equivalent).
-- Single thread, CPU: keep FLOPs modest for phones. Current bundled sizes: WWE-UIE ~0.9 MB, Five A+ ~0.9 MB and Shallow-UWnet ~230 KB. File size alone does not establish inference speed.
+- Single thread, CPU: keep FLOPs modest for phones. Current bundled sizes: WWE-UIE ~0.9 MB, Five A+ ~81 KB and Shallow-UWnet ~230 KB. File size alone does not establish inference speed.
 
 ## Export examples
 

@@ -47,8 +47,13 @@ describe('bundled ONNX models',()=>{
       expect(inputMeta.isTensor).toBe(true);
       expect(outputMeta.isTensor).toBe(true);
       if(!inputMeta.isTensor||!outputMeta.isTensor) throw new Error('expected image tensors');
-      expect(inputMeta.shape).toEqual([1,3,256,256]);
-      expect(outputMeta.shape).toEqual([1,3,256,256]);
+      if(id==='fivea'){
+        expect(inputMeta.shape).toEqual([1,3,'H','W']);
+        expect(outputMeta.shape).toEqual(['Concatoutput_dim_0',3,'H','W']);
+      }else{
+        expect(inputMeta.shape).toEqual([1,3,256,256]);
+        expect(outputMeta.shape).toEqual([1,3,256,256]);
+      }
       const input=new Float32Array(3*256*256);
       for(let i=0;i<input.length;i++) input[i]=(i%251)/250;
       const result=await session.run({[session.inputNames[0]]:new ort.Tensor('float32',input,[1,3,256,256])});
@@ -62,6 +67,10 @@ describe('bundled ONNX models',()=>{
       for(let i=0;i<data.length;i++){if(!Number.isFinite(data[i])) finite=false; if(Math.abs(data[i]-input[i])>1e-6) changed=true;}
       expect(finite).toBe(true);
       expect(changed).toBe(true);
+      if(id==='fivea'){
+        const plane=256*256;
+        for(let c=0;c<3;c++) expect(data[c*plane]).toBe(data[c*plane+256+1]);
+      }
     } finally {await session.release();}
   },30000);
 });
