@@ -2,11 +2,26 @@
 
 Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
-## Active follow-up plan — 18 October 2026
+## Active follow-up plan — 19 October 2026
+
+Current branch: `codex/android-lens-discovery-fix` / PR #8, incorporating current main including photo-quality and SDR MOV repairs. Latest authorization: evaluate saved device evidence for a defensible lens fix; otherwise defer hardware testing and complete Settings APK/unsigned sideload IPA/PWA install entries plus iOS preview/still framing repair. Lower-cost agents own these three investigations. Phone is off ADB. Raw device evidence is retained only in ignored Android build output. Earlier binding success does not prove usable sensor output or optical zoom; do not merge lens changes as accepted.
+
+The following 18 October checkpoints are historical; preserve them for continuity.
+
 
 Latest checkpoint: web update tip merged via PR #7 (`c6bc012`), Pages run 39098032471 passed and live bundle verified. Exact EN/zh-HK/ja notice appears on web only and OK remembers dismissal; normal update activation is unchanged and no collection/settings data is cleared. Already-open cached clients cannot be remotely forced to show it.
 
 Android lens follow-up `1a1abd8` uses Camera2 physical IDs omitted by CameraX, with an API 28 guard for minSdk 24 and stable ordering. Unit tests/debug build passed. Matching-debug update installed in place on Galaxy S24 Ultra R5CX20B0QTR; missing 2.7×/5.1× telephoto choices now appear and both bind, with live preview and transitions back to rear 1×. CameraService exposes logical ID0 only, so OEM active physical sensor routing is not independently proven. These are measured optical ratios, not Samsung marketing labels. Phone left at rear 1×. This follow-up is committed on `codex/android-lens-discovery-fix`; published v1.0.6 binaries remain unchanged.
+
+SDR Display P3 MOV fix completed on `codex/sdr-mov-import`: `af49cbe` classifies HDR by PQ/HLG or Dolby Vision instead of gamut; `f1a6121` validates Android containers by ftyp and cleans failed/cancelled staging state with specific storage errors. Existing sRGB canvas conversion and AAC transcoding remain in use; primary-track selection ignores Live Photo metadata. Shared suite: 186 tests passed; production build passed; Android container unit tests and 17 native bridge tests passed. A local HEVC fixture no longer triggers HDR, but desktop decoder support prevented end-to-end colour validation. Physical-device import/colour/recording checks remain pending. Lens work remains paused. Published v1.0.7 predates this fix.
+
+
+Current priority (18 October, resumed after quota): lens work is explicitly PAUSED because the phone is off ADB. User reports the newly listed telephoto selections do not change field of view. Prior successful binding/live preview was not proof of optical switching; actual sensor routing remains unresolved. Preserve `codex/android-lens-discovery-fix` / PR #8 separately and do not include it in the next release. Resume with same-scene 1×/telephoto preview comparison, CameraX selector/stream physical-ID propagation and logical zoom-reset investigation. No completed corrective field-of-view test was recorded before quota interruption. The user's `.gitignore` stash is separate; do not reapply automatically.
+
+Release review completed: user main `3c56b8a` iOS Chrome detection fix is preserved. PR #4 merged as `b2b4e1d` after lower-cost algorithm and browser/model reviews found no additional defect. 182 shared tests, production build, guided-strip tests, direct browser WASM inference and WebKit sharing checks passed. Android 1.0.7/code26 signed/debug packages and iOS 1.0.7/build5 package (run39116599851) passed integrity/model/version checks. Pages run39116597145 passed; live manifest exposes the 81,476-byte Five A+ model. v1.0.7 is published as latest; all five remote binary hashes matched before publication.
+
+Review context: main `3c56b8a` contains the user's iOS Chrome detection fix. Review branch `codex/review-photo-upscale` merges PR #4 head `175d4aa` with main; validate photo-only guided residual upscaling and smaller Five A+ model, repair substantive issues, then merge and publish web plus signed Android/unsigned iOS packages. Lower-cost agents split algorithm review and web/model-contract review. Preserve user translations and unrelated IDE files.
+
 
 
 Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.6 is now the published native release (source `7085d63`). This section is the resumable progress tracker; the older plan below is historical.

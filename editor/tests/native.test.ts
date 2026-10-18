@@ -111,6 +111,12 @@ describe('Android file bridge',()=>{
   await expect(createAndroidHdrWorkingCopy(source,()=>{},id=>{void cancelAndroidHdrWorkingCopy(id);})).rejects.toMatchObject({name:'AbortError'});
   expect(hdrBridge.finishHdrInput).toHaveBeenCalledWith({id:'hdr-1',abort:true});expect(hdrBridge.convertHdrToSdr).not.toHaveBeenCalled();
  });
+ it('aborts staging when job registration fails',async()=>{
+  const source=new File([new Uint8Array(20)],'capture.mov',{type:'video/quicktime'});
+  await expect(createAndroidHdrWorkingCopy(source,()=>{},()=>{throw new Error('Job registration failed');})).rejects.toThrow('Job registration failed');
+  expect(hdrBridge.finishHdrInput).toHaveBeenCalledWith({id:'hdr-1',abort:true});
+  expect(hdrBridge.writeHdrInputChunk).not.toHaveBeenCalled();
+ });
  it('discards a converted working copy when its originating photo is no longer current',async()=>{
   const source=new File(['original'],'capture.mov',{type:'video/quicktime'});let current=true,complete:(value:{id:string;uri:string})=>void=()=>{};
   hdrBridge.convertHdrToSdr.mockImplementation(()=>new Promise(resolve=>{complete=resolve;}));
