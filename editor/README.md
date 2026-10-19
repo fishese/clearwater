@@ -17,10 +17,10 @@ Open http://127.0.0.1:5173. Import files with Open files or drag and drop. Devel
 ## Included
 
 - JPEG, PNG, HEIC and HEIF import; multi-photo library and local IndexedDB persistence.
-- Select multiple images in one file-picker operation; Previous/Next controls browse the imported library with a position counter and retain each photo's edits. Import order is preserved after reload (older library entries without timestamps fall back to filename order).
+- Select multiple images in one file-picker operation; Previous/Next controls browse the imported library with a position counter and retain each photo's edits. Newest additions appear first, with order retained after reload. Android folder browsing lazily loads supported entries without decoding the whole folder at once.
 - Automatic, adjustable classical colour correction, including severe red deficiency, red/magenta filter casts and conservative haze/contrast treatment.
 - Original RGB-average heuristic as an alternative engine for comparison.
-- WWE-UIE, Five A+ and Shallow-UWnet local ONNX inference, plus a generic ONNX adapter requiring the user's own compatible local model. New photos default to WWE-UIE plus a 30% Balanced after AI pass; existing edits remain unchanged. New videos default to Five A+ sampled colour. The live camera preview stays on Balanced and does not run a neural model.
+- WWE-UIE, Five A+ and Shallow-UWnet local ONNX inference, plus a generic ONNX adapter requiring the user's own compatible local model. New photos default to WWE-UIE plus a 30% Balanced after AI pass; existing edits remain unchanged. New videos default to Five A+ sampled colour. Live camera uses GPU Balanced with optional sampled Five A+ global colour assistance, not full per-frame neural restoration.
 - Surface/underwater, red-filter, blue/green water and approximate-depth hints.
 - Before/after divider, hold for original, zoom, undo, redo and reset.
 - Warmth, green/magenta tint, signed red correction, vibrance, exposure, highlights, shadows, contrast and haze controls.
@@ -167,7 +167,7 @@ The Android app uses native CameraX still/video capture through 'src/native-came
 
 Balanced live correction runs on the GPU. Optional Five A+ colour assist samples raw 256px frames at most once per second, off-thread, and reuses a global affine colour change. It does not run full spatial restoration per frame. The recipe retains that matrix for photo editing. Red-filter/depth hints apply to Balanced when AI assist is off. White-balance picks replace earlier picks. Recording freezes correction and stores enhanced video only, importing at zero strength. The linked Android gallery photo shows the enhancement, while the untouched photo and settings remain private. Camera mode stays open after shots; duration and file-size guards remain configurable.
 
-Zoom cycles supported ratios; long press opens actual lens/zoom options, including ultra-wide when exposed. Android launcher shortcuts or 'clearwater://camera' / 'clearwater://edit' open the selected mode. PWA shortcuts use '?mode=camera|edit'. The iOS backend must use AVFoundation; see the root IOS_PLAN.md.
+Zoom cycles supported ratios; long press opens actual lens/zoom options, including ultra-wide when exposed. Native Auto chooses a suitable reported optical module plus digital crop; a manual lens stays selected until Auto is chosen again. Lens switching is unavailable during recording. Android launcher shortcuts or 'clearwater://camera' / 'clearwater://edit' open the selected mode. PWA shortcuts use '?mode=camera|edit'. iOS uses AVFoundation and supports home-screen quick actions and App Shortcuts; see the root IOS_PLAN.md.
 
 Native camera builds compile, but physical-device camera/GL parity, front/rear orientation, lens switching and long-recording thermal/audio checks remain necessary. Browser fake-camera checks do not satisfy that acceptance gate.
 
@@ -175,7 +175,7 @@ Native camera builds compile, but physical-device camera/GL parity, front/rear o
 
 Open the gear beside the brand for language and web offline model preferences. Automatic downloading applies to installed/Home Screen launches and can use mobile data; disable it for manual-only downloading. Individual model checkboxes control caching. Unchecking removes that cached model without changing photos, recipes or custom ONNX storage; using the model again can download it on demand. Completed files survive interruption and unchanged files are reused across updates. Browser retention is best effort; check readiness before travel.
 
-Web Settings links to the latest signed stable Android APK using `https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk`, with separate release notes. Stable releases must include that constant asset filename; experimental debug APKs keep their own names.
+Web Settings includes PWA installation and links to the latest signed Android APK and unsigned sideload IPA, with release notes. Stable releases must include the constant filenames `clearwater-release.apk` and `clearwater-unsigned.ipa` under GitHub's `releases/latest/download/` endpoint. Native shells hide this web Install section; experimental artifacts keep separate names.
 
 ### Linked camera gallery photos
 

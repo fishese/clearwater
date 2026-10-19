@@ -1,5 +1,9 @@
 # Maintenance
 
+## Documentation and next feature checkpoint (19 October 2026)
+
+HANDOFF.md is the concise current-state entry point; older handoff history remains in Git. IMPLEMENTATION_PLAN.md now tracks the adaptive photo colour-and-tone experiment (P0 research complete; P1 implementation not started). Public examples/current renderer were reviewed without proprietary code access. Planning branch: `codex/adaptive-finish-plan`; no runtime code, defaults, release assets or native versions change here. Preserve the web/native release gap described below. Keep private comparison details in ignored notes/output. Commit each future milestone with its evidence and next action; no merge or stable publication is authorized by this planning task.
+
 ## Web Save/Share readiness follow-up (19 October 2026)
 
 Merged PR #10 as `206d080`; Pages run 39188913154 passed tests/build and deployed successfully. Live site returns HTTP 200 with bundle `index-CeSWtHCU.js`. Use ClearWater's update control to fetch the web fix; native release 1.0.8 packages predate this shared UI correction.
@@ -23,7 +27,7 @@ PR #8 adds Auto selection by reported optical ratio and local zoom capabilities,
 PR #8 / codex/android-lens-discovery-fix includes main plus the separately committed Settings and iOS preview work. Commit 1c79343 sends the selected Camera2 physical ID through every use-case builder, derives JPEG sizes from the physical/logical intersection under 12.5 MP, and intersects physical zoom capabilities with CameraX bounds. This is required by the pinned CameraX 1.6.2 ordinary bind path; do not treat selector-only targeting or successful binding as proof of optical switching. Three bounded capture-result logs per bind make first-frame and per-physical sensor checks possible without recording image data.
 
 On S24 Ultra, verified both telephoto sensors, full advertised still sizes, a saved 1080p short recording, module zoom and rear/front/ultra-wide transitions. Final debug APK is installed; camera returned to rear1x. Android unit/build checks pass. PR remains unmerged and published 1.0.7 binaries are unchanged. iOS run39160894942 passed build/package and 31 native tests; phone framing still needs user acceptance. Raw device notes and test artifacts stay in ignored Android build output.
-## Current published release (18 October 2026)
+## Historical release 1.0.7 (18 October 2026)
 
 v1.0.7 is published as latest from `b2b4e1d` (PR #4). Android versionCode 26, iOS build 5. All uploaded APK/IPA hashes matched; Android signing identity is unchanged. Shared suite 182 tests passed; guided photo strip tests, direct WASM inference, WebKit sharing and production builds passed. Pages run 39116597145 and iOS package run 39116599851 succeeded. Guided upscaling is photo-only; the smaller Five A+ is 81,476 bytes. The unresolved Android lens follow-up remains excluded. A separate SDR Display P3 MOV import correction follows in af49cbe/f1a6121 and is not part of these release binaries. HDR classification uses transfer/Dolby Vision, not gamut or bit depth. Android staging validates ftyp and removes cancelled/failed state. 186 shared tests and production build passed; targeted Android container and native bridge tests passed. Final on-device HEVC colour/full-range validation remains pending.
 
@@ -102,7 +106,7 @@ Use Node.js 24. From `editor`: `npm ci`, `npm run dev`. Verify with `npm test` a
 | Languages | i18n-check.mjs |
 | PWA / updates | pwa-check.mjs, update-check.mjs |
 
-Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. CI runs unit tests/build; the current iOS feature baseline is 161 tests.
+Some checks need ignored local fixtures: consult local notes and script input paths. Do not commit personal fixtures to make CI pass. Generated results belong in ignored analysis directories. Latest shared baseline is 193 tests; the latest native iOS implementation passed 31 hosted tests. These are separate suites, not physical-device acceptance.
 
 ## Languages
 
