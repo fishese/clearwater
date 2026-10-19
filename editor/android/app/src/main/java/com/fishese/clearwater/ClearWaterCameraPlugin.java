@@ -364,6 +364,7 @@ public class ClearWaterCameraPlugin extends Plugin {
                     Set<String> candidates=new TreeSet<>();
                     candidates.addAll(advertisedIds);
                     candidates.addAll(cameraXPhysicalRatios.keySet());
+                    float primaryWideDistance=Float.POSITIVE_INFINITY;
                     for (String physicalId : candidates) {
                         try {
                             if (physicalId==null || physicalId.isEmpty() || physicalIds.contains(physicalId) ||
@@ -374,14 +375,25 @@ public class ClearWaterCameraPlugin extends Plugin {
                             // do not call an unknown module a 1x wide lens.
                             float ratio=CameraLensGeometry.opticalRatio(reportedRatio,Float.NaN);
                             CameraCharacteristics physicalCharacteristics=null;
+                            float measured=Float.NaN;
                             try {
                                 if(cameraManager!=null && logicalCharacteristics!=null) {
                                     physicalCharacteristics=cameraManager.getCameraCharacteristics(physicalId);
-                                    float measured=CameraLensGeometry.relativeZoom(logicalCharacteristics,
+                                    measured=CameraLensGeometry.relativeZoom(logicalCharacteristics,
                                         physicalCharacteristics);
                                     if(validIntrinsicZoom(measured)&&validIntrinsicZoom(intrinsic))ratio=measured*intrinsic;
                                 }
                             } catch(Exception ignored) { /* Use CameraX metadata if a physical ID is hidden. */ }
+                            // Pin the primary rear 1x choice to the physical wide
+                            // module so manual zoom cannot trigger an OEM lens swap.
+                            float distance=Math.abs(measured-1f);
+                            if(primary && "environment".equals(lensFacing) && Float.isFinite(distance) &&
+                                distance<.08f && distance<primaryWideDistance) {
+                                float[] bounds=physicalZoomBounds(physicalCharacteristics);
+                                lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic,false),lensFacing,
+                                    physicalId,id,info,intrinsic,bounds[0],bounds[1]));
+                                primaryWideDistance=distance;
+                            }
                             physicalIds.add(physicalId);
                             if(hasEquivalentLens(lensFacing,ratio,null))continue;
                             String key="physical:"+id+":"+physicalId;
@@ -402,6 +414,11 @@ public class ClearWaterCameraPlugin extends Plugin {
     private CameraCharacteristics cameraCharacteristics(CameraManager manager,String id) {
         if(manager==null||id==null)return null;
         try{return manager.getCameraCharacteristics(id);}catch(Exception ignored){return null;}
+    }
+
+    private Rect cameraActiveArray(CameraCharacteristics characteristics) {
+        if(characteristics==null)return null;
+        try{return characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);}catch(Exception ignored){return null;}
     }
 
     private float[] physicalZoomBounds(CameraCharacteristics characteristics) {
@@ -437,7 +454,8 @@ public class ClearWaterCameraPlugin extends Plugin {
     private boolean hasEquivalentLens(String facing,float ratio,Boolean physicalOnly) {
         if(!validIntrinsicZoom(ratio))return false;
         for(Lens lens:lenses.values())if(facing.equals(lens.facing) &&
-            (physicalOnly==null||lens.physical()==physicalOnly) && validIntrinsicZoom(lens.intrinsicZoom) &&
+            (physicalOnly==null || (physicalOnly ? lens.physical() : lens.id.startsWith("logical:"))) &&
+            validIntrinsicZoom(lens.intrinsicZoom) &&
             Math.abs(lens.intrinsicZoom-ratio)/Math.max(lens.intrinsicZoom,ratio)<.08f)return true;
         return false;
     }
@@ -445,7 +463,7 @@ public class ClearWaterCameraPlugin extends Plugin {
     private void removeEquivalentPhysicalLenses(String facing,float ratio) {
         if(!validIntrinsicZoom(ratio))return;
         List<String> duplicates=new ArrayList<>();
-        for(Lens lens:lenses.values())if(lens.physical() && facing.equals(lens.facing) &&
+        for(Lens lens:lenses.values())if(lens.physical() && !lens.id.startsWith("logical:") && facing.equals(lens.facing) &&
             validIntrinsicZoom(lens.intrinsicZoom) &&
             Math.abs(lens.intrinsicZoom-ratio)/Math.max(lens.intrinsicZoom,ratio)<.08f)duplicates.add(lens.id);
         for(String id:duplicates)lenses.remove(id);
@@ -456,7 +474,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         String preferred=defaultCameraId("user".equals(desired)?CameraSelector.DEFAULT_FRONT_CAMERA:CameraSelector.DEFAULT_BACK_CAMERA);
         if(preferred!=null && lenses.containsKey("logical:"+preferred))return "logical:"+preferred;
         Lens best=null;
-        for (Lens item:lenses.values()) if (desired.equals(item.facing) && !item.physical()) {
+        for (Lens item:lenses.values()) if (desired.equals(item.facing) && item.id.startsWith("logical:")) {
             if (best==null || Math.abs(item.intrinsicZoom-1f)<Math.abs(best.intrinsicZoom-1f)) best=item;
         }
         return best==null?null:best.id;
@@ -809,6 +827,12 @@ public class ClearWaterCameraPlugin extends Plugin {
 
     private CameraCaptureSession.CaptureCallback lensCaptureCallback(String lensId,String requestedPhysicalId) {
         AtomicInteger frames=new AtomicInteger();
+        Lens lens=lenses.get(lensId);
+        CameraManager manager=(CameraManager)getContext().getSystemService(Context.CAMERA_SERVICE);
+        CameraCharacteristics logical=cameraCharacteristics(manager,lens==null?null:lens.logicalCameraId);
+        CameraCharacteristics physical=cameraCharacteristics(manager,requestedPhysicalId);
+        Rect logicalArray=cameraActiveArray(logical);
+        Rect physicalArray=cameraActiveArray(physical);
         return new CameraCaptureSession.CaptureCallback() {
             @Override public void onCaptureCompleted(@NonNull CameraCaptureSession session,@NonNull CaptureRequest request,@NonNull TotalCaptureResult result) {
                 int frame=frames.incrementAndGet();
@@ -823,11 +847,16 @@ public class ClearWaterCameraPlugin extends Plugin {
                 Float physicalFocal=physicalResult==null?null:physicalResult.get(CaptureResult.LENS_FOCAL_LENGTH);
                 Float physicalZoom=Build.VERSION.SDK_INT>=Build.VERSION_CODES.R&&physicalResult!=null
                     ? physicalResult.get(CaptureResult.CONTROL_ZOOM_RATIO) : null;
+                Rect requestedCrop=request.get(CaptureRequest.SCALER_CROP_REGION);
+                Rect logicalCrop=result.get(CaptureResult.SCALER_CROP_REGION);
+                Rect physicalCrop=physicalResult==null?null:physicalResult.get(CaptureResult.SCALER_CROP_REGION);
                 Log.i("ClearWaterCamera","capture frame="+frame+" lens="+lensId+
                     " requestedPhysical="+requestedPhysicalId+" activePhysical="+active+
                     " focalMm="+focal+" zoom="+zoom+" physicalResults="+
                     (Build.VERSION.SDK_INT>=Build.VERSION_CODES.P?result.getPhysicalCameraResults().keySet():Collections.emptySet())+
-                    " requestedPhysicalFocalMm="+physicalFocal+" requestedPhysicalZoom="+physicalZoom);
+                    " requestedPhysicalFocalMm="+physicalFocal+" requestedPhysicalZoom="+physicalZoom+
+                    " requestedCrop="+requestedCrop+" logicalCrop="+logicalCrop+" physicalCrop="+physicalCrop+
+                    " logicalArray="+logicalArray+" physicalArray="+physicalArray);
             }
         };
     }
