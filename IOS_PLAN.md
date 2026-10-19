@@ -1,5 +1,11 @@
 # iOS native camera and sideloading plan
 
+## Automatic lens selection checkpoint (19 October 2026)
+
+PR #8 adds native Auto lens selection using reported optical ratios and per-device zoom bounds. A requested 5x may use a near-native 5.1x module, or a 4x module with 1.25x digital zoom. Manual lens selection stays fixed until Auto is selected again. Lens switches are serialized and unavailable during recording. Automatic switches preserve picked neutral calibration; stale sampled/AI frames are discarded. Browser camera selection is unchanged.
+
+iOS source `f45fa00` passed unsigned physical-device packaging and all 31 hosted native tests in [run 39185483253](https://github.com/fishese/clearwater/actions/runs/39185483253). [Unsigned test IPA](https://github.com/fishese/clearwater/actions/runs/39185483253/artifacts/12158220837). This is a branch test artifact, not a new stable release. Actual iPhone lens transitions, framing, picked white balance across automatic switches and recording after a switch still require hardware acceptance. Android physical-stream digital zoom is being verified separately; do not infer its behavior from the iOS implementation.
+
 ## iPhone acceptance and merge approval (17 October 2026)
 
 The user confirms the iPhone tests passed for the final `ba03e3b` IPA and authorizes merging PR #2 with a merge commit, preserving its existing history. This is user-confirmed device acceptance; the agent did not perform new physical-device tests. The earlier pending-phone/pre-merge notes below are historical. Main-branch checks and Pages deployment must be verified after merging. Release publication and enabling `IOS_IPA_URL` remain explicitly unauthorized: keep the latest release and public IPA download unchanged.

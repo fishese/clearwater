@@ -1,5 +1,11 @@
 # Maintenance
 
+## Native Auto lens selection (19 October 2026)
+
+PR #8 adds Auto selection by reported optical ratio and local zoom capabilities, with manual lens lock until Auto is selected again. A 3% tolerance allows a reported 5.1x module for requested 5x; a 4x module can supply 5x using local 1.25x digital zoom. Lens changes are serialized, blocked during recording, and clear stale samples while preserving picked white balance during automatic switches. Android's logical wide entry is pinned to its reported physical wide sensor where identifiable, preventing the OEM from switching lenses behind a manual selection.
+
+193 shared tests, production/browser regressions, three Android geometry tests and minified debug build pass. S24 Ultra confirms Auto telephoto choice, same-lens 5.1x to 10x physical crop, manual wide 5x crop and return to Auto. Physical result CONTROL_ZOOM_RATIO remains 1 for forced streams; inspect SCALER_CROP_REGION relative to the physical active array to verify digital zoom. Do not infer success from the logical zoom result alone. Latest test debug APK is installed; ignored copy `editor/android/build/clearwater-pr8-auto-lens-debug.apk`. iOS run 39185483253 passed unsigned packaging and 31 native tests; artifact 12158220837 still requires iPhone lens/white-balance acceptance. Stable 1.0.7 is unchanged.
+
 ## Android physical lens fix (19 October 2026)
 
 PR #8 / codex/android-lens-discovery-fix includes main plus the separately committed Settings and iOS preview work. Commit 1c79343 sends the selected Camera2 physical ID through every use-case builder, derives JPEG sizes from the physical/logical intersection under 12.5 MP, and intersects physical zoom capabilities with CameraX bounds. This is required by the pinned CameraX 1.6.2 ordinary bind path; do not treat selector-only targeting or successful binding as proof of optical switching. Three bounded capture-result logs per bind make first-frame and per-physical sensor checks possible without recording image data.
