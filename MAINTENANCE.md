@@ -1,5 +1,11 @@
 # Maintenance
 
+## Web Save/Share readiness follow-up (19 October 2026)
+
+User reports Save/Share sometimes stay disabled in iPhone browsers. Confirmed state bug: loading a recipe or otherwise starting a newer preview can supersede Auto enhance; the old enhancement reply is ignored while its busy flag previously remained set indefinitely. Track the pending enhancement and clear only its busy state when superseded. Ignore stale enhancement errors so they cannot unlock a newer render or export. Also avoid rendering an unchanged preview after every export/cancel; actual changes made while exporting still schedule one deferred preview.
+
+Regression coverage delays enhancement, loads a recipe, holds the replacement render and injects an old enhancement error. Save stays locked until the real replacement preview finishes, then remains usable after the late result. Existing iOS save prompt, fresh-tap share, cancel/retry, preset sharing, desktop destination/collision/cancel, native share and iOS shell checks pass. The full shared suite has 193 tests. Windows Playwright WebKit's full photo load remains inconclusive; its isolated share-wrapper check passes. These tests do not establish that every reported physical iPhone save failure has the same cause. This is a web follow-up for the next native packages, not a replacement of 1.0.8 release binaries.
+
 ## Published 1.0.8 (19 October 2026)
 
 User authorized merging PR #8 and release publication. Merged as `0eae50cee4578df86a75375f3288172ada05c2a6`; [v1.0.8](https://github.com/fishese/clearwater/releases/tag/v1.0.8) is published as latest with versioned debug/release APKs, canonical release APK and unsigned IPA, checksums, provenance, LICENSE and NOTICE. Android version code 27 retains the 1.0.7 release signing certificate; iOS build 6 requires iOS 26+. All 14 uploaded asset SHA-256 digests match local files. APK/IPA archive integrity and bundled model hashes pass. Android native tests (9 total), minified debug/release builds and version checks pass. Pages run 39187121298 passed 193 shared tests and deployed main. iOS run 39187142233 packaged the merged source; the unchanged native implementation already passed all 31 hosted tests in run 39185483253. Actual iPhone lens/white-balance acceptance remains open. Previous unmerged/stable-unchanged statements below describe earlier checkpoints.

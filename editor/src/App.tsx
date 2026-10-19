@@ -102,12 +102,13 @@ export default function App() {
   const previewPlayback=useRef({playing:false,startedAt:0,startTime:0});
   previewTimeRef.current=previewTime;videoDurationRef.current=videoInfo?.duration??0;
   const [stageSize,setStageSize]=useState({width:0,height:0}),[ready,setReady]=useState(false),[sampleBusy,setSampleBusy]=useState(false),[rendering,setRendering]=useState(false);
+  const [previewRenderNonce,setPreviewRenderNonce]=useState(0),deferredPreviewRender=useRef(false);
   const originalCanvas=useRef<HTMLCanvasElement>(null),editedCanvas=useRef<HTMLCanvasElement>(null),stage=useRef<HTMLDivElement>(null),controlsPanel=useRef<HTMLElement>(null),controlBody=useRef<HTMLFieldSetElement>(null);
   const [zoomControlPosition,setZoomControlPosition]=useState({right:8,bottom:8});
   const lastBackAt=useRef(0),exitPromptTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const expandedGesture=useRef({points:new Map<number,{x:number;y:number}>(),pinched:false,moved:false,picker:false,comparison:false,startZoom:1,startDistance:0,startDivider:50,lastPoint:null as {x:number;y:number}|null});
   const importInput=useRef<HTMLInputElement>(null),recipeInput=useRef<HTMLInputElement>(null);
-  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),pendingCustomCommand=useRef<Record<string,unknown>|null>(null),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
+  const worker=useRef<Worker|null>(null),generation=useRef(0),request=useRef(0),latest=useRef(0),exportRequest=useRef(0),neutralRequest=useRef(0),autoEnhancementRequest=useRef<number|null>(null),pendingModelBlob=useRef<Blob|null>(null),pendingModelRestore=useRef(false),pendingCustomCommand=useRef<Record<string,unknown>|null>(null),applyCustomModel=useRef(false),modelRestoreStarted=useRef(false),modelSelectionStarted=useRef(false);
   const workerRecovery=useRef<{photoId:string|null;attempts:number}>({photoId:null,attempts:0});
   const deferredWorkerFailure=useRef(false);
   const previewRenderQueue=useRef<{inFlight:number|null;pending:{type:'render';gen:number;request:number;recipe:Recipe;time:number}|null}>({inFlight:null,pending:null});
@@ -441,7 +442,7 @@ export default function App() {
       if(data.type==='rendered'||(data.type==='error'&&data.operation==='render'))finishPreviewRender(data.request);
       if(data.gen!==generation.current){data.bitmap?.close();data.original?.close();return;}
       if(data.type==='photo-info'){setPhotoInfo(data.info);}
-      else if(data.type==='enhancement-ready'&&data.request===latest.current){setBusy('');setRendering(false);update(r=>({...r,enhancement:{...data.enhancement,autoApplied:true}}));}
+      else if(data.type==='enhancement-ready'&&data.request===latest.current){autoEnhancementRequest.current=null;setBusy('');setRendering(false);update(r=>({...r,enhancement:{...data.enhancement,autoApplied:true}}));}
       else if(data.type==='loaded') {
         setPhotoInfo(data.photo??null);setPhotoRetry(false);
         setAnalysis(data.analysis);setDimensions([data.width,data.height]);setVideoInfo(data.video?{...data.video,hdrToneMapped:hdrWorkingCopies.current.has(activeRef.current??'')}:null);setBusy('');setReady(true);expandedGesture.current.points.clear();expandedGesture.current.pinched=false;expandedGesture.current.picker=false;setZoom(1);
@@ -467,6 +468,10 @@ export default function App() {
       else if(data.type==='exported'&&data.request===exportRequest.current) {
         void finishExport(data.blob,data.metadataWarning);
       } else if(data.type==='error') {
+        if(data.operation==='enhance'){
+          if(data.request!==autoEnhancementRequest.current)return;
+          autoEnhancementRequest.current=null;
+        }
         if(data.operation==='render'&&data.request!==latest.current)return;
         if(data.operation==='load'||data.operation==='render'){
           const id=activeRef.current;
@@ -558,7 +563,7 @@ export default function App() {
     if(p.nativeCapture?.descriptor.kind==='video'&&!capabilities.videoEditing){setBusy('');setRendering(false);setReady(false);return;}
     for(const id of hdrWorkingCopies.current.keys())if(id!==p.id)disposeHdrWorkingCopy(id);
     const clip=isVideo(p.file);worker.current=clip?videoProcessor.current:photoProcessor.current;
-    const loadGeneration=++generation.current;setShareReady(null);setIosWebSave(null);setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setPreviewTime(0);setKeepAudio(true);setModelStatus('');setReady(false);setRendering(true);setAnalysis(null);setBusy(clip?t("Opening video…"):isRaw(p.file)?t("Developing DNG locally…"):/\.hei[cf]$/i.test(p.file.name)?t("Decoding HEIC locally…"):t("Opening photo…"));setEyedropper(false);
+    const loadGeneration=++generation.current;autoEnhancementRequest.current=null;setShareReady(null);setIosWebSave(null);setPhotoInfo(null);setPhotoRetry(false);setVideoInfo(null);setPreviewTime(0);setKeepAudio(true);setModelStatus('');setReady(false);setRendering(true);setAnalysis(null);setBusy(clip?t("Opening video…"):isRaw(p.file)?t("Developing DNG locally…"):/\.hei[cf]$/i.test(p.file.name)?t("Decoding HEIC locally…"):t("Opening photo…"));setEyedropper(false);
     (clip?photoProcessor.current:videoProcessor.current)?.postMessage({type:'unload',gen:generation.current});
     if(customFile&&customModel)worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,name:customModel.name,inputRange:customModel.inputRange,outputRange:customModel.outputRange,silent:true,expectedConfig:customModel});
     const hdrCopy=hdrWorkingCopies.current.get(p.id);
@@ -569,12 +574,15 @@ export default function App() {
     if(ready&&pendingBitmap.current&&originalCanvas.current){const b=pendingBitmap.current,c=originalCanvas.current;c.width=b.width;c.height=b.height;c.getContext('2d')!.drawImage(b,0,0);b.close();pendingBitmap.current=null;}
   },[ready]);
   useEffect(()=>{
-    if(!recipe||!ready||exporting||cameraOpen||(photo?.nativeCapture&&(!photo.nativeCapture.loaded||(video&&!capabilities.videoEditing))))return;
+    if(!recipe||!ready||cameraOpen||(photo?.nativeCapture&&(!photo.nativeCapture.loaded||(video&&!capabilities.videoEditing))))return;
+    if(exporting){deferredPreviewRender.current=true;return;}
+    if(autoEnhancementRequest.current!==null){autoEnhancementRequest.current=null;setBusy('');}
     if(recipe.engine==='wave'&&(!customModel||(recipe.customModel&&(recipe.customModel.sha256!==customModel.sha256||recipe.customModel.inputRange!==customModel.inputRange||recipe.customModel.outputRange!==customModel.outputRange)))){latest.current=++request.current;setInputRange(recipe.customModel?.inputRange??'unit');setOutputRange(recipe.customModel?.outputRange??'unit');setCustomOpen(true);setRendering(true);return;}
     const id=++request.current;latest.current=id;setRendering(true);
     const timer=setTimeout(()=>{previewRenderQueue.current.pending={type:'render',gen:generation.current,request:id,recipe,time:previewTime};drainPreviewRenderQueue();},40);
     return ()=>clearTimeout(timer);
-  },[recipe,ready,exporting,customModel,previewTime,photo?.id,photo?.nativeCapture?.loaded,cameraOpen]);
+  },[recipe,ready,customModel,previewTime,photo?.id,photo?.nativeCapture?.loaded,cameraOpen,previewRenderNonce]);
+  useEffect(()=>{if(!exporting&&deferredPreviewRender.current){deferredPreviewRender.current=false;setPreviewRenderNonce(value=>value+1);}},[exporting]);
   useEffect(()=>{if(!video||!ready||exporting||cameraOpen||settingsOpen||about||customOpen||saveDialog)pauseVideoPreview();},[video,ready,exporting,cameraOpen,settingsOpen,about,customOpen,saveDialog,pauseVideoPreview]);
   useEffect(()=>{setShareReady(null);},[recipe,format,jpegQuality,keepMetadata,keepAudio,exportMode]);
   useEffect(()=>{const pauseWhenHidden=()=>{if(document.visibilityState!=='visible')pauseVideoPreview();};document.addEventListener('visibilitychange',pauseWhenHidden);window.addEventListener('pagehide',pauseVideoPreview);return()=>{document.removeEventListener('visibilitychange',pauseWhenHidden);window.removeEventListener('pagehide',pauseVideoPreview);};},[pauseVideoPreview]);
@@ -626,7 +634,7 @@ export default function App() {
     if(recipe?.engine==='wave'&&!matching&&analysis)update(r=>({...r,engine:'balanced',auto:suggest(analysis,r.hints,'balanced')}));
   }
   async function forgetSavedModel(){if(customLoading)return;try{await forgetCustomModel();setRememberedModel(null);notify(t("Saved custom model removed from this device."));}catch{notify(t("Could not remove the saved custom model."));}}
-  function autoEnhance(){if(!canEdit||video||rendering)return;const id=++request.current;latest.current=id;setBusy(t('Analysing photo enhancement…'));worker.current?.postMessage({type:'enhance',gen:generation.current,request:id,recipe});}
+  function autoEnhance(){if(!canEdit||video||rendering)return;const id=++request.current;latest.current=id;autoEnhancementRequest.current=id;setBusy(t('Analysing photo enhancement…'));worker.current?.postMessage({type:'enhance',gen:generation.current,request:id,recipe});}
   function enhance(key:'contrast'|'clarity'|'sharpness'|'brightness',value:number){update(r=>{const previous={...r.enhancement??DEFAULT_ENHANCEMENT};delete previous.autoApplied;return {...r,enhancement:{...previous,[key]:value}};},false);}
   const autoEnhancementApplied=recipe?.enhancement?.autoApplied===true&&(
     recipe.enhancement.contrast!==0||recipe.enhancement.clarity!==0||recipe.enhancement.sharpness!==0||
