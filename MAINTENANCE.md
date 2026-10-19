@@ -1,5 +1,12 @@
 # Maintenance
 
+## Adaptive finish P2 saved-fit checkpoint (19 October 2026)
+
+7557c4b completes the bounded Vivid comparison (216 local treatments, no engine/browser errors); Natural and Vivid follow the user-selected direction. c1744a5 adds optional validated recipe-v1 fit storage and shared photo preview/export application. One fit and cached inference are reused, with explicit update, safe fallback, bounded kernels, and stale fit guards. Automatically applied contrast is suppressed only for a real active finish; manual contrast remains available. Defaults and video/live-camera/native ownership are unchanged.
+
+234 shared tests and production build pass. Legacy Effects/PNG parity, iOS web Save/Share supersession/cancel/retry, destination/collision/cancel and mocked iOS shell pass. P3 UI/wording is awaiting its focused browser check/commit. P4 remains open for human visuals, full export/mobile cost and hardware acceptance; the measured extra pass still exceeds the initial 10% target. No stable release, merge, version bump or publication has occurred. Earlier isolated-only/gated statements below are historical.
+
+
 ## Adaptive finish P1 implementation checkpoint (19 October 2026)
 
 72295d2 adds isolated reusable colour/tone math, 12 synthetic regressions and a local four-engine comparison harness. All 205 shared tests and production build pass; 180 local treatments completed without engine/browser errors. Private reports, source crops and manifests stay ignored in analysis/adaptive-finish/. The module is absent from production bundles. No UI/schema/worker/default, native, Save/Share, version or release changes were made.
