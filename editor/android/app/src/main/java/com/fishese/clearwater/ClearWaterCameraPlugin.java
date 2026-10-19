@@ -223,12 +223,12 @@ public class ClearWaterCameraPlugin extends Plugin {
         final String logicalCameraId;
         final CameraInfo info;
         final float intrinsicZoom;
-        final float physicalMinZoom, physicalMaxZoom;
+        final float metadataMinZoom, metadataMaxZoom;
         Lens(String id, String label, String facing, String physicalCameraId, String logicalCameraId, CameraInfo info, float intrinsicZoom,
-             float physicalMinZoom, float physicalMaxZoom) {
+             float metadataMinZoom, float metadataMaxZoom) {
             this.id=id; this.label=label; this.facing=facing; this.physicalCameraId=physicalCameraId;
             this.logicalCameraId=logicalCameraId; this.info=info; this.intrinsicZoom=intrinsicZoom;
-            this.physicalMinZoom=physicalMinZoom;this.physicalMaxZoom=physicalMaxZoom;
+            this.metadataMinZoom=metadataMinZoom;this.metadataMaxZoom=metadataMaxZoom;
         }
         boolean physical() { return physicalCameraId != null; }
         CameraSelector selector() {
@@ -346,7 +346,8 @@ public class ClearWaterCameraPlugin extends Plugin {
                 // to an equivalent physical selector advertised by a logical camera.
                 if(primary || !hasEquivalentLens(lensFacing,intrinsic,false)) {
                     removeEquivalentPhysicalLenses(lensFacing,intrinsic);
-                    lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, !primary),lensFacing,null,id,info,intrinsic,Float.NaN,Float.NaN));
+                    float[] zoomBounds=logicalZoomBounds(logicalCharacteristics);
+                    lenses.put(logicalId,new Lens(logicalId,labelFor(intrinsic, !primary),lensFacing,null,id,info,intrinsic,zoomBounds[0],zoomBounds[1]));
                 }
                 Set<String> advertisedIds=Build.VERSION.SDK_INT>=Build.VERSION_CODES.P && logicalCharacteristics!=null
                     ? logicalCharacteristics.getPhysicalCameraIds() : Collections.emptySet();
@@ -405,15 +406,32 @@ public class ClearWaterCameraPlugin extends Plugin {
 
     private float[] physicalZoomBounds(CameraCharacteristics characteristics) {
         if(characteristics==null)return new float[]{1f,Float.POSITIVE_INFINITY};
-        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R){
-            Range<Float> range=characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE);
-            if(range!=null&&Float.isFinite(range.getLower())&&Float.isFinite(range.getUpper())&&range.getUpper()>=1f){
-                float min=Math.max(1f,range.getLower());
-                if(range.getUpper()>=min)return new float[]{min,range.getUpper()};
+        try {
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R){
+                Range<Float> range=characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE);
+                if(range!=null&&Float.isFinite(range.getLower())&&Float.isFinite(range.getUpper())&&range.getUpper()>=1f){
+                    float min=Math.max(1f,range.getLower());
+                    if(range.getUpper()>=min)return new float[]{min,range.getUpper()};
+                }
             }
-        }
-        Float max=characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
-        return new float[]{1f,max!=null&&Float.isFinite(max)&&max>=1f?max:Float.POSITIVE_INFINITY};
+            Float max=characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+            return new float[]{1f,max!=null&&Float.isFinite(max)&&max>=1f?max:Float.POSITIVE_INFINITY};
+        } catch(Exception ignored) { return new float[]{1f,Float.POSITIVE_INFINITY}; }
+    }
+
+    private float[] logicalZoomBounds(CameraCharacteristics characteristics) {
+        if(characteristics==null)return new float[]{Float.NaN,Float.NaN};
+        try {
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.R){
+                Range<Float> range=characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE);
+                if(range!=null&&Float.isFinite(range.getLower())&&Float.isFinite(range.getUpper())&&
+                    range.getLower()>0f&&range.getUpper()>=range.getLower())
+                    return new float[]{range.getLower(),range.getUpper()};
+            }
+            Float max=characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+            return max!=null&&Float.isFinite(max)&&max>=1f
+                ? new float[]{1f,max} : new float[]{Float.NaN,Float.NaN};
+        } catch(Exception ignored) { return new float[]{Float.NaN,Float.NaN}; }
     }
 
     private boolean hasEquivalentLens(String facing,float ratio,Boolean physicalOnly) {
@@ -458,6 +476,18 @@ public class ClearWaterCameraPlugin extends Plugin {
         for (Lens lens:lenses.values()) {
             JSObject value=new JSObject(); value.put("id",lens.id); value.put("label",lens.label); value.put("facing",lens.facing);
             if(validIntrinsicZoom(lens.intrinsicZoom))value.put("intrinsicZoom",lens.intrinsicZoom);
+            float min=lens.metadataMinZoom,max=lens.metadataMaxZoom;
+            androidx.camera.core.ZoomState state=null;
+            try { state=lens.info.getZoomState().getValue(); } catch(Exception ignored) {}
+            if(state!=null){
+                if(!Float.isFinite(min))min=state.getMinZoomRatio();
+                else min=Math.max(min,state.getMinZoomRatio());
+                if(!Float.isFinite(max))max=state.getMaxZoomRatio();
+                else max=Math.min(max,state.getMaxZoomRatio());
+            }
+            if(validIntrinsicZoom(min)&&Float.isFinite(max)&&max>=min){
+                value.put("minZoom",min);value.put("maxZoom",max);
+            }
             values.put(value);
         }
         return values;
@@ -927,7 +957,7 @@ public class ClearWaterCameraPlugin extends Plugin {
         Lens lens=lenses.get(lastBoundLensId==null?selectedLensId:lastBoundLensId);
         if(lens==null||!lens.physical())return new float[]{state.getMinZoomRatio(),state.getMaxZoomRatio()};
         return CameraLensGeometry.intersectZoomBounds(state.getMinZoomRatio(),state.getMaxZoomRatio(),
-            lens.physicalMinZoom,lens.physicalMaxZoom);
+            lens.metadataMinZoom,lens.metadataMaxZoom);
     }
     private int photoWidth(){return photoWidth(imageCapture);}
     private int photoHeight(){return photoHeight(imageCapture);}

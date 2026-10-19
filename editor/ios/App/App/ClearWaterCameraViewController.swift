@@ -785,6 +785,12 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             var item: [String: Any] = ["id": device.uniqueID, "label": label,
                 "facing": device.position == .front ? "user" : "environment"]
             if let ratio { item["intrinsicZoom"] = ratio }
+            let minZoom = device.minAvailableVideoZoomFactor
+            let maxZoom = device.maxAvailableVideoZoomFactor
+            if minZoom.isFinite, maxZoom.isFinite, minZoom > 0, maxZoom >= minZoom {
+                item["minZoom"] = minZoom
+                item["maxZoom"] = maxZoom
+            }
             return item
         }
     }
@@ -799,11 +805,13 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             } catch { completion(.failure(error)) }
         }
     }
-    func embeddedSetLens(_ id: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    func embeddedSetLens(_ id: String, preserveWhiteBalance: Bool = false,
+                         completion: @escaping (Result<[String: Any], Error>) -> Void) {
         let devices = selectableLensDevices()
         guard state == "ready", !closeRequested, !backgrounded, !sessionInterrupted, session.isRunning,
               let device = devices.first(where: { $0.uniqueID == id }) else { completion(.failure(CameraError.unavailable)); return }
         if cameraInput?.device.uniqueID == id { completion(.success(nativeInfo())); return }
+        let preservePickedNeutral = preserveWhiteBalance && pickedNeutral
         setState("starting")
         // Keep the existing white balance until the new camera is confirmed running.
         sessionQueue.async { [weak self] in
@@ -823,6 +831,9 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 return
             }
             let oldPosition = self.cameraPosition
+            // Transfer color temperature and tint, never raw sensor gains.
+            let previousWhiteBalance = preservePickedNeutral
+                ? oldInput.device.temperatureAndTintValues(for: oldInput.device.deviceWhiteBalanceGains) : nil
             let oldPhotoDimensions = self.photoOutput.maxPhotoDimensions
             let previousCandidateFormat = device.activeFormat
             let previousCandidateMinimumDuration = device.activeVideoMinFrameDuration
@@ -836,6 +847,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             var sessionStopped = false
             var deviceFormatChanged = false
             var lifecycleCancelled = false
+            var transferredWhiteBalance = false
             do {
                 let input = try AVCaptureDeviceInput(device: device)
                 newInput = input
@@ -856,6 +868,19 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                 }
                 self.session.startRunning()
                 guard self.session.isRunning, !self.sessionInterrupted else { throw CameraError.unavailable }
+                if let previousWhiteBalance, device.isWhiteBalanceModeSupported(.locked) {
+                    do {
+                        try device.lockForConfiguration()
+                        var gains = device.deviceWhiteBalanceGains(for: previousWhiteBalance)
+                        let limit = device.maxWhiteBalanceGain
+                        gains.redGain = min(limit, max(1, gains.redGain))
+                        gains.greenGain = min(limit, max(1, gains.greenGain))
+                        gains.blueGain = min(limit, max(1, gains.blueGain))
+                        device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+                        device.unlockForConfiguration()
+                        transferredWhiteBalance = true
+                    } catch { transferredWhiteBalance = false }
+                }
                 self.cameraInput = input; self.cameraPosition = device.position
                 self.observeSystemPressure(device)
                 self.resetHardwareWhiteBalance(on: oldInput.device)
@@ -865,7 +890,11 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                           self.session.isRunning, self.state == "starting" else {
                         completion(.failure(CameraError.cancelled)); return
                     }
-                    self.releaseHardwareWhiteBalance()
+                    self.frameLock.lock(); self.latestSource = nil; self.latestSourceSize = nil
+                    self.latestRendered = nil; self.frameLock.unlock()
+                    if preservePickedNeutral && self.pickedNeutral {
+                        self.hardwareWhiteBalanceLocked = transferredWhiteBalance
+                    } else { self.releaseHardwareWhiteBalance() }
                     self.photoCaptureAvailable = hasPhoto
                     self.setState("ready")
                     completion(.success(self.nativeInfo()))
