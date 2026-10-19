@@ -4,6 +4,8 @@ Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / 
 
 ## Active follow-up plan — 19 October 2026
 
+Release completion: user authorized merge/publication after Auto validation. PR #8 merged at `0eae50c`; v1.0.8 is published as latest with signed release APK, debug APK and unsigned IPA. Android version code 27 / iOS build 6. Pages run 39187121298 and iOS packaging run 39187142233 passed. All 14 uploaded asset hashes match; Android release certificate matches 1.0.7. Native Android tests/builds and bundled models pass. No unfinished implementation remains for this request; iPhone lens transitions remain a user hardware-acceptance check. Earlier no-publication instructions below are superseded by this explicit authorization.
+
 New authorized task: native Android/iOS Auto lens selection for requested absolute zoom, with explicit manual lens lock and an Auto chooser option. Use reported optical ratios and per-lens zoom capabilities, not a model database. Near-native matches such as 5.1x for requested5x are allowed within a small tolerance; a 4x telephoto can supply requested5x with digital1.25x. Shared lower-cost agent owns selection policy, serialized UI/native transactions, manual override and regressions. Native lower-cost agent exposes local min/max zoom per lens and preserves picked white balance on automatic switching. Keep browser camera behavior and recording restrictions. Parent owns real Android tests, integrated checks and iOS CI. No stable publication or PR merge is requested by this step.
 
 The completed physical-routing checkpoint below remains the baseline; do not repeat already-passed tests unless the new Auto behavior affects them.

@@ -1,5 +1,9 @@
 # Maintenance
 
+## Published 1.0.8 (19 October 2026)
+
+User authorized merging PR #8 and release publication. Merged as `0eae50cee4578df86a75375f3288172ada05c2a6`; [v1.0.8](https://github.com/fishese/clearwater/releases/tag/v1.0.8) is published as latest with versioned debug/release APKs, canonical release APK and unsigned IPA, checksums, provenance, LICENSE and NOTICE. Android version code 27 retains the 1.0.7 release signing certificate; iOS build 6 requires iOS 26+. All 14 uploaded asset SHA-256 digests match local files. APK/IPA archive integrity and bundled model hashes pass. Android native tests (9 total), minified debug/release builds and version checks pass. Pages run 39187121298 passed 193 shared tests and deployed main. iOS run 39187142233 packaged the merged source; the unchanged native implementation already passed all 31 hosted tests in run 39185483253. Actual iPhone lens/white-balance acceptance remains open. Previous unmerged/stable-unchanged statements below describe earlier checkpoints.
+
 ## Native Auto lens selection (19 October 2026)
 
 PR #8 adds Auto selection by reported optical ratio and local zoom capabilities, with manual lens lock until Auto is selected again. A 3% tolerance allows a reported 5.1x module for requested 5x; a 4x module can supply 5x using local 1.25x digital zoom. Lens changes are serialized, blocked during recording, and clear stale samples while preserving picked white balance during automatic switches. Android's logical wide entry is pinned to its reported physical wide sensor where identifiable, preventing the OEM from switching lenses behind a manual selection.
