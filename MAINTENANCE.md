@@ -2,6 +2,8 @@
 
 ## Web Save/Share readiness follow-up (19 October 2026)
 
+Merged PR #10 as `206d080`; Pages run 39188913154 passed tests/build and deployed successfully. Live site returns HTTP 200 with bundle `index-CeSWtHCU.js`. Use ClearWater's update control to fetch the web fix; native release 1.0.8 packages predate this shared UI correction.
+
 User reports Save/Share sometimes stay disabled in iPhone browsers. Confirmed state bug: loading a recipe or otherwise starting a newer preview can supersede Auto enhance; the old enhancement reply is ignored while its busy flag previously remained set indefinitely. Track the pending enhancement and clear only its busy state when superseded. Ignore stale enhancement errors so they cannot unlock a newer render or export. Also avoid rendering an unchanged preview after every export/cancel; actual changes made while exporting still schedule one deferred preview.
 
 Regression coverage delays enhancement, loads a recipe, holds the replacement render and injects an old enhancement error. Save stays locked until the real replacement preview finishes, then remains usable after the late result. Existing iOS save prompt, fresh-tap share, cancel/retry, preset sharing, desktop destination/collision/cancel, native share and iOS shell checks pass. The full shared suite has 193 tests. Windows Playwright WebKit's full photo load remains inconclusive; its isolated share-wrapper check passes. These tests do not establish that every reported physical iPhone save failure has the same cause. This is a web follow-up for the next native packages, not a replacement of 1.0.8 release binaries.
