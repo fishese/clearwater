@@ -1,5 +1,5 @@
 import { analyse, makePhotoRecipe, makeRecipe, renderPixels, suggest } from '../../src/core/engine';
-import { fitAdaptiveFinish, applyAdaptiveFinish, type AdaptiveFinishFit } from '../../src/core/adaptive-finish';
+import { fitAdaptiveFinish, applyAdaptiveFinish, type AdaptiveFinishFit, type AdaptiveFinishVariant } from '../../src/core/adaptive-finish';
 import { enhancePixels, suggestEnhancement } from '../../src/core/enhancement';
 import { DEFAULT_MANUAL, type Hints, type Recipe } from '../../src/core/types';
 import { prepareGuidedField, transferField, type GuidedField } from '../../src/core/neural-field';
@@ -7,14 +7,14 @@ import { decodePhoto } from '../../src/photo-decode';
 import { BUNDLED_MODEL_IDS, type BundledModelId } from '../../src/core/bundled-models';
 import { inferField } from '../../src/models';
 
-type Candidate = 'tone' | 'colour-tone' | 'soft-water';
+type Candidate = AdaptiveFinishVariant;
 type EngineId = 'balanced' | BundledModelId;
 type SampleSpec = { name?: string; category?: string; hints?: Partial<Hints>; preserveRedCorrection?: boolean; crop?: { x?: number; y?: number; size?: number } };
 type HarnessOptions = { samples: SampleSpec[]; engines: EngineId[]; synthetic: boolean };
 type RuntimeResult = { sample: string; category: string; originalWidth: number; originalHeight: number; previewWidth: number; previewHeight: number; crop: { x: number; y: number; width: number; height: number }; records: unknown[]; errors: string[] };
 
-const CANDIDATES: Candidate[] = ['tone', 'colour-tone', 'soft-water'];
-const COLUMNS = ['Corrected', 'Auto enhance', 'Tone replaces auto', 'Colour + tone replaces auto', 'Soft water replaces auto'];
+const CANDIDATES: Candidate[] = ['tone', 'colour-tone', 'soft-water', 'vivid'];
+const COLUMNS = ['Corrected', 'Auto enhance', 'Tone replaces auto', 'Colour + tone replaces auto', 'Soft water replaces auto', 'Vivid replaces auto'];
 const TILE_W = 320, WHOLE_TILE_H = 232, WHOLE_IMAGE_H = 190;
 let cropTileWidth = 524, cropTileHeight = 556;
 const DEFAULT_HINTS: Hints = { scene: 'auto', water: 'auto', filter: 'auto', depth: null };
@@ -233,12 +233,21 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
         const cropApplyMs = now() - cropApplyStart;
         labelCell(wholeSheet, row, candidateIndex + 2, candidatePreview, previewWidth, previewHeight, `${engineTitle} · ${COLUMNS[candidateIndex + 2]}`, TILE_W, WHOLE_TILE_H, WHOLE_IMAGE_H);
         labelCell(cropSheet, row, candidateIndex + 2, candidateCrop, crop.width, crop.height, `${engineTitle} · ${COLUMNS[candidateIndex + 2]}`, cropTileWidth, cropTileHeight, crop.height);
-        records.push({ sample: sampleId, category, engine, treatment: variant, replaces: 'Auto enhance tone; no clarity or sharpness stacked', inferenceCount: 0, fit: { active: fit.active, reason: fit.reason, colourReason: fit.colourReason, sampleCount: fit.sampleCount, colourGains: fit.colourGains, toneScale: fit.toneScale, toneOffset: fit.toneOffset }, fitMs, previewApplyMs, previewWarmApplyMs, cropApplyMs, warmApplyPercentOfWarmRenderer: +(previewWarmApplyMs / Math.max(.001, warmPreviewRendererMs) * 100).toFixed(2), preview: metrics(candidatePreview), crop: metrics(candidateCrop), previewDeltaFromCorrected: deltaMetrics(correctedPreview, candidatePreview), previewDeltaFromAutoEnhance: deltaMetrics(autoPreview, candidatePreview) });
+        records.push({ sample: sampleId, category, engine, treatment: variant, replaces: 'Auto enhance tone; no clarity or sharpness stacked', experimental: variant === 'vivid', qualityClaim: variant === 'vivid' ? 'none; visual comparison required' : undefined, inferenceCount: 0, fitObjectReusedForPreviewAndCrop: true, fit: { active: fit.active, reason: fit.reason, colourReason: fit.colourReason, sampleCount: fit.sampleCount, colourGains: fit.colourGains, chromaGain: fit.chromaGain ?? 1, toneScale: fit.toneScale, toneOffset: fit.toneOffset }, fitMs, previewApplyMs, previewWarmApplyMs, cropApplyMs, warmApplyPercentOfWarmRenderer: +(previewWarmApplyMs / Math.max(.001, warmPreviewRendererMs) * 100).toFixed(2), preview: metrics(candidatePreview), crop: metrics(candidateCrop), previewDeltaFromCorrected: deltaMetrics(correctedPreview, candidatePreview), previewDeltaFromAutoEnhance: deltaMetrics(autoPreview, candidatePreview) });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error); errors.push(`${engine}: ${message}`);
       const context = wholeSheet.getContext('2d')!; context.fillStyle = '#ffb4a6'; context.font = '14px system-ui, sans-serif'; context.fillText(`${engineTitle} failed: ${message.slice(0, 120)}`, 8, 8 + row * WHOLE_TILE_H + 48, wholeSheet.width - 16);
     }
+  }
+  for (const record of records) {
+    if (CANDIDATES.includes(record.treatment as Candidate) && (record.inferenceCount !== 0 || record.fitObjectReusedForPreviewAndCrop !== true)) {
+      errors.push(`${String(record.engine)}: candidate did not reuse its fit or triggered an unexpected inference.`);
+    }
+  }
+  for (const engine of engines) {
+    const baseline = records.find(record => record.engine === engine && record.treatment === 'corrected baseline');
+    if (baseline && baseline.inferenceCount !== (engine === 'balanced' ? 0 : 1)) errors.push(`${engine}: expected one AI inference for the baseline and none for Balanced.`);
   }
   status.textContent = `Ready · ${sampleId} · ${engines.length} configured engines · ${errors.length} engine errors`;
   if (bitmap instanceof ImageBitmap) bitmap.close();

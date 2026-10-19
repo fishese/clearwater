@@ -6,7 +6,7 @@
  * colour balance and luminance curve; it cannot recover missing scene colour.
  */
 
-export type AdaptiveFinishVariant = 'tone' | 'colour-tone' | 'soft-water';
+export type AdaptiveFinishVariant = 'tone' | 'colour-tone' | 'soft-water' | 'vivid';
 
 export interface AdaptiveFinishFit {
   readonly variant: AdaptiveFinishVariant;
@@ -17,6 +17,8 @@ export interface AdaptiveFinishFit {
   readonly colourReason: 'fit' | 'protected-surface' | 'weak-channel';
   /** Per-channel linear-light multipliers. Always finite and bounded. */
   readonly colourGains: readonly [number, number, number];
+  /** Optional bounded chroma expansion. Missing is identity for older saved fits. */
+  readonly chromaGain?: number;
   /** Linear-light luminance curve: output = input * toneScale + toneOffset. */
   readonly toneScale: number;
   readonly toneOffset: number;
@@ -100,7 +102,7 @@ function sampleReference(data: Uint8ClampedArray, width: number, height: number)
 }
 
 function inactive(variant: AdaptiveFinishVariant, reason: AdaptiveFinishFit['reason'], sampleCount = 0): AdaptiveFinishFit {
-  return { variant, active: false, reason, sampleCount, colourReason: 'fit', colourGains: IDENTITY_GAINS, toneScale: 1, toneOffset: 0 };
+  return { variant, active: false, reason, sampleCount, colourReason: 'fit', colourGains: IDENTITY_GAINS, ...(variant === 'vivid' ? { chromaGain: 1 } : {}), toneScale: 1, toneOffset: 0 };
 }
 
 function boundedColourGains(stats: ReferenceStats, variant: AdaptiveFinishVariant): { gains: [number, number, number]; reason: AdaptiveFinishFit['colourReason'] } {
@@ -136,7 +138,7 @@ export function fitAdaptiveFinish(
   variant: AdaptiveFinishVariant = 'colour-tone',
   options: AdaptiveFinishOptions = {},
 ): AdaptiveFinishFit {
-  if (!['tone', 'colour-tone', 'soft-water'].includes(variant)) throw new Error('Unknown adaptive finish variant.');
+  if (!['tone', 'colour-tone', 'soft-water', 'vivid'].includes(variant)) throw new Error('Unknown adaptive finish variant.');
   const stats = sampleReference(reference, width, height);
   if (!stats) return inactive(variant, 'invalid-dimensions');
   if (stats.sampleCount >= MIN_SAMPLES && stats.darkCount / stats.sampleCount > .65) return inactive(variant, 'dark', stats.consideredCount);
@@ -163,6 +165,7 @@ export function fitAdaptiveFinish(
     sampleCount: stats.consideredCount,
     colourReason: colour.reason,
     colourGains: colour.gains,
+    ...(variant === 'vivid' ? { chromaGain: colour.reason === 'fit' ? 1.12 : 1 } : {}),
     toneScale: clamp(toneScale, .88, 1.12),
     toneOffset: clamp(toneOffset, -.045, .045),
   };
@@ -185,14 +188,16 @@ export function applyAdaptiveFinish(
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || input.length !== width * height * 4) {
     throw new Error('Adaptive finish dimensions do not match.');
   }
-  if (!fit || typeof fit !== 'object' || !['tone', 'colour-tone', 'soft-water'].includes(fit.variant) || typeof fit.active !== 'boolean' ||
+  if (!fit || typeof fit !== 'object' || !['tone', 'colour-tone', 'soft-water', 'vivid'].includes(fit.variant) || typeof fit.active !== 'boolean' ||
     !Number.isInteger(fit.sampleCount) || fit.sampleCount < 0 || !Array.isArray(fit.colourGains) || fit.colourGains.length !== 3 ||
     !['fit', 'protected-surface', 'weak-channel'].includes(fit.colourReason) ||
     fit.colourGains.some(gain => !Number.isFinite(gain) || gain < .82 || gain > 1.2) ||
+    (fit.chromaGain !== undefined && (!Number.isFinite(fit.chromaGain) || fit.chromaGain < 1 || fit.chromaGain > 1.15)) ||
     !Number.isFinite(fit.toneScale) || fit.toneScale < .88 || fit.toneScale > 1.12 ||
     !Number.isFinite(fit.toneOffset) || fit.toneOffset < -.045 || fit.toneOffset > .045) return input;
   if (!fit.active) return input;
-  if (fit.toneScale === 1 && fit.toneOffset === 0 && fit.colourGains[0] === 1 && fit.colourGains[1] === 1 && fit.colourGains[2] === 1) return input;
+  const chromaGain = fit.variant === 'vivid' && fit.colourReason === 'fit' ? fit.chromaGain ?? 1 : 1;
+  if (fit.toneScale === 1 && fit.toneOffset === 0 && fit.colourGains[0] === 1 && fit.colourGains[1] === 1 && fit.colourGains[2] === 1 && chromaGain === 1) return input;
   const out = new Uint8ClampedArray(input);
   const [redGain, greenGain, blueGain] = fit.colourGains;
 
@@ -205,8 +210,9 @@ export function applyAdaptiveFinish(
     const originalLuma = luminance(r, g, b);
     if (originalLuma <= 1e-5) continue;
 
+    const coolWater = fit.variant === 'soft-water' || fit.variant === 'vivid' ? waterLikelihood(r, g, b) : 0;
     let colourAmount = 1;
-    if (fit.variant === 'soft-water') colourAmount -= .68 * waterLikelihood(r, g, b);
+    if (fit.variant === 'soft-water' || fit.variant === 'vivid') colourAmount -= .68 * coolWater;
     const peak = Math.max(r, g, b);
     const shadowProtection = smooth(.025, .15, originalLuma);
     const highlightProtection = 1 - smooth(.82, .98, peak);
@@ -219,6 +225,22 @@ export function applyAdaptiveFinish(
     r *= effectiveRed;
     g *= effectiveGreen;
     b *= effectiveBlue;
+
+    if (fit.variant === 'vivid' && chromaGain > 1) {
+      const y = luminance(r, g, b);
+      const chromaPeak = Math.max(r, g, b);
+      const protection = smooth(.025, .14, y) * (1 - smooth(.82, .98, chromaPeak)) * (1 - .85 * coolWater);
+      let gain = 1 + (chromaGain - 1) * protection;
+      // Expanding chroma around luminance can otherwise push one channel past
+      // the SDR gamut. Limit the shared expansion before applying any clipping.
+      for (const channel of [r, g, b]) {
+        if (channel > y + 1e-6) gain = Math.min(gain, (1 - y) / (channel - y));
+        else if (channel < y - 1e-6) gain = Math.min(gain, y / (y - channel));
+      }
+      r = y + (r - y) * gain;
+      g = y + (g - y) * gain;
+      b = y + (b - y) * gain;
+    }
 
     const changedLuma = luminance(r, g, b);
     // First preserve luminance while changing colour, then apply the tone curve.

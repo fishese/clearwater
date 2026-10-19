@@ -6,9 +6,13 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const editorRoot = process.cwd();
-const outputRoot = resolve(editorRoot, '../analysis/adaptive-finish');
+const baseOutputRoot = resolve(editorRoot, '../analysis/adaptive-finish');
+const runName = process.env.CHECK_RUN_NAME ?? '';
+if (runName && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(runName)) throw new Error('CHECK_RUN_NAME must contain lowercase letters, numbers, and single hyphen separators.');
+const outputRoot = runName ? resolve(baseOutputRoot, runName) : baseOutputRoot;
 const baseUrl = process.env.CHECK_URL ?? 'http://127.0.0.1:5173/';
 const synthetic = process.env.CHECK_SYNTHETIC === '1';
+const candidateNames = ['tone', 'colour-tone', 'soft-water', 'vivid'];
 const positiveLimit = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -31,8 +35,9 @@ async function codeProvenance() {
   }
   const comparisonStatus = execFileSync('git', ['status', '--porcelain', '--', ...fingerprintPaths], { cwd: editorRoot, encoding: 'utf8' });
   return {
-    methodId: 'adaptive-photo-finish-p1-isolated-v1',
-    reportSchemaVersion: 1,
+    methodId: runName === 'vivid' ? 'adaptive-photo-finish-p1-vivid-v1' : 'adaptive-photo-finish-p1-isolated-v1',
+    reportSchemaVersion: 2,
+    runName: runName || 'baseline',
     gitHead,
     workingTreeDirty: workingTree.trim().length > 0,
     comparisonSourcesDirty: comparisonStatus.trim().length > 0,
@@ -65,7 +70,10 @@ async function saveCheckpoint(report, { preserveExistingErrors = false } = {}) {
   };
   const provenance = provenanceInfo.comparisonRun || provenanceInfo.reportGenerator ? `<details><summary>Method and source version</summary><pre>${escapeHtml(JSON.stringify(provenanceInfo, null, 2))}</pre></details>` : '';
   const perf = report.performance?.scope ? `<p>${escapeHtml(report.performance.scope)}</p>` : '';
-  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Adaptive finish local comparison</title><style>body{font:14px system-ui,sans-serif;background:#101a20;color:#e7eff1;margin:24px}h1{font-size:24px}h2{font-size:18px;margin-bottom:4px}p{color:#b5c6ca}.images{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin:12px 0}.images img{width:100%;height:auto;border:1px solid #38515a}section{padding:8px 0 24px;border-bottom:1px solid #38515a}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;vertical-align:top;padding:6px;border:1px solid #38515a}th{background:#1b2c33}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>Adaptive finish local comparison</h1><p>Mode: ${escapeHtml(report.mode)}. ${escapeHtml(report.evidenceLimit)}</p><p>Completed samples: ${report.samples.length} / ${report.sampleLimit}. Engines: ${escapeHtml(report.engines.join(', '))}. JSON: <a href="report.json">report.json</a>.</p>${perf}${provenance}${sections || '<p>No completed samples yet.</p>'}</html>`;
+  const pageTitle = report.runName === 'vivid' ? 'Adaptive finish comparison · vivid candidate' : 'Adaptive finish local comparison';
+  const candidates = report.comparison?.candidates?.join(', ') ?? 'not recorded';
+  const candidateNote = report.runName === 'vivid' ? ' Vivid is an experimental candidate; this report makes no quality claim.' : '';
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(pageTitle)}</title><style>body{font:14px system-ui,sans-serif;background:#101a20;color:#e7eff1;margin:24px}h1{font-size:24px}h2{font-size:18px;margin-bottom:4px}p{color:#b5c6ca}.images{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin:12px 0}.images img{width:100%;height:auto;border:1px solid #38515a}section{padding:8px 0 24px;border-bottom:1px solid #38515a}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;vertical-align:top;padding:6px;border:1px solid #38515a}th{background:#1b2c33}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>${escapeHtml(pageTitle)}</h1><p>Mode: ${escapeHtml(report.mode)}. ${escapeHtml(report.evidenceLimit)}${escapeHtml(candidateNote)}</p><p>Completed samples: ${report.samples.length} / ${report.sampleLimit}. Engines: ${escapeHtml(report.engines.join(', '))}. Candidates: ${escapeHtml(candidates)}. JSON: <a href="report.json">report.json</a>.</p>${perf}${provenance}${sections || '<p>No completed samples yet.</p>'}</html>`;
   await Promise.all([
     writeFile(resolve(outputRoot, 'report.html'), html, 'utf8'),
     writeFile(resolve(outputRoot, 'index.html'), html, 'utf8')
@@ -86,8 +94,9 @@ if (process.env.CHECK_REPORT_ONLY === '1') {
   report.reportGeneratorProvenance = { ...await codeProvenance(), capturePhase: 'report-regeneration' };
   if (!report.provenance && !report.comparisonProvenance) {
     report.comparisonProvenance = {
-      methodId: 'adaptive-photo-finish-p1-isolated-v1',
+      methodId: runName === 'vivid' ? 'adaptive-photo-finish-p1-vivid-v1' : 'adaptive-photo-finish-p1-isolated-v1',
       reportSchemaVersion: report.schemaVersion,
+      runName: runName || 'baseline',
       capturePhase: 'not-captured-at-comparison-run',
       gitHead: null,
       workingTreeDirty: null,
@@ -115,7 +124,9 @@ try {
   if (synthetic) {
     samples = [{ category: 'synthetic mechanics' }];
   } else {
-    const manifestPath = resolve(editorRoot, process.env.CHECK_MANIFEST ?? '../analysis/adaptive-finish/manifest.json');
+    const manifestPath = process.env.CHECK_MANIFEST
+      ? resolve(editorRoot, process.env.CHECK_MANIFEST)
+      : resolve(baseOutputRoot, 'manifest.json');
     if (existsSync(manifestPath)) {
       const parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
       samples = Array.isArray(parsed) ? parsed : parsed.samples;
@@ -139,13 +150,13 @@ try {
   if (!samples.length) throw new Error('No samples were selected.');
 
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     mode: synthetic ? 'synthetic mechanics only' : 'authorized local photos',
     evidenceLimit: synthetic ? 'Synthetic output checks mechanics only and is not evidence of photo quality.' : 'Model outputs and finish estimates are not ground truth; inspect the whole-image previews and source-resolution crops.',
     comparison: {
-      candidates: ['tone', 'colour-tone', 'soft-water'],
-      candidateOrder: 'Each candidate replaces Auto enhance tone. Current Auto enhance is shown as a separate baseline. Candidate results do not stack clarity or sharpness.',
+      candidates: candidateNames,
+      candidateOrder: 'Each candidate, including vivid, replaces Auto enhance tone. Current Auto enhance is shown as a separate baseline. Candidate results do not stack clarity or sharpness. Vivid is an experimental bounded candidate; this report makes no quality claim.',
       reference: 'One renderer-corrected 256x256 reference per sample and engine; each fitted candidate is reused for preview and crop.',
       reuseVerification: 'Each candidate closure passes the identical fit object to preview and crop application. The candidate path performs no model inference; each successful AI engine baseline records one inference and Balanced records zero.',
       crop: 'Source-resolution square crop. Current Auto enhance uses a source strip with sufficient filter halo and full-source filter radii before the square is extracted.',
@@ -156,6 +167,7 @@ try {
     },
     provenance: { ...await codeProvenance(), capturePhase: 'comparison-run' },
     engines,
+    runName: runName || 'baseline',
     sampleLimit: samples.length,
     samples: [],
     pageErrors: errors,
