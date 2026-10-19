@@ -23,8 +23,8 @@ Public inspiration: https://deepcolors.app/ describes hue adjustment, channel st
 | ID | Deliverable and acceptance | Status |
 | --- | --- | --- |
 | P0 | Review public examples/current renderer; record hypothesis, limits and baseline | Complete, 19 Oct; research only |
-| P1 | Isolated candidate transforms and comparison harness; compare current default and Auto enhance | Not started; next action |
-| P2 | Select candidate; store/reuse fit; integrate shared photo preview/export with legacy-safe validation | Not started; gated by P1 |
+| P1 | Isolated candidate transforms and comparison harness; compare current default and Auto enhance | Complete experiment: 72295d2; 9 photos x 4 engines x 5 treatments, 205 tests/build pass. No candidate promoted; see result below |
+| P2 | Select candidate; store/reuse fit; integrate shared photo preview/export with legacy-safe validation | Gated: P1 candidates lack sufficient colour distinction and exceed warm-render cost target; bounded vivid follow-up next |
 | P3 | Minimal optional Effects UI, translations, guide and undo/reset/preset behavior | Not started; gated by P2 |
 | P4 | Correctness, visual/performance checks, necessary native-shell acceptance and test handoff | Not started; no stable release authorized |
 
@@ -63,3 +63,9 @@ Expose only a useful candidate. Keep it opt-in and separate from restoration thr
 - Run npm test and npm run build after meaningful changes. Focused scripts include enhancement-check.mjs, ios-web-export-check.mjs, export-destination-check.mjs and ios-shell-check.mjs. Add meaningful tests for new math/state; avoid unrelated native builds during the isolated experiment.
 - Seek human feedback over the representative set and report both gains/failures. Two public demos cannot establish general superiority. Physical iPhone browser memory/saving acceptance differs from mocks.
 - Finish with committed progress, limitations and test artifact locations. Next native build must include the already-merged Save/Share fix. Merge/version bump/publication require separate authorization.
+
+## P1 result and next action (19 October 2026)
+
+Code checkpoint: 72295d2. Isolated tone, colour-tone and soft-water candidates, bounded corrected-reference fitting, reusable application, explicit filtered-surface protection and a local comparison runner are implemented. All 205 shared tests and production build pass. Nine authorized local photos across Balanced, WWE-UIE + 30% Balanced, Five A+ and Shallow-UWnet produced 180 comparisons with zero engine/browser errors. Inspectable private reports/contact sheets/source-pixel crops are gitignored under analysis/adaptive-finish/. Reproduction and limits: editor/scripts/adaptive-finish/README.md.
+
+No candidate is selected for production. The natural tone result is subtle; colour fitting frequently falls back and did not show a consistent useful gain. Standalone active application averaged about 38%/38%/42% of measured transfer-plus-render time for tone/colour-tone/soft-water, above the initial 10% target; these are exploratory desktop preview timings, not export/mobile measurements. Preserve the first report before revising. Next action: one bounded vivid/chroma-separation experiment with the same protections, followed by human visual feedback and a feasible fused-pass performance check before P2. P2-P4, native hardware acceptance, merge and release remain incomplete.

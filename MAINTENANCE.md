@@ -1,5 +1,12 @@
 # Maintenance
 
+## Adaptive finish P1 implementation checkpoint (19 October 2026)
+
+72295d2 adds isolated reusable colour/tone math, 12 synthetic regressions and a local four-engine comparison harness. All 205 shared tests and production build pass; 180 local treatments completed without engine/browser errors. Private reports, source crops and manifests stay ignored in analysis/adaptive-finish/. The module is absent from production bundles. No UI/schema/worker/default, native, Save/Share, version or release changes were made.
+
+The candidates are not selected for integration: colour differences are modest, and a standalone extra pass averaged roughly 38-42% of measured transfer-plus-render time, exceeding the initial 10% target. P2 remains gated on a bounded vivid follow-up, human visual feedback and a practical fused-pass performance result. Full export/mobile memory/timing and existing hardware acceptance remain open. See the active checklist and experiment README. The following planning-only checkpoint is historical.
+
+
 ## Documentation and next feature checkpoint (19 October 2026)
 
 HANDOFF.md is the concise current-state entry point; older handoff history remains in Git. IMPLEMENTATION_PLAN.md now tracks the adaptive photo colour-and-tone experiment (P0 research complete; P1 implementation not started). Public examples/current renderer were reviewed without proprietary code access. Planning branch: `codex/adaptive-finish-plan`; no runtime code, defaults, release assets or native versions change here. Preserve the web/native release gap described below. Keep private comparison details in ignored notes/output. Commit each future milestone with its evidence and next action; no merge or stable publication is authorized by this planning task.

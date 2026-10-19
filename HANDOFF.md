@@ -48,7 +48,7 @@ Android camera photos link enhanced gallery output to private originals/edits; c
 
 ## Next action
 
-Planning branch: codex/adaptive-finish-plan. Research and this documentation task are complete; feature code has not started. When the user starts the implementation session, continue from the first unchecked milestone in IMPLEMENTATION_PLAN.md: an isolated adaptive photo colour-and-tone experiment. Preserve production defaults, video/live camera behavior and existing recipes. Unchecked planned milestones are not a quota-interrupted coding task to resume automatically in this chat.
+Active branch: codex/adaptive-finish-plan. P1 isolated math/harness checkpoint is 72295d2; 205 tests/build pass and 180 local comparisons completed without engine/browser errors. No production path imports the candidates. Current colour differences are too modest and standalone application exceeds the initial warm-render cost target, so P2 remains gated. Next: retain the ignored baseline report, test one bounded vivid/chroma-separation candidate with the same protections, seek human visual feedback, then prove a feasible fused-pass cost before selecting a candidate. See IMPLEMENTATION_PLAN.md and editor/scripts/adaptive-finish/README.md. All production defaults, existing recipes and platform distinctions remain intact.
 
 ## New-session prompt
 
