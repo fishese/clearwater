@@ -1,5 +1,6 @@
 import { AI_ENGINES, aiExplanationLabel, isAIEngine } from './bundled-models';
 import { DEFAULT_HINTS, DEFAULT_MANUAL, type Analysis, type Hints, type Recipe, type Suggestion } from './types';
+import { isValidPhotoFinishSettings } from './photo-finish';
 
 export const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
 const smooth = (lo: number, hi: number, x: number) => { const t = clamp((x-lo)/(hi-lo)); return t*t*(3-2*t); };
@@ -165,6 +166,7 @@ export function parseRecipe(value:unknown): Recipe {
   const triple=(v:unknown,lo:number,hi:number)=>Array.isArray(v)&&v.length===3&&v.every(n=>finite(n,lo,hi));
   if(r.cameraColour!==undefined&&(!r.cameraColour||r.cameraColour.source!=='fivea'||!Array.isArray(r.cameraColour.matrix)||r.cameraColour.matrix.length!==12||r.cameraColour.matrix.some((v,i)=>!finite(v,i%4===3?-.4:-2,i%4===3?.4:3))||!['balanced','baseline'].includes(r.engine)))throw new Error('Invalid camera AI colour settings.');
   if(r.enhancement!==undefined&&(!r.enhancement||!(['contrast','clarity','sharpness'] as const).every(k=>finite(r.enhancement![k],0,100))||!finite(r.enhancement.black,0,.2)||!finite(r.enhancement.white,.6,1)||(r.enhancement.brightness!==undefined&&!finite(r.enhancement.brightness,-100,100))||(r.enhancement.autoApplied!==undefined&&typeof r.enhancement.autoApplied!=='boolean')))throw new Error('Invalid photo enhancement settings.');
+  if(r.adaptiveFinish!==undefined&&!isValidPhotoFinishSettings(r.adaptiveFinish))throw new Error('Invalid adaptive photo finish settings.');
   if(r.balancedAfterAI!==undefined&&(!r.balancedAfterAI||typeof r.balancedAfterAI!=='object'||Array.isArray(r.balancedAfterAI)||!finite(r.balancedAfterAI.strength,0,1)))throw new Error('Invalid Balanced after AI settings.');
   if(r.customModel&&(!/^[a-f0-9]{64}$/.test(r.customModel.sha256)||typeof r.customModel.name!=='string'||r.customModel.name.length>255||!['unit','signed'].includes(r.customModel.inputRange)||!['unit','signed'].includes(r.customModel.outputRange)))throw new Error('Invalid custom model settings.');
   if(r.version!==1 || !(['balanced','baseline',...AI_ENGINES] as readonly string[]).includes(r.engine) || !finite(r.strength,0,1) ||

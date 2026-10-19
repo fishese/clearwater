@@ -1,4 +1,5 @@
 import type { AIEngine } from './bundled-models';
+import type { AdaptiveFinishFit } from './adaptive-finish';
 
 export type Scene = 'auto' | 'underwater' | 'surface';
 export type Water = 'auto' | 'blue' | 'green';
@@ -29,10 +30,13 @@ export interface Recipe {
   /** Frozen sampled Five A+ colour fit from camera capture, replayable without inference. */
   cameraColour?: {source:'fivea';matrix:number[]};
   enhancement?: PhotoEnhancement;
+  /** Optional adaptive photo finish; absent means legacy identity behavior. */
+  adaptiveFinish?: AdaptivePhotoFinish;
   /** Optional follow-up Balanced pass for AI photo results. Omitted means disabled. */
   balancedAfterAI?: { strength: number };
   videoCorrection?: {mode:'sampled'|'fixed';interval:2|5|10;referenceTime:number};
 }
+export interface AdaptivePhotoFinish { look: 'natural' | 'vivid'; amount: number; fit: AdaptiveFinishFit }
 export interface PhotoEnhancement {contrast:number;clarity:number;sharpness:number;black:number;white:number;brightness?:number;autoApplied?:boolean}
 export const DEFAULT_ENHANCEMENT:PhotoEnhancement={contrast:0,clarity:0,sharpness:0,black:0,white:1,brightness:0};
 // 'wave' remains the on-disk engine ID for compatibility with earlier recipes.
