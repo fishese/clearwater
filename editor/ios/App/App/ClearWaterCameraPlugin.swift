@@ -139,7 +139,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
     @objc func setLens(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
             guard let id = call.getString("lensId"), let controller = self.embeddedController else { call.reject("Lens selection is invalid.", "CAMERA_LENS"); return }
-            controller.embeddedSetLens(id) { result in
+            controller.embeddedSetLens(id, preserveWhiteBalance: call.getBool("preserveWhiteBalance") ?? false) { result in
                 guard self.embeddedController === controller else { call.reject("Lens change was cancelled.", "CAMERA_CLOSED"); return }
                 switch result { case .success(let info): call.resolve(info); case .failure(let error): call.reject("The selected lens is unavailable.", "CAMERA_LENS", error) }
             }

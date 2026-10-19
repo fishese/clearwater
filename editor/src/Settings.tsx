@@ -1,4 +1,4 @@
-import {useEffect,useRef,useSyncExternalStore} from 'react';
+import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {LanguageSelect,t,useLanguage} from './i18n';
 import {BUNDLED_MODEL_IDS,BUNDLED_MODELS,type BundledModelId} from './core/bundled-models';
@@ -8,12 +8,15 @@ import {getPlatformCapabilities} from './platform/capabilities';
 import {cameraQualityProfile} from './core/camera-quality';
 import {cameraRecordingBudget,getCameraSettings,setCameraMinutes,setCameraQuality,subscribeCameraSettings,type CameraQuality,type CameraRecordingMinutes} from './core/camera-settings';
 import {getIOSCameraPreferences,setIOSMicrophoneEnabled,setIOSSaveEnhancedPhotos,subscribeIOSCameraPreferences} from './platform/ios-camera';
+import {currentBrowserDevice,getWebInstallState,promptWebInstall,subscribeWebInstall} from './platform/web-install';
 
 const modelSizes:Record<BundledModelId,string>={wwe:'0.9 MB',fivea:'81 KB',shallow:'230 KB'};
 const models:[OfflineModel,string,string][]=BUNDLED_MODEL_IDS.map(id=>[id,BUNDLED_MODELS[id].label,modelSizes[id]]);
+const iosDownload=import.meta.env.VITE_IOS_IPA_URL?.trim();
 export default function Settings({onClose,parentAbout,onRestoreCamera,onRestoreIOSCaptures,onDeleteIOSCaptures,restoringCamera=false}:{onClose:()=>void;parentAbout:boolean;onRestoreCamera?:()=>void;onRestoreIOSCaptures?:()=>void;onDeleteIOSCaptures?:()=>void;restoringCamera?:boolean}){
  useLanguage();
- const capabilities=getPlatformCapabilities(),heading=useRef<HTMLHeadingElement>(null),settings=useSyncExternalStore(subscribeOfflineModels,getOfflineSettings),cameraSettings=useSyncExternalStore(subscribeCameraSettings,getCameraSettings),iosCameraSettings=useSyncExternalStore(subscribeIOSCameraPreferences,getIOSCameraPreferences),cameraProfile=cameraQualityProfile(cameraSettings.quality,capabilities.platform==='android'||capabilities.nativeCamera);
+ const capabilities=getPlatformCapabilities(),heading=useRef<HTMLHeadingElement>(null),settings=useSyncExternalStore(subscribeOfflineModels,getOfflineSettings),cameraSettings=useSyncExternalStore(subscribeCameraSettings,getCameraSettings),iosCameraSettings=useSyncExternalStore(subscribeIOSCameraPreferences,getIOSCameraPreferences),installState=useSyncExternalStore(subscribeWebInstall,getWebInstallState),[showInstallInstructions,setShowInstallInstructions]=useState(false),device=currentBrowserDevice(),cameraProfile=cameraQualityProfile(cameraSettings.quality,capabilities.platform==='android'||capabilities.nativeCamera);
+ const installWebApp=()=>{if(installState==='prompt')void promptWebInstall().then(outcome=>{if(outcome!=='accepted')setShowInstallInstructions(true);});else setShowInstallInstructions(true);};
  useEffect(()=>{const previous=document.activeElement as HTMLElement|null;heading.current?.focus();const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();onClose();}};window.addEventListener('keydown',escape);return()=>{window.removeEventListener('keydown',escape);if(previous?.isConnected)previous.focus({preventScroll:true});};},[onClose]);
  return <main className="settings-page" aria-labelledby="settings-title">
   <header className="settings-header"><h1 id="settings-title" tabIndex={-1} ref={heading}>{t('Settings')}</h1><button className="button secondary settings-close" onClick={onClose}><ArrowLeft size={16}/>{parentAbout?t('About & guide'):t('Back to editor')}</button></header>
@@ -35,7 +38,14 @@ export default function Settings({onClose,parentAbout,onRestoreCamera,onRestoreI
     <OfflineModels/>
    </>}
   </section>
-  {capabilities.platform==='web'&&<section><h2>{t('Android app')}</h2><p>{t('Install the latest signed release APK on Android. Updates use the same link.')}</p><div className="settings-install"><a className="button primary" href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk">{t('Install Android (APK)')}</a><a href="https://github.com/fishese/clearwater/releases/latest" target="_blank" rel="noreferrer">{t('Release notes')}</a></div></section>}
+  {capabilities.platform==='web'&&<section><h2>{t('Install')}</h2><div className="settings-install">
+   {installState!=='installed'&&<button className="button primary" type="button" onClick={installWebApp}>{t('Install web app')}</button>}
+   <a className="button secondary" href="https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk">{t('Install Android (APK)')}</a>
+   {iosDownload?<a className="button secondary" href={iosDownload}>{t('Unsigned sideload IPA')}</a>:<span className="about-ios" aria-disabled="true">{t('Unsigned sideload IPA')} · {t('Not published yet')}</span>}
+   <a href="https://github.com/fishese/clearwater/releases/latest" target="_blank" rel="noreferrer">{t('Release notes')}</a>
+  </div>
+   {showInstallInstructions&&installState!=='installed'&&<p role="status">{device==='ios'?t('Use Share to add this page to your Home Screen. If unavailable, open it in Safari.'):device==='desktop'&&/Macintosh.*Safari/i.test(navigator.userAgent)&&!/Chrome|Chromium|Edg|OPR/i.test(navigator.userAgent)?t('In Safari, choose File > Add to Dock.'):t('Use your browser menu to install this site or add it to your Home Screen.')}</p>}
+  </section>}
   {capabilities.androidLinkedCapture&&onRestoreCamera&&<section><h2>{t('Camera originals')}</h2><p>{t('Clear collection keeps linked camera originals and edits. Restore them here without creating another gallery image.')}</p><button className="button secondary" disabled={restoringCamera} onClick={onRestoreCamera}>{restoringCamera?t('Restoring…'):t('Restore camera collection')}</button></section>}
   {capabilities.nativeCamera&&onDeleteIOSCaptures&&<section><h2>{t('Private camera captures')}</h2><p>{t('Private camera captures stay inside ClearWater. Photos receives a separate copy only when you save one there. Clear collection hides captures; restore them in Settings or permanently delete their private files.')}</p>{onRestoreIOSCaptures&&<button className="button secondary" disabled={restoringCamera} onClick={onRestoreIOSCaptures}>{restoringCamera?t('Restoring…'):t('Restore hidden captures')}</button>}<p>{t('Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.')}</p><button className="button secondary" disabled={restoringCamera} onClick={onDeleteIOSCaptures}>{restoringCamera?t('Deleting…'):t('Delete private camera captures')}</button></section>}
   <section><h2>{t('Saved edits & models')}</h2><p>{t('Each collection item keeps its own edits and engine choice. Custom ONNX files and settings are remembered on this device; use Forget saved model under Correction Engine to remove them.')}</p></section>

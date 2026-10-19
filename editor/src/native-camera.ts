@@ -3,7 +3,7 @@ import type {Recipe} from './core/types';
 
 /** CSS viewport coordinates; native converts these to physical view pixels. */
 export interface NativeCameraBounds {x:number;y:number;width:number;height:number;pixelRatio?:number}
-export interface NativeCameraLens {id:string;label:string;facing:'environment'|'user';intrinsicZoom?:number}
+export interface NativeCameraLens {id:string;label:string;facing:'environment'|'user';intrinsicZoom?:number;minZoom?:number;maxZoom?:number}
 export interface NativeCameraPhotoInfoChanged {sessionGeneration:number;photoWidth:number;photoHeight:number}
 export interface NativeCameraInfo {
  width:number;height:number;photoWidth:number;photoHeight:number;sessionGeneration:number;
@@ -17,7 +17,7 @@ export interface NativeCameraPlugin {
  setPreviewBounds(bounds:NativeCameraBounds):Promise<void>;
  setCorrection(options:{recipe:Recipe}):Promise<void>;
  listLenses():Promise<{lenses:NativeCameraLens[]}>;
- setLens(options:{lensId:string}):Promise<NativeCameraInfo>;
+ setLens(options:{lensId:string;preserveWhiteBalance?:boolean}):Promise<NativeCameraInfo>;
  setZoom(options:{ratio:number}):Promise<{zoom:number}>;
  sampleFrame():Promise<{data:string;width:number;height:number}>;
  capturePhoto():Promise<NativeCameraCapture>;

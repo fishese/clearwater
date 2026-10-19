@@ -1,6 +1,7 @@
 package com.fishese.clearwater;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -22,5 +23,14 @@ public class CameraLensGeometryTest {
         assertEquals(5.06f, CameraLensGeometry.opticalRatio(1f, 5.06f), .001f);
         assertEquals(2.74f, CameraLensGeometry.opticalRatio(2.6f, 2.74f), .001f);
         assertEquals(.61f, CameraLensGeometry.opticalRatio(.61f, Float.NaN), .001f);
+    }
+
+    @Test public void physicalZoomCannotEscapeItsModuleRange() {
+        float[] bounds=CameraLensGeometry.intersectZoomBounds(.6f,10f,1f,8f);
+        assertArrayEquals(new float[]{1f,8f},bounds,.001f);
+        assertEquals(1f,CameraLensGeometry.clampZoom(.6f,bounds),.001f);
+        assertEquals(8f,CameraLensGeometry.clampZoom(10f,bounds),.001f);
+        assertEquals(3f,CameraLensGeometry.clampZoom(3f,bounds),.001f);
+        assertArrayEquals(new float[]{1f,10f},CameraLensGeometry.intersectZoomBounds(.6f,10f,1f,Float.POSITIVE_INFINITY),.001f);
     }
 }

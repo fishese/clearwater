@@ -15,6 +15,16 @@ final class CameraLensGeometry {
             Math.abs(cameraXRatio - 1f) > .03f ? cameraXRatio : Float.NaN;
     }
 
+    static float[] intersectZoomBounds(float cameraMin, float cameraMax, float physicalMin, float physicalMax) {
+        float min=Math.max(cameraMin,physicalMin),max=Math.min(cameraMax,physicalMax);
+        return Float.isFinite(min)&&Float.isFinite(max)&&min>0f&&min<=max
+            ? new float[]{min,max} : new float[]{cameraMin,cameraMax};
+    }
+
+    static float clampZoom(float ratio, float[] bounds) {
+        return Math.max(bounds[0],Math.min(bounds[1],ratio));
+    }
+
     static float relativeZoom(CameraCharacteristics reference, CameraCharacteristics lens) {
         if (reference == null || lens == null) return Float.NaN;
         float[] referenceFocals = reference.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS);

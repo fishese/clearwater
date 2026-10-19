@@ -3,7 +3,7 @@ import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff
 import { makeCameraRecipe, pickCameraNeutral, cameraFramePoint, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
 import { createCameraPreview } from './core/camera-preview';
 import { cameraQualityProfile } from './core/camera-quality';
-import { cameraNextZoomPreset, cameraZoomPresets, cameraZoomValue, labeledRearCameras, type ZoomRange } from './core/camera-zoom';
+import { cameraApplyNativeAutoZoom, cameraNativeAutoRange, cameraNextZoomPreset, cameraZoomPresets, cameraZoomValue, labeledRearCameras, type ZoomRange } from './core/camera-zoom';
 import { useCameraAiAssist } from './core/use-camera-ai';
 import { cameraRecordingBudget, getCameraSettings, subscribeCameraSettings } from './core/camera-settings';
 import { analyse } from './core/engine';
@@ -39,6 +39,10 @@ function cameraErrorKey(error: unknown): string {
 function formatElapsed(milliseconds: number): string {
   const seconds = Math.max(0, Math.floor(milliseconds / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function formatZoom(value: number): string {
+  return `${Number(value.toFixed(1))}×`;
 }
 
 function currentCameraBounds(stage: HTMLElement): NativeCameraBounds {
@@ -97,6 +101,10 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const nativeRecordingRef = useRef(false);
   const nativeFrameBusyRef = useRef(false);
   const nativeLastFrameAtRef = useRef(0);
+  const nativeLensEpochRef = useRef(0);
+  const nativeZoomTargetRef = useRef<number | null>(null);
+  const nativeZoomWorkerRef = useRef<Promise<void> | null>(null);
+  const lensSwitchPendingRef = useRef(false);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const previewCaptureStreamRef = useRef<MediaStream | null>(null);
   const previewRef = useRef<ReturnType<typeof createCameraPreview> | null>(null);
@@ -159,6 +167,9 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const [nativeInfo, setNativeInfo] = useState<NativeCameraInfo | null>(null);
   const nativeInfoRef = useRef<NativeCameraInfo | null>(nativeInfo);
   const [nativeLenses, setNativeLenses] = useState<NativeCameraLens[]>([]);
+  const [autoLens, setAutoLens] = useState(true);
+  const autoLensRef = useRef(true);
+  const [lensSwitchPending, setLensSwitchPending] = useState(false);
   const zoomButtonRef = useRef<HTMLButtonElement>(null);
   const depthButtonRef = useRef<HTMLButtonElement>(null);
   const zoomChooserRef = useRef<HTMLDivElement>(null);
@@ -182,6 +193,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
 
   const releaseCamera = useCallback((preservePendingStart = false) => {
     generationRef.current++;
+    nativeLensEpochRef.current++;
+    nativeZoomTargetRef.current = null;
+    nativeZoomWorkerRef.current = null;
+    lensSwitchPendingRef.current = false;
+    setLensSwitchPending(false);
     if (!preservePendingStart) nativeStartInFlightRef.current = 0;
     cancelAnimationFrame(frameRef.current);
     frameRef.current = 0;
@@ -324,6 +340,8 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           ]);
         if (!aliveRef.current || generation !== generationRef.current) return;
         nativeSessionActiveRef.current = true;
+        autoLensRef.current = true;
+        setAutoLens(true);
         nativeRecordingRef.current = false;
         setNativeActive(true);
         nativeInfoRef.current = info;
@@ -347,17 +365,18 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         let lastUiAt = 0;
         const drawNative = (time: number) => {
           if (!aliveRef.current || generation !== generationRef.current) return;
-          if (!nativeRecordingRef.current && !startingRecordingRef.current && !nativeFrameBusyRef.current && time - nativeLastFrameAtRef.current >= 500) {
+          if (!nativeRecordingRef.current && !startingRecordingRef.current && !lensSwitchPendingRef.current && !nativeFrameBusyRef.current && time - nativeLastFrameAtRef.current >= 500) {
             nativeFrameBusyRef.current = true;
             nativeLastFrameAtRef.current = time;
+            const lensEpoch = nativeLensEpochRef.current;
             void nativeCamera.sampleFrame().then(async frame => {
-              if (!aliveRef.current || generation !== generationRef.current || nativeRecordingRef.current || startingRecordingRef.current) return;
+              if (!aliveRef.current || generation !== generationRef.current || lensEpoch !== nativeLensEpochRef.current || lensSwitchPendingRef.current || nativeRecordingRef.current || startingRecordingRef.current) return;
               const binary = atob(frame.data);
               const bytes = new Uint8Array(binary.length);
               for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
               const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
               try {
-                if (!aliveRef.current || generation !== generationRef.current) return;
+                if (!aliveRef.current || generation !== generationRef.current || lensEpoch !== nativeLensEpochRef.current || lensSwitchPendingRef.current) return;
                 const context = sourceCanvas.getContext('2d', { willReadFrequently: true });
                 if (!context) return;
                 sourceCanvas.width = frame.width;
@@ -669,7 +688,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   saveCaptureRef.current = saveCapture;
 
   function showPickerLoupe(event:React.PointerEvent<HTMLCanvasElement>){
-    if(!pickingBalance||recordingRef.current||savingRef.current)return;
+    if(!pickingBalance||recordingRef.current||savingRef.current||lensSwitchPendingRef.current)return;
     const source=nativeSessionActiveRef.current?sourceCanvasRef.current:previewCanvasRef.current,loupe=loupeRef.current;
     if(!source||!loupe||!source.width||!source.height)return;
     const rect=previewCanvasRef.current?.getBoundingClientRect();
@@ -687,7 +706,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     setLoupeVisible(true);
   }
   function pickBalance(event:React.PointerEvent<HTMLCanvasElement>){
-    if(!pickingBalance||recordingRef.current||savingRef.current)return;
+    if(!pickingBalance||recordingRef.current||savingRef.current||lensSwitchPendingRef.current)return;
     const source=nativeSessionActiveRef.current?sourceCanvasRef.current:videoRef.current,current=recipeRef.current;
     const width=source instanceof HTMLCanvasElement?source.width:source?.videoWidth;
     const height=source instanceof HTMLCanvasElement?source.height:source?.videoHeight;
@@ -705,6 +724,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     recipeRef.current=next;setRecipe(next);if(nativeSessionActiveRef.current)void nativeCamera.setCorrection({recipe:next}).catch(()=>{});whiteBalanceLocked.current=true;setBalanceLocked(true);setPickingBalance(false);setError('');
   }
   function resetBalance(){
+    if (lensSwitchPendingRef.current) return;
     whiteBalanceLocked.current=false;setBalanceLocked(false);setPickingBalance(false);
     const source=nativeSessionActiveRef.current?sourceCanvasRef.current:videoRef.current;
     const width=source instanceof HTMLCanvasElement?source.width:source?.videoWidth;
@@ -713,26 +733,92 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
 
   const applyCameraZoom = useCallback(async (value: number) => {
     if (nativeSessionActiveRef.current) {
-      const next = cameraZoomValue(value, zoomRange);
+      const info = nativeInfoRef.current;
+      if (!info || recordingRef.current || startingRecordingRef.current || (lensSwitchPendingRef.current && !autoLensRef.current)) return;
+      const currentLens = info.lenses.find(lens => lens.id === info.lensId);
+      const range = autoLensRef.current
+        ? cameraNativeAutoRange(info.lenses, info.lensId, currentLens?.facing ?? facingRef.current, { min: info.minZoom, max: info.maxZoom })
+        : { min: info.minZoom, max: info.maxZoom };
+      const next = cameraZoomValue(value, range);
       if (next === null) return;
+      nativeZoomTargetRef.current = next;
+      if (nativeZoomWorkerRef.current) return;
       const generation = generationRef.current;
-      if (!aliveRef.current || !nativeSessionActiveRef.current) return;
       const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
-      try {
-        const result = await nativeCamera.setZoom({ ratio: next });
-        if (!isCurrentSession()) return;
-        setZoom(result.zoom);
-        const currentInfo = nativeInfoRef.current;
-        if (currentInfo) {
-          const updated = { ...currentInfo, zoom: result.zoom };
-          nativeInfoRef.current = updated;
-          setNativeInfo(updated);
+      const worker = (async () => {
+        while (nativeZoomTargetRef.current !== null && isCurrentSession()) {
+          const target = nativeZoomTargetRef.current;
+          nativeZoomTargetRef.current = null;
+          const initial = nativeInfoRef.current;
+          if (!initial) break;
+          let current: NativeCameraInfo = initial;
+          let switched = false;
+          try {
+            let localZoom = target;
+            if (autoLensRef.current) {
+              const activeLens = current.lenses.find(lens => lens.id === current.lensId);
+              const updated = await cameraApplyNativeAutoZoom(current, target, activeLens?.facing ?? facingRef.current, {
+                beforeSwitch: async () => {
+                  switched = true;
+                  lensSwitchPendingRef.current = true;
+                  setLensSwitchPending(true);
+                  nativeLensEpochRef.current++;
+                  const sourceCanvas = sourceCanvasRef.current;
+                  if (sourceCanvas) { sourceCanvas.width = 1; sourceCanvas.height = 1; }
+                  setPickingBalance(false);
+                  setLoupeVisible(false);
+                  if (cameraAiEnabledRef.current) {
+                    cameraAiInvalidateRef.current();
+                    cameraAiMatrixRef.current = null;
+                    if (recipeRef.current) {
+                      const freshRecipe = recipeWithCameraColour(recipeRef.current, true, null);
+                      recipeRef.current = freshRecipe;
+                      setRecipe(freshRecipe);
+                      await nativeCamera.setCorrection({ recipe: freshRecipe });
+                    }
+                  }
+                },
+                setLens: lensId => nativeCamera.setLens({ lensId, preserveWhiteBalance: whiteBalanceLocked.current }),
+                lensChanged: info => {
+                  if (!isCurrentSession()) return;
+                  nativeInfoRef.current = info;
+                  setNativeInfo(info);
+                  setNativeLenses(info.lenses);
+                  setSelectedDeviceId(info.lensId);
+                  setZoomRange(info.maxZoom >= info.minZoom ? { min: info.minZoom, max: info.maxZoom } : undefined);
+                  setZoom(info.zoom);
+                },
+                setZoom: ratio => isCurrentSession() ? nativeCamera.setZoom({ ratio }) : Promise.reject(new Error('stale camera session')),
+              });
+              if (!isCurrentSession()) break;
+              nativeInfoRef.current = updated;
+              setNativeInfo(updated);
+              setZoom(updated.zoom);
+              continue;
+            } else {
+              localZoom = cameraZoomValue(target, { min: current.minZoom, max: current.maxZoom }) ?? current.zoom;
+            }
+            const result = await nativeCamera.setZoom({ ratio: localZoom });
+            if (!isCurrentSession()) break;
+            const updated = { ...current, zoom: result.zoom };
+            nativeInfoRef.current = updated;
+            setNativeInfo(updated);
+            setZoom(result.zoom);
+          } catch {
+            if (isCurrentSession()) {
+              setZoom(nativeInfoRef.current?.zoom ?? 1);
+              setError('Could not switch camera.');
+            }
+          } finally {
+            if (isCurrentSession() && switched) {
+              lensSwitchPendingRef.current = false;
+              setLensSwitchPending(false);
+            }
+          }
         }
-      } catch {
-        if (!isCurrentSession()) return;
-        const actual = nativeInfoRef.current?.zoom;
-        if (typeof actual === 'number' && Number.isFinite(actual)) setZoom(actual);
-      }
+      })();
+      nativeZoomWorkerRef.current = worker;
+      void worker.finally(() => { if (nativeZoomWorkerRef.current === worker) nativeZoomWorkerRef.current = null; });
       return;
     }
     const track = cameraStreamRef.current?.getVideoTracks()[0];
@@ -749,8 +835,12 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   }, [zoomRange]);
 
   const cycleCameraZoom = useCallback(() => {
-    const presets = cameraZoomPresets(zoomRange);
-    const next = cameraNextZoomPreset(zoom, presets);
+    const info = nativeInfoRef.current;
+    const activeLens = info?.lenses.find(lens => lens.id === info.lensId);
+    const range = info && autoLensRef.current ? cameraNativeAutoRange(info.lenses, info.lensId, activeLens?.facing ?? facingRef.current, { min: info.minZoom, max: info.maxZoom }) : zoomRange;
+    const presets = cameraZoomPresets(range);
+    const current = info && autoLensRef.current ? zoom * (activeLens?.intrinsicZoom ?? 1) : zoom;
+    const next = cameraNextZoomPreset(current, presets);
     if (next !== null) void applyCameraZoom(next);
   }, [zoomRange, zoom, applyCameraZoom]);
 
@@ -768,23 +858,32 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   };
 
   const chooseRearCamera = async (deviceId: string) => {
-    if (recording || starting || recordPending || photoPending || savePending || !ready) return;
+    if (recording || starting || recordPending || photoPending || savePending || !ready || lensSwitchPendingRef.current) return;
     setZoomChooserOpen(false);
     zoomButtonRef.current?.focus();
-    whiteBalanceLocked.current = false;
-    setBalanceLocked(false);
-    setPickingBalance(false);
-    setLoupeVisible(false);
     if (nativeSessionActiveRef.current) {
+      const wasAuto = autoLensRef.current;
+      autoLensRef.current = false;
+      setAutoLens(false);
+      nativeZoomTargetRef.current = null;
+      lensSwitchPendingRef.current = true;
+      setLensSwitchPending(true);
       const generation = generationRef.current;
       const isCurrentSession = () => aliveRef.current && generation === generationRef.current && nativeSessionActiveRef.current;
       try {
+        await nativeZoomWorkerRef.current;
+        if (!isCurrentSession()) return;
         if (cameraAiEnabledRef.current) {
           cameraAiInvalidateRef.current();
           cameraAiMatrixRef.current = null;
         }
+        nativeLensEpochRef.current++;
         const info = await nativeCamera.setLens({ lensId: deviceId });
         if (!isCurrentSession()) return;
+        whiteBalanceLocked.current = false;
+        setBalanceLocked(false);
+        setPickingBalance(false);
+        setLoupeVisible(false);
         nativeInfoRef.current = info;
         setNativeInfo(info);
         setNativeLenses(info.lenses);
@@ -799,17 +898,34 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setRecipe(freshRecipe);
           void nativeCamera.setCorrection({ recipe: freshRecipe }).catch(() => {});
         }
-      } catch { if (isCurrentSession()) setError('Could not switch camera.'); }
+      } catch { if (isCurrentSession()) { autoLensRef.current = wasAuto; setAutoLens(wasAuto); setError('Could not switch camera.'); } }
+      finally { if (isCurrentSession()) { lensSwitchPendingRef.current = false; setLensSwitchPending(false); } }
       return;
     }
+    whiteBalanceLocked.current = false;
+    setBalanceLocked(false);
+    setPickingBalance(false);
+    setLoupeVisible(false);
     facingRef.current = 'environment';
     setFacing('environment');
     void startCamera('environment', deviceId);
   };
 
+  const chooseAutoLens = () => {
+    if (!nativeSessionActiveRef.current || lensSwitchPendingRef.current || recordingRef.current) return;
+    const info = nativeInfoRef.current;
+    if (!info) return;
+    const intrinsic = info.lenses.find(lens => lens.id === info.lensId)?.intrinsicZoom ?? 1;
+    autoLensRef.current = true;
+    setAutoLens(true);
+    setZoomChooserOpen(false);
+    zoomButtonRef.current?.focus();
+    void applyCameraZoom(info.zoom * intrinsic);
+  };
+
   const capturePhoto = useCallback(async () => {
     if (nativeSessionActiveRef.current) {
-      if (recording || photoPendingRef.current || savingRef.current) return;
+      if (recording || photoPendingRef.current || savingRef.current || lensSwitchPendingRef.current) return;
       photoPendingRef.current = true;
       setPhotoPending(true);
       setError('');
@@ -864,7 +980,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
 
   const startRecording = useCallback(async () => {
     if (nativeSessionActiveRef.current) {
-      if (recordingRef.current || startingRecordingRef.current || photoPendingRef.current || savingRef.current) return;
+      if (recordingRef.current || startingRecordingRef.current || photoPendingRef.current || savingRef.current || lensSwitchPendingRef.current) return;
       setError('');
       startingRecordingRef.current = true;
       setRecordPending(true);
@@ -991,7 +1107,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
 
   const stopFromUser = useCallback(() => stopRecording(false), [stopRecording]);
   const flipCamera = useCallback(() => {
-    if (recording || starting) return;
+    if (recording || starting || lensSwitchPendingRef.current) return;
     const next = facing === 'environment' ? 'user' : 'environment';
     if (nativeSessionActiveRef.current) {
       const lens = nativeInfoRef.current?.lenses.find(candidate => candidate.facing === next);
@@ -1032,9 +1148,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const activeNativeLens = nativeInfo?.lenses.find(lens => lens.id === nativeInfo.lensId);
   const intrinsicZoom = activeNativeLens?.intrinsicZoom;
   const displayedZoom = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? zoom * intrinsicZoom : zoom;
-  const zoomLabel = `${displayedZoom.toFixed(displayedZoom % 1 ? 1 : 0)}×`;
-  const zoomPresets = cameraZoomPresets(zoomRange);
-  const canAdjustZoom = !!zoomRange && zoomRange.max > zoomRange.min;
+  const zoomLabel = formatZoom(displayedZoom);
+  const autoZoomRange = nativeActive && autoLens && nativeInfo && zoomRange ? cameraNativeAutoRange(nativeLenses, nativeInfo.lensId, activeNativeLens?.facing ?? facing, zoomRange) : undefined;
+  const controlZoomRange = autoZoomRange ?? zoomRange;
+  const zoomPresets = cameraZoomPresets(controlZoomRange);
+  const canAdjustZoom = !!controlZoomRange && controlZoomRange.max > controlZoomRange.min;
   const hasCameraChoices = nativeActive ? nativeLenses.length > 1 : rearCameras.length > 1;
   const photoWidth = nativeActive ? nativeInfo?.photoWidth : videoRef.current?.videoWidth;
   const photoHeight = nativeActive ? nativeInfo?.photoHeight : videoRef.current?.videoHeight;
@@ -1097,19 +1215,19 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           }}
         ><ZoomIn size={20}/><span>{zoomLabel}</span></button> : <button type="button" ref={zoomButtonRef} className={`camera-zoom-button ${zoomChooserOpen ? 'active' : ''}`} aria-label={t(nativeActive ? 'Choose camera lens' : 'Choose rear camera')} aria-expanded={zoomChooserOpen} aria-controls="camera-zoom-chooser" disabled={!ready || recording || starting || recordPending} onClick={() => setZoomChooserOpen(v => !v)}><CameraIcon size={20}/><span>{t('Camera')}</span></button>}
         {zoomChooserOpen && <div id="camera-zoom-chooser" ref={zoomChooserRef} className="camera-zoom-chooser" role="group" aria-label={t('Camera controls')}>
-          {canAdjustZoom && zoomRange && <label className="camera-zoom-slider">{t('Zoom')} <output>{zoomLabel}</output>
-            <input type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step && zoomRange.step > 0 ? zoomRange.step : 'any'} value={zoom} disabled={nativeInterrupted||recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
+          {canAdjustZoom && controlZoomRange && <label className="camera-zoom-slider">{t('Zoom')} <output>{zoomLabel}</output>
+            <input type="range" min={controlZoomRange.min} max={controlZoomRange.max} step={controlZoomRange.step && controlZoomRange.step > 0 ? controlZoomRange.step : 'any'} value={nativeActive && autoLens && autoZoomRange ? displayedZoom : zoom} disabled={nativeInterrupted||recording || recordPending} aria-label={t('Zoom')} onChange={event => void applyCameraZoom(Number(event.target.value))}/>
           </label>}
           {canAdjustZoom && zoomPresets.length > 0 && <div className="camera-zoom-presets" role="group" aria-label={t('Zoom')}>
             {zoomPresets.map(preset => {
-              const factor = nativeActive && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? intrinsicZoom : 1;
+              const factor = nativeActive && !autoLens && typeof intrinsicZoom === 'number' && Number.isFinite(intrinsicZoom) && intrinsicZoom > 0 ? intrinsicZoom : 1;
               const displayed = preset * factor;
-              const label = `${displayed.toFixed(displayed % 1 ? 1 : 0)}×`;
-              return <button type="button" key={preset} className="camera-zoom-preset" aria-label={t('Zoom {0}×', [label.slice(0,-1)])} aria-pressed={Math.abs(zoom - preset) < 0.001} disabled={!ready || nativeInterrupted || recording || starting || recordPending || photoPending || savePending} onClick={() => { setZoomChooserOpen(false); void applyCameraZoom(preset); }}>{label}</button>;
+              const label = formatZoom(displayed);
+              return <button type="button" key={preset} className="camera-zoom-preset" aria-label={t('Zoom {0}×', [label.slice(0,-1)])} aria-pressed={nativeActive && autoLens ? Math.abs(displayedZoom - preset) / preset <= 0.03 : Math.abs(zoom - preset) < 0.001} disabled={!ready || nativeInterrupted || recording || starting || recordPending || lensSwitchPending || photoPending || savePending} onClick={() => { setZoomChooserOpen(false); void applyCameraZoom(preset); }}>{label}</button>;
             })}
           </div>}
           {hasCameraChoices && <div className="camera-lens-choices" role="group" aria-label={t(nativeActive ? 'Camera lenses' : 'Rear cameras')}>
-            {nativeActive ? nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{typeof lens.intrinsicZoom === 'number' && Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>) : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
+            {nativeActive ? <><button type="button" className="camera-lens-choice" aria-pressed={autoLens} disabled={!ready || recording || starting || recordPending || lensSwitchPending || photoPending || savePending} onClick={chooseAutoLens}><CameraIcon size={16}/><span>{t('Auto')}</span></button>{nativeLenses.map(lens => <button type="button" key={lens.id} className="camera-lens-choice" aria-pressed={!autoLens && selectedDeviceId === lens.id} disabled={!ready || recording || starting || recordPending || lensSwitchPending || photoPending || savePending} onClick={() => void chooseRearCamera(lens.id)}><CameraIcon size={16}/><span>{lens.facing === 'user' ? t('Front camera') : ['Camera','Wide','Ultra-wide','Telephoto'].includes(lens.label) ? t(lens.label) : lens.label}{typeof lens.intrinsicZoom === 'number' && Number.isFinite(lens.intrinsicZoom) && lens.intrinsicZoom > 0 ? ` · ${lens.intrinsicZoom.toFixed(lens.intrinsicZoom % 1 ? 1 : 0)}×` : ''}</span></button>)}</> : rearCameras.map(device => <button type="button" key={device.deviceId} className="camera-lens-choice" aria-pressed={selectedDeviceId === device.deviceId} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void chooseRearCamera(device.deviceId)}><CameraIcon size={16}/><span>{device.label}</span></button>)}
           </div>}
         </div>}
       </div>}
@@ -1117,7 +1235,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     {error && <div className="camera-error" role="alert">{t(error)}{!ready && !starting&&!nativeInterrupted && <button className="text-button" type="button" onClick={() => void startCamera(facing)}>{t('Retry camera')}</button>}</div>}
     <div className="camera-options">
       <div className="camera-feature-controls" aria-label={t('Camera controls')}>
-        <button type="button" className={`camera-feature-button ${cameraAi.matrix ? 'active' : ''} ${cameraAi.status === 'error' ? 'camera-ai-error-state' : ''}`} aria-pressed={cameraAi.enabled} aria-label={t('Five A+ assist · {0}', [t(cameraAi.status)])} title={t('Five A+ assist · {0}', [t(cameraAi.status)])} disabled={!ready || recording || recordPending} onClick={() => { if (!cameraAi.enabled) setDepthChooserOpen(false); cameraAi.setEnabled(!cameraAi.enabled); }}>{cameraAi.enabled && cameraAi.status === 'loading' ? <LoaderCircle size={18} className="camera-ai-spinner" aria-hidden="true"/> : <Sparkles size={18}/>}<span>{t('AI')}</span></button>
+        <button type="button" className={`camera-feature-button ${cameraAi.matrix ? 'active' : ''} ${cameraAi.status === 'error' ? 'camera-ai-error-state' : ''}`} aria-pressed={cameraAi.enabled} aria-label={t('Five A+ assist · {0}', [t(cameraAi.status)])} title={t('Five A+ assist · {0}', [t(cameraAi.status)])} disabled={!ready || recording || recordPending || lensSwitchPending} onClick={() => { if (!cameraAi.enabled) setDepthChooserOpen(false); cameraAi.setEnabled(!cameraAi.enabled); }}>{cameraAi.enabled && cameraAi.status === 'loading' ? <LoaderCircle size={18} className="camera-ai-spinner" aria-hidden="true"/> : <Sparkles size={18}/>}<span>{t('AI')}</span></button>
         <button type="button" className={`camera-feature-button ${cameraHints.filter !== 'auto' ? 'active' : ''}`} aria-label={t('Red filter: {0}', [t(cameraHints.filter === 'yes' ? 'Yes' : cameraHints.filter === 'no' ? 'No' : 'Auto')])} title={t('Red filter')} disabled={!ready || recording || recordPending || cameraAi.enabled} onClick={() => updateCameraHints({ filter: cameraHints.filter === 'auto' ? 'yes' : cameraHints.filter === 'yes' ? 'no' : 'auto' })}><span>{t('Red')}</span><small>{t(cameraHints.filter === 'yes' ? 'Yes' : cameraHints.filter === 'no' ? 'No' : 'Auto')}</small></button>
         <div className="camera-depth-control" ref={depthChooserRef}>
           <button ref={depthButtonRef} type="button" className={`camera-feature-button ${cameraHints.depth !== null ? 'active' : ''}`} aria-expanded={depthChooserOpen} aria-controls="camera-depth-chooser" disabled={!ready || recording || recordPending || cameraAi.enabled} onClick={() => setDepthChooserOpen(value => !value)}><SlidersHorizontal size={18}/><span>{t('Depth')} {cameraHints.depth === null ? t('Auto') : `${cameraHints.depth} m`}</span></button>
@@ -1131,7 +1249,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         </div>
       </div>
       <label className="camera-strength-control">{t('Strength')} <output>{strength}%</output><input type="range" aria-label={t('Strength')} min="0" max="100" value={strength} disabled={nativeInterrupted||!ready || recording || recordPending} onChange={event => applyStrength(Number(event.target.value))}/></label>
-      <div className="camera-white-balance"><button type="button" className={`camera-control ${pickingBalance||balanceLocked?'active':''}`} aria-label={pickingBalance?t('Cancel picker'):t('White balance')} title={t('White balance')} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending} onClick={()=>{setPickingBalance(v=>!v);setLoupeVisible(false);}}><Pipette size={28}/></button><button type="button" className="camera-control" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||(!balanceLocked&&!pickingBalance)} onClick={()=>{setLoupeVisible(false);resetBalance();}}><RotateCcw size={28}/></button><button type="button" className={`camera-control camera-audio ${microphoneEnabled?'active':''}`} aria-label={t('Use microphone audio')} title={t('Use microphone audio')} aria-pressed={microphoneEnabled} disabled={nativeInterrupted||recording||starting||recordPending} onClick={()=>setMicrophoneEnabled(v=>{const next=!v;if(supportsNativeCamera())setIOSMicrophoneEnabled(next);return next;})}>{microphoneEnabled?<Mic size={28}/>:<MicOff size={28}/>}</button></div>
+      <div className="camera-white-balance"><button type="button" className={`camera-control ${pickingBalance||balanceLocked?'active':''}`} aria-label={pickingBalance?t('Cancel picker'):t('White balance')} title={t('White balance')} aria-pressed={pickingBalance||balanceLocked} disabled={!ready||recording||recordPending||lensSwitchPending} onClick={()=>{setPickingBalance(v=>!v);setLoupeVisible(false);}}><Pipette size={28}/></button><button type="button" className="camera-control" aria-label={t('Reset white balance')} title={t('Reset white balance')} disabled={!ready||recording||recordPending||lensSwitchPending||(!balanceLocked&&!pickingBalance)} onClick={()=>{setLoupeVisible(false);resetBalance();}}><RotateCcw size={28}/></button><button type="button" className={`camera-control camera-audio ${microphoneEnabled?'active':''}`} aria-label={t('Use microphone audio')} title={t('Use microphone audio')} aria-pressed={microphoneEnabled} disabled={nativeInterrupted||recording||starting||recordPending||lensSwitchPending} onClick={()=>setMicrophoneEnabled(v=>{const next=!v;if(supportsNativeCamera())setIOSMicrophoneEnabled(next);return next;})}>{microphoneEnabled?<Mic size={28}/>:<MicOff size={28}/>}</button></div>
       <small>{t('{0} min / {1} MiB limit', [cameraSettings.minutes, Math.round(recordingBudget.maxBytes / (1024 * 1024))])}{recording && !nativeActive && ` · ${Math.round(byteLimitPercent)}%`}</small>
     </div>
     {cameraAi.enabled && <small className="camera-hints-note">{t('Red filter and depth hints apply to Balanced restoration.')}</small>}
@@ -1139,11 +1257,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     {ready && !nativeActive && typeof previewCanvasRef.current?.captureStream !== 'function' && <p className="camera-error" role="status">{t('Enhanced video recording is unavailable on this device. Photos still work.')}</p>}
     {!nativeActive && !videoMimeType && <p className="camera-error" role="status">{t('MP4 recording is unavailable on this device. Photos still work.')}</p>}
     <footer className="camera-actions">
-      <button type="button" className="camera-control camera-flip" disabled={!ready || recording || starting || recordPending || photoPending || savePending} aria-label={t('Flip camera')} title={t('Flip camera')} onClick={() => { setSelectedDeviceId(''); flipCamera(); }}><SwitchCamera size={30}/></button>
-      <button type="button" className="camera-photo" aria-label={t('Take photo')} title={t('Take photo')} disabled={!ready || recording || starting || recordPending || photoPending || savePending} onClick={() => void capturePhoto()}><span aria-hidden="true"/></button>
+      <button type="button" className="camera-control camera-flip" disabled={!ready || recording || starting || recordPending || lensSwitchPending || photoPending || savePending} aria-label={t('Flip camera')} title={t('Flip camera')} onClick={() => { setSelectedDeviceId(''); flipCamera(); }}><SwitchCamera size={30}/></button>
+      <button type="button" className="camera-photo" aria-label={t('Take photo')} title={t('Take photo')} disabled={!ready || recording || starting || recordPending || lensSwitchPending || photoPending || savePending} onClick={() => void capturePhoto()}><span aria-hidden="true"/></button>
       {recording
         ? <button type="button" className="camera-record recording" aria-label={t('Stop recording')} title={t('Stop recording')} onClick={stopFromUser}><Square size={25} fill="currentColor"/></button>
-        : <button type="button" className="camera-record" aria-label={t('Record video')} title={t('Record video')} disabled={!ready || starting || recordPending || photoPending || savePending || (!nativeActive && (!videoMimeType || typeof previewCanvasRef.current?.captureStream !== 'function' || (microphoneEnabled && !audioVideoMimeType)))} onClick={() => void startRecording()}><Circle size={30} fill="currentColor"/></button>}
+        : <button type="button" className="camera-record" aria-label={t('Record video')} title={t('Record video')} disabled={!ready || starting || recordPending || lensSwitchPending || photoPending || savePending || (!nativeActive && (!videoMimeType || typeof previewCanvasRef.current?.captureStream !== 'function' || (microphoneEnabled && !audioVideoMimeType)))} onClick={() => void startRecording()}><Circle size={30} fill="currentColor"/></button>}
     </footer>
   </div>;
 });

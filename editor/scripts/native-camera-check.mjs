@@ -16,12 +16,13 @@ try {
     const realSetTimeout = window.setTimeout.bind(window);
     window.setTimeout = (callback, delay, ...args) => realSetTimeout(callback, window.nativeCameraState.accelerateStartupTimeout && delay === 20000 ? 100 : delay, ...args);
     const lenses = [
-      { id: 'rear-ultrawide', label: 'Rear ultra wide', facing: 'environment', intrinsicZoom: 0.5 },
-      { id: 'rear-wide', label: 'Rear wide', facing: 'environment', intrinsicZoom: 1 },
-      { id: 'front-main', label: 'Front camera', facing: 'user', intrinsicZoom: 1 },
-      ...Array.from({ length: 8 }, (_, index) => ({ id: `rear-extra-${index}`, label: `Rear lens ${index + 1}`, facing: 'environment', intrinsicZoom: 1 })),
+      { id: 'rear-ultrawide', label: 'Rear ultra wide', facing: 'environment', intrinsicZoom: 0.5, minZoom: 1, maxZoom: 8 },
+      { id: 'rear-wide', label: 'Rear wide', facing: 'environment', intrinsicZoom: 1, minZoom: 1, maxZoom: 10 },
+      { id: 'front-main', label: 'Front camera', facing: 'user', intrinsicZoom: 1, minZoom: 1, maxZoom: 10 },
+      { id: 'rear-tele', label: 'Rear telephoto', facing: 'environment', intrinsicZoom: 5.1, minZoom: 1, maxZoom: 20 },
+      ...Array.from({ length: 8 }, (_, index) => ({ id: `rear-extra-${index}`, label: `Rear lens ${index + 1}`, facing: 'environment', intrinsicZoom: 1, minZoom: 1, maxZoom: 10 })),
     ];
-    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: 10 });
+    window.nativeCameraInfo = () => ({ width: 390, height: 844, photoWidth: 1600, photoHeight: 1200, sessionGeneration: window.nativeCameraState.starts, lenses, lensId: window.nativeCameraState.lensId, zoom: window.nativeCameraState.zoom, minZoom: 1, maxZoom: lenses.find(lens => lens.id === window.nativeCameraState.lensId)?.maxZoom ?? 10 });
     const cameraMethods = ['getLaunchMode', 'startSession', 'setPreviewBounds', 'setCorrection', 'listLenses', 'setLens', 'setZoom', 'sampleFrame', 'capturePhoto', 'releaseCapture', 'startRecording', 'stopRecording', 'stopSession'];
     const filesMethods = ['getRememberedModel', 'drainShares', 'releaseShare', 'probeAndroidSources', 'createCapture', 'copyCameraCapture', 'beginWrite', 'writeChunk', 'finishWrite', 'deleteCameraCapture'];
     const backMethods = ['setEnabled', 'exitApp'];
@@ -53,7 +54,7 @@ try {
           if (method === 'setCorrection') { state.recipe = options.recipe; return {}; }
           if (method === 'listLenses') return { lenses };
           if (method === 'setLens') { state.lensId = options.lensId; state.zoom = 1; return window.nativeCameraInfo(); }
-          if (method === 'setZoom') { state.zoom = Math.max(1, Math.min(10, options.ratio)); return { zoom: state.zoom }; }
+          if (method === 'setZoom') { state.zoom = Math.max(1, Math.min(lenses.find(lens => lens.id === state.lensId)?.maxZoom ?? 10, options.ratio)); return { zoom: state.zoom }; }
           if (method === 'sampleFrame') return { data: window.nativeSampleData, width: 8, height: 8 };
           if (method === 'capturePhoto') return { uri: 'mock-native://photo', name: 'clearwater-camera-00000000-0000-4000-8000-000000000001.jpg', type: 'image/jpeg', width: 1600, height: 1200 };
           if (method === 'releaseCapture') { state.released = options.uri; return {}; }
@@ -147,19 +148,19 @@ try {
   await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.locator('#camera-zoom-chooser').waitFor();
   assert.equal(await zoom.innerText(), '2×', 'long press opens the chooser without cycling zoom');
-  for (const [language, frontLabel] of [['en', 'Front camera'], ['zh-HK', '前置鏡頭'], ['ja', '前面カメラ']]) {
+  for (const [language, frontLabel, autoLabel] of [['en', 'Front camera', 'Auto'], ['zh-HK', '前置鏡頭', '自動'], ['ja', '前面カメラ', '自動']]) {
     await page.evaluate(language => {
       localStorage.setItem('clearwater-language', language);
       window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
     }, language);
     const lensLabels = await page.locator('.camera-lens-choice span').allTextContents();
-    assert.deepEqual(lensLabels.slice(0, 3), ['Rear ultra wide · 0.5×', 'Rear wide · 1×', `${frontLabel} · 1×`], `${language} front camera label`);
+    assert.deepEqual(lensLabels.slice(0, 4), [autoLabel, 'Rear ultra wide · 0.5×', 'Rear wide · 1×', `${frontLabel} · 1×`], `${language} front camera label`);
   }
   await page.evaluate(() => {
     localStorage.setItem('clearwater-language', 'en');
     window.dispatchEvent(new StorageEvent('storage', { key: 'clearwater-language' }));
   });
-  assert.deepEqual(await page.locator('.camera-zoom-preset').allTextContents(), ['1×', '2×', '3×', '5×', '10×'], 'chooser exposes every cycling zoom stop, including 5× and 10×');
+  assert.deepEqual(await page.locator('.camera-zoom-preset').allTextContents(), ['0.5×', '1×', '2×', '3×', '5×', '10×'], 'Auto chooser spans the rear lenses and standard zoom stops');
   assert.equal(await page.locator('.camera-zoom-preset[aria-pressed="true"]').innerText(), '2×', 'active zoom preset is marked');
   const scrollArea = page.locator('#camera-zoom-chooser');
   const scrollGeometry = await scrollArea.evaluate(element => {
@@ -186,7 +187,7 @@ try {
   await swipeChooser();
   assert.ok(await scrollArea.evaluate(element => element.scrollTop > 20), 'a native Chromium touch swipe scrolls the portrait lens chooser');
   assert.equal(await zoomAndLensCalls(), callsBeforePan, 'panning over chooser buttons does not activate zoom or a lens');
-  for (let index = 0; index < 4; index++) await swipeChooser(false);
+  for (let index = 0; index < 7; index++) await swipeChooser(false);
   const lastLensVisible = await scrollArea.evaluate(element => {
     const last = element.querySelector('.camera-lens-choice:last-child');
     return last.getBoundingClientRect().bottom <= element.getBoundingClientRect().bottom && element.scrollTop + element.clientHeight >= element.scrollHeight - 2;
@@ -213,21 +214,43 @@ try {
   assert.ok(await page.evaluate(() => window.nativeCameraState.zoom > 2.5), 'horizontal touch drag still changes the zoom slider');
   await page.locator('.camera-zoom-preset').filter({ hasText: '10×' }).click();
   assert.equal(await zoom.innerText(), '10×', '10× preset updates the displayed magnification');
-  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio), 10, '10× preset applies native CameraX zoom');
+  assert.equal(await page.evaluate(() => window.nativeCameraState.lensId), 'rear-tele', '10× Auto zoom uses the telephoto module');
+  assert.ok(Math.abs(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio) - 10 / 5.1) < 0.001, '10× preset applies the lens-local crop');
   assert.equal(await scrollArea.count(), 0, 'selecting a zoom preset closes the chooser');
   await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
   await page.waitForTimeout(600);
   await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await scrollArea.waitFor();
-  await page.locator('.camera-zoom-preset').filter({ hasText: '5×' }).click();
-  assert.equal(await zoom.innerText(), '5×', '5× preset updates the displayed magnification');
-  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio), 5, '5× preset applies native CameraX zoom');
+  await page.getByRole('button', { name: 'Zoom 5×', exact: true }).click();
+  assert.equal(await zoom.innerText(), '5.1×', '5× Auto preset uses the reported 5.1× optical module');
+  assert.equal(await page.evaluate(() => window.nativeCameraState.lensId), 'rear-tele', '5× Auto preset stays on the telephoto module');
+  assert.equal(await page.evaluate(() => window.nativeMockCalls.filter(call => call.plugin === 'ClearWaterCamera' && call.method === 'setZoom').at(-1).options.ratio), 1, '5× Auto preset clamps the telephoto local zoom to its minimum');
   await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
   await page.waitForTimeout(600);
   await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await scrollArea.waitFor();
   await page.getByRole('button', { name: /Rear ultra wide/ }).click();
   assert.equal(await zoom.innerText(), '0.5×', 'displayed magnification uses the reported native lens factor');
+  assert.equal(await page.evaluate(() => window.nativeCameraState.lensId), 'rear-ultrawide', 'manual lens choice locks the selected lens');
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await scrollArea.waitFor();
+  assert.equal(await page.locator('.camera-lens-choice[aria-pressed="true"]').innerText(), 'Rear ultra wide · 0.5×', 'manual lens choice is marked');
+  await page.getByRole('button', { name: 'Zoom 2.5×', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.nativeCameraState.lensId), 'rear-ultrawide', 'manual local zoom stays on the locked lens');
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await scrollArea.waitFor();
+  await page.getByRole('button', { name: 'Auto', exact: true }).click();
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [zoomTouch] });
+  await page.waitForTimeout(600);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await scrollArea.waitFor();
+  assert.equal(await page.locator('.camera-lens-choice[aria-pressed="true"]').innerText(), 'Auto', 'Auto lens selection can be restored');
+  await page.getByRole('button', { name: 'Zoom 5×', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.nativeCameraState.lensId), 'rear-tele', 'restored Auto lens selection switches to telephoto');
   assert.ok(await page.evaluate(() => window.nativeMockCalls.some(call => call.plugin === 'ClearWaterCamera' && call.method === 'setLens')));
   await page.getByRole('button', { name: 'White balance', exact: true }).click();
   const previewHit = await page.evaluate(() => {
