@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
+import android.util.Log;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -117,7 +118,12 @@ public class ClearWaterSharePlugin extends Plugin {
                 String name = safeName(call.getString("name"));
                 String type = safeType(call.getString("type"), name);
                 long size = call.getLong("size", -1L);
-                if (size <= 0 || size > MAX_BYTES) throw new IOException("Share file exceeds the 512 MB limit.");
+                if (size <= 0 || size > MAX_BYTES) {
+                    String code = "video/mp4".equals(type) ? "too-large" : "photo-too-large";
+                    String token = "cw-limit/" + code + "/bytes/" + Math.max(0L, size) + "/" + MAX_BYTES;
+                    Log.w("ClearWaterShare", token);
+                    throw new IOException(token);
+                }
                 ensureCapacity(size);
                 String id = UUID.randomUUID().toString();
                 File directory = shareDirectory();
@@ -127,7 +133,11 @@ public class ClearWaterSharePlugin extends Plugin {
                 Stage stage = new Stage(partial, finished, new FileOutputStream(partial), size, name, type);
                 stages.put(id, stage);
                 JSObject result = new JSObject(); result.put("id", id); call.resolve(result);
-            } catch (Exception error) { call.reject("Could not prepare the file for sharing.", error); }
+            } catch (Exception error) {
+                Log.w("ClearWaterShare", "beginShare failed", error);
+                String raw = error.getMessage() == null ? "" : error.getMessage();
+                call.reject(raw.startsWith("cw-limit/") ? raw : "Could not prepare the file for sharing.", error);
+            }
         });
     }
 

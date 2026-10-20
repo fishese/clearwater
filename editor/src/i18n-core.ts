@@ -8,14 +8,22 @@ export function detectLanguage(languages:readonly string[]):Language {
  for(const language of languages){const tag=language.toLowerCase();if(tag.startsWith('ja'))return 'ja';if(tag.startsWith('zh'))return 'zh-HK';if(tag.startsWith('en'))return 'en';}
  return 'en';
 }
+const namedPlaceholder=/\{(?:actual|limit)\}/;
+const anyPlaceholder=/\{(?:\d+|actual|limit)\}/;
 export function translate(language:Language,key:string,values:readonly unknown[]=[]):string {
  const text=catalogs[language][key]??catalogs.en[key]??key;
+ if(namedPlaceholder.test(key)){
+  const names=[...key.matchAll(/\{(actual|limit)\}/g)].map(match=>match[1]);
+  const map=new Map<string,unknown>();
+  names.forEach((name,index)=>{if(!map.has(name))map.set(name,values[index]);});
+  return text.replace(/\{(actual|limit)\}/g,(placeholder,name)=>map.get(name)===undefined?placeholder:String(map.get(name)));
+ }
  return text.replace(/\{(\d+)\}/g,(placeholder,index)=>values[Number(index)]===undefined?placeholder:String(values[Number(index)]));
 }
 
 // Workers and native bridges retain English diagnostics. Localise known messages at
 // presentation, including variable model names, without translating user filenames.
-const patterns=Object.keys(en).filter(key=>/\{\d+\}/.test(key)).map(key=>({key,pattern:new RegExp('^'+key.split(/(\{\d+\})/).map(part=>/^\{\d+\}$/.test(part)?'(.+?)':part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('')+'$')}));
+const patterns=Object.keys(en).filter(key=>anyPlaceholder.test(key)).map(key=>({key,pattern:new RegExp('^'+key.split(/(\{(?:\d+|actual|limit)\})/).map(part=>/^\{(?:\d+|actual|limit)\}$/.test(part)?'(.+?)':part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('')+'$')}));
 export function translateMessage(language:Language,text:string):string {
  if(catalogs.en[text])return translate(language,text);
  for(const {key,pattern} of patterns){const match=text.match(pattern);if(match)return translate(language,key,match.slice(1));}

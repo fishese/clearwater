@@ -44,7 +44,12 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func beginExport(_ call: CAPPluginCall) {
         guard let size = call.getInt("size"), size > 0, size <= Self.maximumBytes else {
-            call.reject("Export size must be between 1 byte and 512 MB.")
+            let suppliedType = call.getString("type") ?? ""
+            let code = suppliedType.hasPrefix("video/") ? "too-large" : "photo-too-large"
+            let actual = call.getInt("size") ?? 0
+            let token = "cw-limit/\(code)/bytes/\(max(0, actual))/\(Self.maximumBytes)"
+            NSLog("ClearWaterExport %@", token)
+            call.reject(token)
             return
         }
         guard let type = call.getString("type"),

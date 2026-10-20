@@ -10,6 +10,7 @@ import type {PhotoInfo,PhotoResolution,PhotoDevice} from './core/photo-size';
 import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancement';
 import {pickNeutralFromPixels} from './core/white-balance';
 import {applyPhotoFinish,fitPhotoFinish,isValidPhotoFinishSettings,preparePhotoFinish} from './core/photo-finish';
+import {classifyMediaFailure,currentMediaPlatform,isMediaPlatform,PlatformLimitError,type MediaPlatform} from './core/platform-limits';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
@@ -80,6 +81,7 @@ function withoutAutoContrast(settings:Recipe['enhancement'],finish:AdaptivePhoto
 const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message,transfer);
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
+  const platform:MediaPlatform=isMediaPlatform(data.platform)?data.platform:currentMediaPlatform();
   if(type==='render'||type==='enhance'||type==='finish')latestPreviewRequest=request;
   try {
     if(type==='custom-model') {
@@ -90,7 +92,7 @@ ctx.onmessage=async({data})=>{
       source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
       photoFinishKernels.clear();
       mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
-      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
       const {bitmap}=decoded;
       if(gen!==generation){bitmap.close();return;}
       source=bitmap;sourceFile=data.blob;sourceInfo=decoded.info;
@@ -163,7 +165,7 @@ ctx.onmessage=async({data})=>{
       const followUp=balancedFollowUp(recipe,guided);
       if(sourceInfo?.large&&!exportSource&&originalFile){
         send({type:'progress',gen,request,progress:1});decoding=new AbortController();
-        const decoded=await decodePhoto(originalFile,{mode,device,preview:false,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+        const decoded=await decodePhoto(originalFile,{mode,device,preview:false,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
         if(gen!==generation){decoded.bitmap.close();return;}exportSource=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
       }
       const bitmap=exportSource??source;
@@ -207,6 +209,10 @@ ctx.onmessage=async({data})=>{
     if((type==='render'||type==='enhance')&&request!==latestPreviewRequest)return;
     if(type==='finish'&&(gen!==generation||request!==latestPreviewRequest))return;
     if(type==='custom-model'&&data.silent)return;
-    send({type:'error',gen,request,operation:type,message:error instanceof Error?error.message:type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.',restore:data.restore===true});
+    const fallback=type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.';
+    if(type==='custom-model')console.error(error);
+    const classified=type==='custom-model'?error instanceof Error?error:new Error(fallback):classifyMediaFailure(error instanceof Error?error:new Error(fallback),platform,type==='export'?'export':'load');
+    const limit=classified instanceof PlatformLimitError?classified:undefined;
+    send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
   }
 };

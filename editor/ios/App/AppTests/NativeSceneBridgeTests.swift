@@ -7,6 +7,33 @@ import CoreMedia
 @testable import App
 
 final class NativeSceneBridgeTests: XCTestCase {
+
+    @MainActor
+    func testMemoryTerminationProxyForwardsNavigationPolicyAndStart() async throws {
+        let policy = expectation(description: "forwarded navigation policy")
+        let start = expectation(description: "forwarded provisional navigation")
+        let delegate = NavigationForwardingProbe(policy: { policy.fulfill() }, start: { start.fulfill() })
+        let proxy = WebContentTerminationProxy()
+        proxy.forward = delegate
+        XCTAssertTrue(proxy.responds(to: NSSelectorFromString("webView:decidePolicyForNavigationAction:decisionHandler:")))
+        XCTAssertTrue(proxy.responds(to: NSSelectorFromString("webView:didStartProvisionalNavigation:")))
+        let webView = WKWebView()
+        webView.navigationDelegate = proxy
+        webView.loadHTMLString("<!doctype html><html><body>Local navigation</body></html>", baseURL: nil)
+        await fulfillment(of: [policy, start], timeout: 15)
+        webView.stopLoading()
+    }
+
+    @MainActor
+    func testMemoryTerminationProxyReloadsOnlyOnce() {
+        let delegate = NavigationForwardingProbe(policy: {}, start: {})
+        let proxy = WebContentTerminationProxy()
+        proxy.forward = delegate
+        let webView = ReloadCountingWebView()
+        proxy.webViewWebContentProcessDidTerminate(webView)
+        XCTAssertTrue(proxy.pendingMemoryNotice)
+        XCTAssertEqual(webView.reloadCount, 1, "Capacitor's forwarded recovery must not be followed by a second reload.")
+    }
     func testCameraFormatPrefersStillFramingOverExtraVideoPixels() {
         let photo = CMVideoDimensions(width: 4032, height: 3024)
         let fullHeight = CMVideoDimensions(width: 1440, height: 1080)
@@ -215,4 +242,27 @@ final class NativeSceneBridgeTests: XCTestCase {
             }
         }
     }
+}
+
+@MainActor
+private final class NavigationForwardingProbe: NSObject, WKNavigationDelegate {
+    let policy: () -> Void
+    let start: () -> Void
+    init(policy: @escaping () -> Void, start: @escaping () -> Void) {
+        self.policy = policy
+        self.start = start
+    }
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        policy()
+        decisionHandler(.allow)
+    }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { start() }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
+}
+
+@MainActor
+private final class ReloadCountingWebView: WKWebView {
+    var reloadCount = 0
+    override func reload() -> WKNavigation? { reloadCount += 1; return nil }
 }
