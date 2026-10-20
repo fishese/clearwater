@@ -19,25 +19,30 @@ try{
    if(message?.type==='load'&&message.blob?.type?.startsWith('image/'))state.photoWorker=this;
    return Reflect.apply(post,this,[message,...args]);
   };
-  const descriptor=Object.getOwnPropertyDescriptor(Worker.prototype,'onmessage');
-  if(descriptor?.get&&descriptor?.set)Object.defineProperty(Worker.prototype,'onmessage',{
-   configurable:true,enumerable:descriptor.enumerable,
-   get(){return descriptor.get.call(this);},
-   set(handler){
-    if(typeof handler!=='function'){descriptor.set.call(this,handler);return;}
-    state.handlers.set(this,handler);
-    descriptor.set.call(this,event=>{
-     if(state.holdGeneration!==null&&event.data?.type==='rendered'&&event.data.gen===state.holdGeneration){
-      state.held.push({worker:this,handler,event});return;
-     }
-     return handler.call(this,event);
-    });
-   },
-  });
+  let owner=Worker.prototype,descriptor;
+  while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onmessage');owner=Object.getPrototypeOf(owner);}
+  if(descriptor?.get&&descriptor?.set){
+   state.hookInstalled=true;
+   Object.defineProperty(Worker.prototype,'onmessage',{
+    configurable:true,enumerable:descriptor.enumerable,
+    get(){return descriptor.get.call(this);},
+    set(handler){
+     if(typeof handler!=='function'){descriptor.set.call(this,handler);return;}
+     state.handlers.set(this,handler);
+     descriptor.set.call(this,event=>{
+      if(state.holdGeneration!==null&&event.data?.type==='rendered'&&event.data.gen===state.holdGeneration){
+       state.held.push({worker:this,handler,event});return;
+      }
+      return handler.call(this,event);
+     });
+    },
+   });
+  }else state.hookInstalled=false;
   state.releaseHeld=()=>{const held=state.held.splice(0);for(const item of held)item.handler.call(item.worker,item.event);};
   state.inject=(worker,data)=>state.handlers.get(worker)?.call(worker,{data});
  },process.env.CHECK_IOS_SHELL==='1');
  await page.goto(url);
+ assert.equal(await page.evaluate(()=>window.__photoSwitchCheck.hookInstalled),true,'Worker onmessage interception must be installed');
  if(process.env.CHECK_IOS_SHELL==='1'){
   assert.equal(await page.evaluate(()=>window.Capacitor?.getPlatform?.()),'ios','mocked native shell must be active for the iOS switch run');
   assert.equal(await page.locator('.camera-launch').getAttribute('aria-label'),'Native camera is unavailable in this iOS build.','application runtime must recognize the mocked iOS platform');
@@ -73,10 +78,21 @@ try{
  const originalHash=await hash();
  const oldGeneration=await page.locator('canvas[aria-label="Edited photo"]').getAttribute('data-generation');
  await page.evaluate(generation=>window.__photoSwitchCheck.holdGeneration=Number(generation),oldGeneration);
- const warmth=page.getByRole('slider',{name:'Warmth',exact:true});await warmth.focus();await page.keyboard.press('ArrowUp');
- await page.waitForFunction(()=>window.__photoSwitchCheck.held.length===1,{timeout:30000});
+ const warmth=page.getByRole('slider',{name:'Warmth',exact:true});
+ const warmthBefore=Number(await warmth.inputValue()),warmthStep=Number(await warmth.getAttribute('step'))||1,warmthMax=Number(await warmth.getAttribute('max')||Infinity);
+ const nextWarmth=Math.min(warmthMax,warmthBefore+warmthStep),previousRenderCount=await renderCount();
+ await warmth.evaluate((input,value)=>{
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,String(value));
+  input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+ },nextWarmth);
+ assert.equal(Number(await warmth.inputValue()),nextWarmth,'warmth slider must accept the new value');
+ await waitForRenderAfter(previousRenderCount);
+ await page.waitForFunction(()=>window.__photoSwitchCheck.held.length===1,{timeout:30000}).catch(async error=>{
+  console.error('HELD RENDER NOT INTERCEPTED',JSON.stringify(await page.evaluate(()=>({hookInstalled:window.__photoSwitchCheck.hookInstalled,held:window.__photoSwitchCheck.held.length,renderCount:window.__photoSwitchCheck.messages.filter(message=>message.type==='render').length,handlers:window.__photoSwitchCheck.handlers.size}))));
+  throw error;
+ });
 
- let previousRenderCount=await renderCount();await navigate('Next photo');await waitForRenderAfter(previousRenderCount);await settled();
+ let nextRenderCount=await renderCount();await navigate('Next photo');await waitForRenderAfter(nextRenderCount);await settled();
  assert.equal(await page.getByLabel('Photo position',{exact:true}).innerText(),'2 / 2');
  const secondHash=await hash();assert.notEqual(secondHash,originalHash,'next JPG must load its own pixels');
  await page.evaluate(()=>window.__photoSwitchCheck.releaseHeld());
@@ -90,7 +106,7 @@ try{
 
  for(let i=0;i<3;i++){
   const direction=i%2===0?'Previous photo':'Next photo';
-  previousRenderCount=await renderCount();await navigate(direction);await waitForRenderAfter(previousRenderCount);await settled();
+  nextRenderCount=await renderCount();await navigate(direction);await waitForRenderAfter(nextRenderCount);await settled();
  }
  assert.deepEqual(errors,[],'photo switching must not produce browser errors');
  console.log(`PASS ${process.env.CHECK_BROWSER==='webkit'?'WebKit ':''}${process.env.CHECK_IOS_SHELL==='1'?'mocked iOS shell ':''}held stale render and error replies are ignored while switching JPGs back and forth`);
