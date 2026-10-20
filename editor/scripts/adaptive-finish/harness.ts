@@ -1,5 +1,6 @@
 import { analyse, makePhotoRecipe, makeRecipe, renderPixels, suggest } from '../../src/core/engine';
 import { fitAdaptiveFinish, applyAdaptiveFinish, type AdaptiveFinishFit, type AdaptiveFinishVariant } from '../../src/core/adaptive-finish';
+import {fitPhotoFinish,applyPhotoFinish,preparePhotoFinish} from '../../src/core/photo-finish';
 import { enhancePixels, suggestEnhancement } from '../../src/core/enhancement';
 import { DEFAULT_MANUAL, type Hints, type Recipe } from '../../src/core/types';
 import { prepareGuidedField, transferField, type GuidedField } from '../../src/core/neural-field';
@@ -9,7 +10,7 @@ import { inferField } from '../../src/models';
 
 type Candidate = AdaptiveFinishVariant;
 type EngineId = 'balanced' | BundledModelId;
-type SampleSpec = { name?: string; category?: string; hints?: Partial<Hints>; preserveRedCorrection?: boolean; crop?: { x?: number; y?: number; size?: number } };
+type SampleSpec = { name?: string; benchmark?: string; productFinish?: boolean; category?: string; hints?: Partial<Hints>; preserveRedCorrection?: boolean; crop?: { x?: number; y?: number; size?: number } };
 type HarnessOptions = { samples: SampleSpec[]; engines: EngineId[]; synthetic: boolean };
 type RuntimeResult = { sample: string; category: string; originalWidth: number; originalHeight: number; previewWidth: number; previewHeight: number; crop: { x: number; y: number; width: number; height: number }; records: unknown[]; errors: string[] };
 
@@ -167,11 +168,17 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
   previewContext.imageSmoothingEnabled = true; previewContext.imageSmoothingQuality = 'high'; previewContext.drawImage(bitmap, 0, 0, previewWidth, previewHeight);
   const previewPixels = readPixels(previewCanvas, previewWidth, previewHeight);
   const crop = sourceCropPosition(spec, bitmap.width, bitmap.height), cropSource = squareCrop(bitmap, crop.x, crop.y, crop.width);
+  const product=spec.productFinish===true, candidates:Candidate[]=product?['tone','vivid']:CANDIDATES;
+  const columns=product?['Corrected','Auto enhance','Natural','Vivid','Input','Benchmark reference']:COLUMNS;
+  const outputs:{name:string;png:string}[]=[];
+  const savePreview=(name:string,data:Uint8ClampedArray)=>{if(!product)return;const c=canvas(previewWidth,previewHeight);c.getContext('2d')!.putImageData(new ImageData(data,previewWidth,previewHeight),0,0);outputs.push({name,png:c.toDataURL('image/png')});};
+  let benchmarkPixels:Uint8ClampedArray|undefined,benchmarkCrop:Uint8ClampedArray|undefined;
+  if(spec.benchmark){const target=await loadInput({name:spec.benchmark},false);try{if(target.bitmap.width!==bitmap.width||target.bitmap.height!==bitmap.height)throw new Error('Benchmark dimensions must match input');const c=canvas(previewWidth,previewHeight);c.getContext('2d')!.drawImage(target.bitmap,0,0,previewWidth,previewHeight);benchmarkPixels=readPixels(c,previewWidth,previewHeight);benchmarkCrop=squareCrop(target.bitmap,crop.x,crop.y,crop.width);}finally{if(target.bitmap instanceof ImageBitmap)target.bitmap.close();}}
   const hints = normalizeHints(spec), records: Record<string, unknown>[] = [], errors: string[] = [];
   const wholeSheet = document.querySelector<HTMLCanvasElement>('#whole')!, cropSheet = document.querySelector<HTMLCanvasElement>('#crop')!;
-  wholeSheet.width = TILE_W * COLUMNS.length; wholeSheet.height = 8 + engines.length * WHOLE_TILE_H;
+  wholeSheet.width = TILE_W * columns.length; wholeSheet.height = 8 + engines.length * WHOLE_TILE_H;
   cropTileWidth = crop.width + 12; cropTileHeight = crop.height + 32;
-  cropSheet.width = cropTileWidth * COLUMNS.length; cropSheet.height = 8 + engines.length * cropTileHeight;
+  cropSheet.width = cropTileWidth * columns.length; cropSheet.height = 8 + engines.length * cropTileHeight;
   for (const target of [wholeSheet, cropSheet]) { const context = target.getContext('2d')!; context.fillStyle = '#101a20'; context.fillRect(0, 0, target.width, target.height); }
   const sampleTitle = `${sampleId} · ${category}`;
   const wholeTitle = wholeSheet.getContext('2d')!; wholeTitle.fillStyle = '#e8f0f2'; wholeTitle.font = 'bold 15px system-ui, sans-serif'; wholeTitle.fillText(`Whole image preview · ${sampleTitle}`, 8, 18);
@@ -180,6 +187,7 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
   for (let row = 0; row < engines.length; row++) {
     const engine = engines[row], engineTitle = engine === 'balanced' ? 'Balanced default' : engine === 'wwe' ? 'WWE-UIE + 30% Balanced' : engine === 'fivea' ? 'Five A+' : 'Shallow-UWnet';
     try {
+      if(product){labelCell(wholeSheet,row,4,previewPixels,previewWidth,previewHeight,'Input',TILE_W,WHOLE_TILE_H,WHOLE_IMAGE_H);labelCell(cropSheet,row,4,cropSource,crop.width,crop.height,'Input',cropTileWidth,cropTileHeight,crop.height);if(benchmarkPixels&&benchmarkCrop){labelCell(wholeSheet,row,5,benchmarkPixels,previewWidth,previewHeight,'Other app reference',TILE_W,WHOLE_TILE_H,WHOLE_IMAGE_H);labelCell(cropSheet,row,5,benchmarkCrop,crop.width,crop.height,'Other app reference',cropTileWidth,cropTileHeight,crop.height);}}
       let guided: GuidedField | undefined, inferenceMs: number | undefined, prepareMs: number | undefined;
       const referenceCanvas = new OffscreenCanvas(256, 256), referenceContext = referenceCanvas.getContext('2d', { willReadFrequently: true, colorSpace: 'srgb' })!;
       referenceContext.imageSmoothingEnabled = true; referenceContext.imageSmoothingQuality = 'high'; referenceContext.drawImage(bitmap, 0, 0, 256, 256);
@@ -220,20 +228,24 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
       labelCell(cropSheet, row, 1, autoCrop, crop.width, crop.height, `${engineTitle} · Auto enhance`, cropTileWidth, cropTileHeight, crop.height);
       records.push({ sample: sampleId, category, engine, treatment: 'current Auto enhance baseline', settings: autoSettings, inferenceCount: 0, previewApplyMs: autoMs, previewWarmApplyMs: autoWarmMs, preview: metrics(autoPreview), crop: metrics(autoCrop), previewDeltaFromCorrected: deltaMetrics(correctedPreview, autoPreview) });
 
-      for (let candidateIndex = 0; candidateIndex < CANDIDATES.length; candidateIndex++) {
-        const variant = CANDIDATES[candidateIndex], fitStart = now();
-        const fit: AdaptiveFinishFit = fitAdaptiveFinish(correctedReference, 256, 256, variant, { scene: hints.scene, filter: hints.filter, preserveRedCorrection: spec.preserveRedCorrection === true || hints.filter === 'yes' });
+      for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+        const variant = candidates[candidateIndex], fitStart = now();
+        const fitter=product?(ref:Uint8ClampedArray,w:number,h:number,_v:Candidate,options:Parameters<typeof fitAdaptiveFinish>[4])=>fitPhotoFinish(ref,w,h,variant==='tone'?'natural':'vivid',options):fitAdaptiveFinish;
+        const fit: AdaptiveFinishFit = fitter(correctedReference, 256, 256, variant, { scene: hints.scene, filter: hints.filter, preserveRedCorrection: spec.preserveRedCorrection === true || hints.filter === 'yes' });
         const fitMs = now() - fitStart, applyStart = now();
-        const applyFittedCandidate = (input: Uint8ClampedArray, width: number, height: number) => applyAdaptiveFinish(input, width, height, fit);
+        const settings={look:variant==='tone'?'natural' as const:'vivid' as const,amount:100,fit};
+        const prepared=product?preparePhotoFinish(settings):undefined;
+        const applyFittedCandidate = (input: Uint8ClampedArray, width: number, height: number) => product?applyPhotoFinish(input,width,height,settings,prepared):applyAdaptiveFinish(input, width, height, fit);
         const candidatePreview = applyFittedCandidate(correctedPreview, previewWidth, previewHeight);
         const previewApplyMs = now() - applyStart, warmStart = now();
         applyFittedCandidate(correctedPreview, previewWidth, previewHeight);
         const previewWarmApplyMs = now() - warmStart, cropApplyStart = now();
         const candidateCrop = applyFittedCandidate(correctedCrop, crop.width, crop.height);
         const cropApplyMs = now() - cropApplyStart;
-        labelCell(wholeSheet, row, candidateIndex + 2, candidatePreview, previewWidth, previewHeight, `${engineTitle} · ${COLUMNS[candidateIndex + 2]}`, TILE_W, WHOLE_TILE_H, WHOLE_IMAGE_H);
-        labelCell(cropSheet, row, candidateIndex + 2, candidateCrop, crop.width, crop.height, `${engineTitle} · ${COLUMNS[candidateIndex + 2]}`, cropTileWidth, cropTileHeight, crop.height);
-        records.push({ sample: sampleId, category, engine, treatment: variant, replaces: 'Auto enhance tone; no clarity or sharpness stacked', experimental: variant === 'vivid', qualityClaim: variant === 'vivid' ? 'none; visual comparison required' : undefined, inferenceCount: 0, fitObjectReusedForPreviewAndCrop: true, fit: { active: fit.active, reason: fit.reason, colourReason: fit.colourReason, sampleCount: fit.sampleCount, colourGains: fit.colourGains, chromaGain: fit.chromaGain ?? 1, toneScale: fit.toneScale, toneOffset: fit.toneOffset }, fitMs, previewApplyMs, previewWarmApplyMs, cropApplyMs, warmApplyPercentOfWarmRenderer: +(previewWarmApplyMs / Math.max(.001, warmPreviewRendererMs) * 100).toFixed(2), preview: metrics(candidatePreview), crop: metrics(candidateCrop), previewDeltaFromCorrected: deltaMetrics(correctedPreview, candidatePreview), previewDeltaFromAutoEnhance: deltaMetrics(autoPreview, candidatePreview) });
+        labelCell(wholeSheet, row, candidateIndex + 2, candidatePreview, previewWidth, previewHeight, `${engineTitle} · ${columns[candidateIndex + 2]}`, TILE_W, WHOLE_TILE_H, WHOLE_IMAGE_H);
+        labelCell(cropSheet, row, candidateIndex + 2, candidateCrop, crop.width, crop.height, `${engineTitle} · ${columns[candidateIndex + 2]}`, cropTileWidth, cropTileHeight, crop.height);
+        savePreview(engine+'-'+(variant==='tone'?'natural':'vivid'),candidatePreview);
+        records.push({ sample: sampleId, category, engine, treatment: variant, productFinish:product, savedFit:fit, benchmarkDelta:benchmarkPixels?deltaMetrics(benchmarkPixels,candidatePreview):undefined, replaces: 'Auto enhance tone; no clarity or sharpness stacked', experimental: variant === 'vivid', qualityClaim: variant === 'vivid' ? 'none; visual comparison required' : undefined, inferenceCount: 0, fitObjectReusedForPreviewAndCrop: true, fit: { active: fit.active, reason: fit.reason, colourReason: fit.colourReason, sampleCount: fit.sampleCount, colourGains: fit.colourGains, chromaGain: fit.chromaGain ?? 1, toneScale: fit.toneScale, toneOffset: fit.toneOffset }, fitMs, previewApplyMs, previewWarmApplyMs, cropApplyMs, warmApplyPercentOfWarmRenderer: +(previewWarmApplyMs / Math.max(.001, warmPreviewRendererMs) * 100).toFixed(2), preview: metrics(candidatePreview), crop: metrics(candidateCrop), previewDeltaFromCorrected: deltaMetrics(correctedPreview, candidatePreview), previewDeltaFromAutoEnhance: deltaMetrics(autoPreview, candidatePreview) });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error); errors.push(`${engine}: ${message}`);
@@ -251,7 +263,7 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
   }
   status.textContent = `Ready · ${sampleId} · ${engines.length} configured engines · ${errors.length} engine errors`;
   if (bitmap instanceof ImageBitmap) bitmap.close();
-  return { sample: sampleId, category, originalWidth, originalHeight, decodedWidth: loaded.decodedWidth, decodedHeight: loaded.decodedHeight, previewWidth, previewHeight, crop, records, errors };
+  return { sample: sampleId, category, originalWidth, originalHeight, decodedWidth: loaded.decodedWidth, decodedHeight: loaded.decodedHeight, previewWidth, previewHeight, crop, records, errors, outputs };
 };
 
 export type { HarnessOptions };

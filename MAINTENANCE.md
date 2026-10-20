@@ -1,5 +1,15 @@
 # Maintenance
 
+## Resumed photo finish (20 October 2026)
+
+User resumed optional photo-only Natural/Vivid work after the 1.0.9 release and supplied three paired visual benchmarks. All six source/reference files and generated comparisons are gitignored; only general processing code and reusable tooling may be committed. The finish must be available for Balanced, every bundled neural engine and custom ONNX. No model-specific finish tuning or extra inference is intended.
+
+- [x] Integrate main through 1.0.9 (`71d55a3`); preserve PR #11 platform limits, Save/Share and iOS navigation/recovery fixes. Restore only feature source and regression scripts from stash `9bd4ff0`, leaving the stash and unrelated IDE state intact.
+- [x] Existing-fit baseline: three benchmark inputs × four engines × six treatments = 72 comparisons, zero engine/browser errors. Current colour fitting remains too subtle and sometimes falls back to tone-only. Baseline report is ignored under `analysis/adaptive-finish/benchmark-baseline/`. Restored shared suite: 244 tests and production build pass.
+- [x] Add opt-in paired-reference harness mode with full preview outputs and explicit visual-reference limitations; default isolated comparisons remain available.
+- [ ] Next: finish versioned stronger fitting while retaining old stored-fit rendering, then rerun paired comparisons and representative water/highlight/shadow/filter cases. Complete the restored P3 lifecycle/model-independence browser regression and P4 export timing. No merge, publish, version bump or native signing is authorized for this resumed feature.
+
+
 ## Adaptive finish P2 saved-fit checkpoint (19 October 2026)
 
 7557c4b completes the bounded Vivid comparison (216 local treatments, no engine/browser errors); Natural and Vivid follow the user-selected direction. c1744a5 adds optional validated recipe-v1 fit storage and shared photo preview/export application. One fit and cached inference are reused, with explicit update, safe fallback, bounded kernels, and stale fit guards. Automatically applied contrast is suppressed only for a real active finish; manual contrast remains available. Defaults and video/live-camera/native ownership are unchanged.

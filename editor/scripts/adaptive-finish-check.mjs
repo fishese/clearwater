@@ -20,6 +20,8 @@ const positiveLimit = (value, fallback) => {
 const escapeHtml = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const fingerprintPaths = [
   'src/core/adaptive-finish.ts',
+  'src/core/photo-finish.ts',
+  'src/core/adaptive-finish-fast.ts',
   'scripts/adaptive-finish/harness.ts',
   'scripts/adaptive-finish/index.html',
   'scripts/adaptive-finish-check.mjs'
@@ -155,7 +157,9 @@ try {
     mode: synthetic ? 'synthetic mechanics only' : 'authorized local photos',
     evidenceLimit: synthetic ? 'Synthetic output checks mechanics only and is not evidence of photo quality.' : 'Model outputs and finish estimates are not ground truth; inspect the whole-image previews and source-resolution crops.',
     comparison: {
-      candidates: candidateNames,
+      candidates: samples.every(sample=>sample.productFinish===true)?['natural','vivid']:candidateNames,
+      pairedReferences: samples.some(sample=>typeof sample.benchmark==='string'),
+      benchmarkMeaning: 'User-supplied other-app outputs are visual targets, not ground truth. Pixel differences are descriptive only; no automatic superiority or exact-match claim.',
       candidateOrder: 'Each candidate, including vivid, replaces Auto enhance tone. Current Auto enhance is shown as a separate baseline. Candidate results do not stack clarity or sharpness. Vivid is an experimental bounded candidate; this report makes no quality claim.',
       reference: 'One renderer-corrected 256x256 reference per sample and engine; each fitted candidate is reused for preview and crop.',
       reuseVerification: 'Each candidate closure passes the identical fit object to preview and crop application. The candidate path performs no model inference; each successful AI engine baseline records one inference and Balanced records zero.',
@@ -184,6 +188,8 @@ try {
       }
     }
     for (const error of result.errors) engineErrors.push({ sample: result.sample, error });
+    for(const output of result.outputs??[]){if(!/^[a-z]+-(natural|vivid)$/.test(output.name))throw new Error('Invalid output name');await writeFile(resolve(outputRoot,result.sample+'-'+output.name+'.png'),Buffer.from(output.png.split(',')[1],'base64'));}
+    delete result.outputs;
     const stem = result.sample;
     const wholeImage = `${stem}-whole.png`, cropImage = `${stem}-crops.png`;
     await page.locator('#whole').screenshot({ path: resolve(outputRoot, wholeImage) });
