@@ -19,10 +19,10 @@ try{
    if(message?.type==='load'&&message.blob?.type?.startsWith('image/'))state.photoWorker=this;
    return Reflect.apply(post,this,[message,...args]);
   };
-  let owner=Worker.prototype,descriptor;
-  while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onmessage');owner=Object.getPrototypeOf(owner);}
+  let owner=Worker.prototype,descriptor,descriptorOwner;
+  while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onmessage');if(descriptor)descriptorOwner=owner;else owner=Object.getPrototypeOf(owner);}
   if(descriptor?.get&&descriptor?.set){
-   state.hookInstalled=true;state.hookOwner=owner?.constructor?.name??'Worker';
+   state.hookInstalled=true;state.hookOwner=descriptorOwner?.constructor?.name??'Worker';
    Object.defineProperty(Worker.prototype,'onmessage',{
     configurable:true,enumerable:descriptor.enumerable,
     get(){return descriptor.get.call(this);},
