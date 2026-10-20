@@ -1,6 +1,7 @@
 import {Capacitor,registerPlugin,type PluginListenerHandle} from '@capacitor/core';
 import type {LocalDirectoryHandle,LocalFileHandle} from './file-save';
-import {mediaLimit,supportedMedia} from './core/media';
+import {isVideo,mediaLimit,supportedMedia} from './core/media';
+import {assertVideoBytes,detectMediaPlatform,normalizeMediaError,PlatformLimitError,presentMediaError,type MediaPlatform} from './core/platform-limits';
 import type {CustomModel} from './core/types';
 
 type SharedPhoto={id:string;path:string;name:string;type:string};
@@ -50,6 +51,10 @@ const back=registerPlugin<NativeBack>('ClearWaterBack');
 let backListeners=0;
 const cancelledHdrJobs=new Set<string>();
 export const isAndroid=()=>Capacitor.getPlatform()==='android';
+function androidPlatform():MediaPlatform {
+ const nav=typeof navigator==='undefined'?undefined:navigator;
+ return detectMediaPlatform({capacitorPlatform:Capacitor.getPlatform(),userAgent:nav?.userAgent??'',navigatorPlatform:nav?.platform??'',maxTouchPoints:nav?.maxTouchPoints??0});
+}
 function base64Chunk(bytes:Uint8Array){
  const parts:string[]=[];
  // Keep each argument list bounded while converting a whole write chunk at once.
@@ -58,7 +63,9 @@ function base64Chunk(bytes:Uint8Array){
 }
 export async function createAndroidHdrWorkingCopy(source:File,onProgress:(progress:number)=>void,onJob:(id:string)=>void):Promise<{id:string;file:File}> {
  if(!isAndroid())throw new Error('HDR video conversion is available in the Android app.');
- if(source.size<=0||source.size>512*1024*1024)throw new Error('HDR videos must be no larger than 512 MB.');
+ const platform=androidPlatform();
+ if(source.size<=0)throw new Error('The HDR video is empty.');
+ assertVideoBytes(source.size,platform);
  const {id}=await hdr.beginHdrInput({name:source.name,size:source.size});let staged=false,outputReady=false;let listener:PluginListenerHandle|undefined;
  try{
   onJob(id);
@@ -67,7 +74,7 @@ export async function createAndroidHdrWorkingCopy(source:File,onProgress:(progre
   await hdr.finishHdrInput({id,abort:false});staged=true;
   listener=await hdr.addListener('hdrConversionProgress',event=>{if(event.id===id)onProgress(5+Math.round(Math.max(0,Math.min(100,event.progress))*.95));});
   if(cancelledHdrJobs.has(id))throw new DOMException('HDR conversion cancelled.','AbortError');
-  const result=await hdr.convertHdrToSdr({id});outputReady=true;
+  const result=await hdr.convertHdrToSdr({id}).catch(error=>{throw normalizeMediaError(error,platform);});outputReady=true;
   const response=await fetch(Capacitor.convertFileSrc(result.uri));if(!response.ok)throw new Error('Could not read the SDR working copy.');
   const blob=await response.blob();if(!blob.size)throw new Error('The SDR working copy was empty.');
   return {id,file:new File([blob],'hdr-working-copy.mp4',{type:'video/mp4'})};
@@ -174,25 +181,32 @@ async function pickFolder(){try{return await files.chooseFolder();}catch(error){
 export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{return directoryHandle(await pickFolder());}
 export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{
  const folder=await pickFolder(),result=await files.listPhotos({folder:folder.uri});
- const photos=result.photos.filter(photo=>supportedMedia(photo)&&photo.size<=mediaLimit(photo))
+ const platform=androidPlatform();
+ const photos=result.photos.filter(photo=>supportedMedia(photo)&&photo.size<=mediaLimit(photo,platform))
   .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'})||a.uri.localeCompare(b.uri));
  return {name:folder.name,directory:directoryHandle(folder),photos};
 }
+function fileTooLarge(bytes:number,file:{name:string;type?:string},platform:MediaPlatform){
+ const error=new PlatformLimitError(isVideo(file)?'too-large':'photo-too-large',platform,{unit:'bytes',actual:bytes,limit:mediaLimit(file,platform)});
+ console.error(error);
+ return error;
+}
 export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto):Promise<File>{
+ const platform=androidPlatform(),limit=mediaLimit(photo,platform);
  const response=await fetch(Capacitor.convertFileSrc(photo.uri));if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
  const reader=response.body?.getReader();let blob:Blob;
- if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>mediaLimit(photo))throw new Error('This file exceeds the 512 MB safety ceiling.');chunks.push(new Uint8Array(part.value));}}catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
+ if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>limit)throw fileTooLarge(bytes,photo,platform);chunks.push(new Uint8Array(part.value));}}catch(error){console.error(error);await reader.cancel().catch(cancelError=>{console.error(cancelError);});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
  else blob=await response.blob();
- if(blob.size>mediaLimit(photo))throw new Error('This file exceeds the 512 MB safety ceiling.');
+ if(blob.size>limit)throw fileTooLarge(blob.size,photo,platform);
  return new File([blob],photo.name,{type:photo.type});
 }
 export async function receiveAndroidPhotos(onFiles:(photos:File[])=>void,onError:(message:string)=>void){
  let running=false,pending=false,stopped=false;
  const drain=async()=>{if(stopped)return;if(running){pending=true;return;}running=true;try{
-   do {pending=false;const result=await files.drainShares();if(result.error)onError(result.error);
-    for(const item of result.photos){try{const response=await fetch(Capacitor.convertFileSrc(item.path));if(!response.ok)throw new Error('Read failed');onFiles([new File([await response.blob()],item.name,{type:item.type})]);}catch{onError('Could not import a shared file. Share it again or use Open files.');}finally{await files.releaseShare({id:item.id}).catch(()=>{});}}
+   do {pending=false;const result=await files.drainShares();if(result.error)onError(presentMediaError(new Error(result.error),androidPlatform()));
+    for(const item of result.photos){try{const response=await fetch(Capacitor.convertFileSrc(item.path));if(!response.ok)throw new Error('Read failed');onFiles([new File([await response.blob()],item.name,{type:item.type})]);}catch(error){console.error(error);const normalized=normalizeMediaError(error,androidPlatform());onError(normalized instanceof PlatformLimitError?normalized.message:'Could not import a shared file. Share it again or use Open files.');}finally{await files.releaseShare({id:item.id}).catch(error=>{console.error(error);});}}
    }while(pending&&!stopped);
- }catch{onError('Could not receive shared files.');}finally{running=false;}};
+ }catch(error){console.error(error);onError('Could not receive shared files.');}finally{running=false;}};
  const listener=await files.addListener('sharesAvailable',()=>void drain());await drain();
  return ()=>{stopped=true;void listener.remove();};
 }

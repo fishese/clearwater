@@ -1,14 +1,15 @@
-import {PHOTO_MAX_BYTES} from './photo-size';
-export const MAX_VIDEO_BYTES=512*1024*1024;
-export const MAX_VIDEO_SECONDS=600;
-export const MAX_VIDEO_OUTPUT_BYTES=256*1024*1024;
-export const MAX_SOURCE_VIDEO_OUTPUT_BYTES=512*1024*1024;
+import {currentMediaPlatform,limitsFor,PlatformLimitError,type MediaPlatform} from './platform-limits';
+const desktopLimits=limitsFor('desktop');
+export const MAX_VIDEO_BYTES=desktopLimits.videoBytes;
+export const MAX_VIDEO_SECONDS=desktopLimits.videoSeconds;
+export const MAX_VIDEO_OUTPUT_BYTES=desktopLimits.compactExportBytes;
+export const MAX_SOURCE_VIDEO_OUTPUT_BYTES=desktopLimits.sourceExportBytes;
 // Reserve space for audio, muxing overhead and encoder bitrate variation.
-export const videoBitrate=(duration:number)=>Math.min(8_000_000,Math.max(500_000,Math.floor(MAX_VIDEO_OUTPUT_BYTES*.8*8/Math.max(1,duration)-256_000)));
+export const videoBitrate=(duration:number,outputBytes=MAX_VIDEO_OUTPUT_BYTES)=>Math.min(8_000_000,Math.max(500_000,Math.floor(outputBytes*.8*8/Math.max(1,duration)-256_000)));
 export function isVideo(file:{name:string;type?:string}){return /\.(mp4|mov)$/i.test(file.name)||['video/mp4','video/quicktime'].includes(file.type??'');}
 export function isRaw(file:{name?:string;type?:string}){return /\.dng$/i.test(file.name??'')||['image/dng','image/x-adobe-dng'].includes(file.type??'');}
 export function supportedMedia(file:{name:string;type?:string}){return isVideo(file)||isRaw(file)||/\.(jpe?g|png|heic|heif)$/i.test(file.name)||['image/jpeg','image/png','image/heic','image/heif'].includes(file.type??'');}
-export function mediaLimit(file:{name:string;type?:string}){return isVideo(file)?MAX_VIDEO_BYTES:PHOTO_MAX_BYTES;}
+export function mediaLimit(file:{name:string;type?:string},platform:MediaPlatform=currentMediaPlatform()){const row=limitsFor(platform);return isVideo(file)?row.videoBytes:row.photoBytes;}
 export function videoSize(width:number,height:number,maxLong=1920,maxShort=1080):[number,number]{
  const scale=Math.min(1,maxLong/Math.max(width,height),maxShort/Math.min(width,height));
  return [Math.max(2,Math.floor(width*scale/2)*2),Math.max(2,Math.floor(height*scale/2)*2)];
@@ -78,21 +79,22 @@ export function videoMetadataTags(tags:VideoMetadataTags,keep:boolean):VideoMeta
  if(!keep)return {};
  return {...(tags.title?{title:tags.title}:{}),...(tags.description?{description:tags.description}:{}),...(tags.comment?{comment:tags.comment}:{}),...(tags.date?{date:tags.date}:{})};
 }
-export function videoExportPlan(info:VideoInfo,mode:VideoExportMode='compatible'):VideoExportPlan{
+export function videoExportPlan(info:VideoInfo,mode:VideoExportMode='compatible',platform:MediaPlatform=currentMediaPlatform()):VideoExportPlan{
  const source=mode==='source';
+ const row=limitsFor(platform);
  const width=source?(info.sourceWidth??info.outputWidth):info.outputWidth;
  const height=source?(info.sourceHeight??info.outputHeight):info.outputHeight;
- const maxOutputBytes=source?MAX_SOURCE_VIDEO_OUTPUT_BYTES:MAX_VIDEO_OUTPUT_BYTES;
+ const maxOutputBytes=source?row.sourceExportBytes:row.compactExportBytes;
  const frameRate=source?undefined:Math.min(30,Math.max(1,info.frameRate||30));
  // Source mode scales a high-quality 12 Mbps 1080p30 target by pixel count and rate, with a
  // fixed ceiling. It never lowers this target to make a long clip fit the file cap.
  const bitrate=source
   ?Math.min(36_000_000,Math.max(8_000_000,Math.round(12_000_000*(width*height/(1920*1080))*((info.sourceFrameRate??info.frameRate??30)/30))))
-  :videoBitrate(info.duration);
+  :videoBitrate(info.duration,row.compactExportBytes);
  const audioReserve=info.hasAudio?(source?512_000:256_000)*info.duration:0;
  const estimatedBytes=Math.ceil((bitrate*info.duration+audioReserve)*(source?1.15:1.08)/8);
  const supported=Number.isFinite(estimatedBytes)&&estimatedBytes<=maxOutputBytes;
- const reason=supported?undefined:source?'Estimated output exceeds the source-quality limit (512 MB). Choose Compact or a shorter clip.':'Estimated output exceeds the Compact export limit (256 MB). Choose a shorter clip.';
+ const reason=supported?undefined:new PlatformLimitError('too-large',platform,{unit:'bytes',actual:estimatedBytes,limit:maxOutputBytes}).message;
  return {mode,width,height,bitrate,estimatedBytes,maxOutputBytes,...(frameRate===undefined?{}:{frameRate}),supported,...(reason?{reason}:{})};
 }
 export interface VideoInfo {duration:number;codec:string;hasAudio:boolean;outputWidth:number;outputHeight:number;frameRate:number;sourceWidth?:number;sourceHeight?:number;sourceFrameRate?:number;creationDate?:Date;hdrToneMapped?:boolean}

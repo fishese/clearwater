@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Base64;
+import android.util.Log;
 import android.util.AtomicFile;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.*;
@@ -333,7 +334,7 @@ public class ClearWaterFilesPlugin extends Plugin {
         else {Uri uri=intent.getParcelableExtra(Intent.EXTRA_STREAM);if(uri!=null)uris.add(uri);}
         if(uris.isEmpty() && intent.getClipData()!=null)for(int i=0;i<intent.getClipData().getItemCount();i++)uris.add(intent.getClipData().getItemAt(i).getUri());
         io.execute(()->{
-            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){shareError="Some shared files could not be imported. Maximum file size: 512 MB.";}
+            for(Uri uri:uris.subList(0,Math.min(uris.size(),50)))try{copyShare(uri);}catch(Exception error){Log.w("ClearWaterFiles","share import failed",error);String raw=error.getMessage()==null?"":error.getMessage();shareError=raw.startsWith("cw-limit/")?raw:"Some shared files could not be imported. Maximum file size: 512 MB.";}
             notifyListeners("sharesAvailable",new JSObject(),true);
         });
     }
@@ -348,8 +349,8 @@ public class ClearWaterFilesPlugin extends Plugin {
         try(InputStream input=getContext().getContentResolver().openInputStream(uri);OutputStream output=new FileOutputStream(file)) {
             if(input==null)throw new IOException("Cannot read photo.");
             byte[] buffer=new byte[65536];long total=0;int count;
-            while((count=input.read(buffer))!=-1){total+=count;if(total>512L*1024*1024)throw new IOException("Photo too large.");output.write(buffer,0,count);}
-        }catch(Exception error){file.delete();throw new IOException(error);}
+            while((count=input.read(buffer))!=-1){total+=count;if(total>512L*1024*1024){String code=isVideoName(name)?"too-large":"photo-too-large";throw new IOException("cw-limit/"+code+"/bytes/"+total+"/"+(512L*1024*1024));}output.write(buffer,0,count);}
+        }catch(Exception error){file.delete();if(error instanceof IOException io&&io.getMessage()!=null&&io.getMessage().startsWith("cw-limit/"))throw io;Log.w("ClearWaterFiles","shared file rejected",error);throw new IOException(error);}
         sharedFiles.put(id,file);JSObject photo=new JSObject();photo.put("id",id);photo.put("path",file.getAbsolutePath());photo.put("name",name);photo.put("type",type==null?"image/jpeg":type);shares.add(photo);
     }
     @PluginMethod public void drainShares(PluginCall call) {io.execute(()->{JSObject result=new JSObject();result.put("photos",new JSArray(shares));shares.clear();if(shareError!=null){result.put("error",shareError);shareError=null;}call.resolve(result);});}

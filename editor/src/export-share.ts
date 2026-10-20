@@ -1,6 +1,10 @@
 import {Capacitor,registerPlugin} from '@capacitor/core';
+import {assertExportBytes,detectMediaPlatform,limitsFor,normalizeMediaError,type MediaPlatform} from './core/platform-limits';
 
-const MAX_SHARE_BYTES=512*1024*1024;
+function sharePlatform():MediaPlatform {
+ const nav=typeof navigator==='undefined'?undefined:navigator;
+ return detectMediaPlatform({capacitorPlatform:Capacitor.getPlatform(),userAgent:nav?.userAgent??'',navigatorPlatform:nav?.platform??'',maxTouchPoints:nav?.maxTouchPoints??0});
+}
 const CHUNK_BYTES=256*1024;
 const allowedMime=new Set(['image/jpeg','image/png','video/mp4']);
 const recipeMime='application/json';
@@ -14,7 +18,12 @@ interface SharePlugin {
 const nativeShare=registerPlugin<SharePlugin>('ClearWaterShare');
 
 function validate(file:Blob,name:string,allowWebRecipe=false){
-  if(!Number.isSafeInteger(file.size)||file.size<=0||file.size>MAX_SHARE_BYTES)throw new Error('This file is too large to share.');
+  if(!Number.isSafeInteger(file.size)||file.size<=0)throw new Error('This file is too large to share.');
+  const platform=sharePlatform();
+  if(file.size>limitsFor(platform).exportBytes){
+    const type=(file.type||mimeFromName(name)).toLowerCase().split(';',1)[0].trim();
+    assertExportBytes(file.size,type.startsWith('video/')?'video':'photo',platform);
+  }
   if(name.length<1||name.length>220||name==='.'||name==='..'||/[\\/\u0000-\u001f\u007f]/.test(name)||name.trim()!==name)throw new Error('This file name cannot be shared.');
   const type=(file.type||mimeFromName(name)).toLowerCase().split(';',1)[0].trim();
   const recipe=allowWebRecipe&&type===recipeMime&&name==='clearwater-recipe.json';
@@ -82,7 +91,7 @@ export async function shareExport(blob:Blob,name:string):Promise<void>{
         if(carry.length)await nativeShare.writeShareChunk({id,data:encodeBase64(carry)});
         await nativeShare.finishShare({id});
       }finally{reader.releaseLock();}
-    }catch(error){try{await nativeShare.cancelShare({id});}catch{}throw error;}
+    }catch(error){try{await nativeShare.cancelShare({id});}catch(cancelError){console.error(cancelError);}console.error(error);throw normalizeMediaError(error,sharePlatform());}
     return;
   }
   const nav=navigator as WebShareNavigator;

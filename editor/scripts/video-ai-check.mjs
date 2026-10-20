@@ -41,6 +41,6 @@ try{
  await load('sampled.mp4');await choose('wave');await ready();console.log('PASS custom model reuse on another video');
  const photoPng=await page.evaluate(async()=>{const canvas=new OffscreenCanvas(96,72),context=canvas.getContext('2d');context.fillStyle='#176c91';context.fillRect(0,0,96,72);context.fillStyle='#ed9b53';context.fillRect(24,18,48,36);return Array.from(new Uint8Array(await (await canvas.convertToBlob()).arrayBuffer()));});
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'photo-handoff.png',mimeType:'image/png',buffer:Buffer.from(photoPng)});await ready();await choose('wave');await ready();console.log('PASS custom model handoff to photo worker');
- await page.getByLabel('Choose photos',{exact:true}).setInputFiles(resolve(dir,'too-long.mp4'));await page.getByRole('status').filter({hasText:'10 minutes'}).waitFor({timeout:30000});
+ await page.getByLabel('Choose photos',{exact:true}).setInputFiles(resolve(dir,'too-long.mp4'));await page.getByRole('status').filter({hasText:'Trim it into shorter clips'}).waitFor({timeout:30000});
  assert.deepEqual(errors,[]);console.log('PASS sampled/fixed AI, cache, custom models, mobile fit, duration boundary and photo regression');
 }finally{await browser.close();}

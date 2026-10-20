@@ -18,6 +18,8 @@ import Settings from './Settings';
 import CaptureRemovalDialog from './CaptureRemovalDialog';
 import Camera,{type CameraHandle,type CameraSaveResult,type CameraCaptureDetails} from './Camera';
 import {isVideo,isRaw,supportedMedia,mediaLimit,videoTime,videoExportPlan,type VideoExportMode,type VideoInfo} from './core/media';
+import {PlatformLimitError,presentMediaError} from './core/platform-limits';
+import {currentMediaPlatform} from './platform/runtime';
 import {useStableTabScroll} from './use-stable-tab-scroll';
 import {useLaunchMode} from './use-launch-mode';
 import {newestPhotos} from './core/library-order';
@@ -47,7 +49,7 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
 function RadioGroup<T extends string>({label,name,value,options,onChange}:{label:string;name:string;value:T;options:[T,string][];onChange:(value:T)=>void}) {
   return <fieldset className="radio-group"><legend>{label}</legend><div>{options.map(([key,text])=><label key={key}><input type="radio" name={name} value={key} checked={value===key} onChange={()=>onChange(key)}/><span>{text}</span></label>)}</div></fieldset>;
 }
-function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert(t("Could not save this file. Please choose a writable folder."));});return;}if(getPlatformCapabilities().platform==='ios'){if(!getPlatformCapabilities().nativeMediaSave){window.alert(t('Photo export is unavailable in this iOS build.'));return;}void shareIOSFile(blob,name).then(result=>{if(result.completed)window.alert(t('Saved {0}.',[name]));}).catch(error=>window.alert(error instanceof Error?error.message:t('Photo export is unavailable in this iOS build.')));return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+function download(blob:Blob,name:string){if(isAndroid()){void chooseFolder().then(async folder=>{const file=await createUniqueFile(folder,name);await writeFile(file.handle,blob);}).catch(error=>{if(error?.code!=='CANCELLED')window.alert(t("Could not save this file. Please choose a writable folder."));});return;}if(getPlatformCapabilities().platform==='ios'){if(!getPlatformCapabilities().nativeMediaSave){window.alert(t('Photo export is unavailable in this iOS build.'));return;}void shareIOSFile(blob,name).then(result=>{if(result.completed)window.alert(t('Saved {0}.',[name]));}).catch(error=>window.alert(message(presentMediaError(error))||t('Photo export is unavailable in this iOS build.')));return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 
 export default function App() {
   useLanguage();
@@ -82,7 +84,7 @@ export default function App() {
   const [dimensions,setDimensions]=useState<[number,number]>([1,1]);
   const [videoInfo,setVideoInfo]=useState<VideoInfo|null>(null),[previewTime,setPreviewTime]=useState(0),[previewPlaying,setPreviewPlaying]=useState(false),[keepAudio,setKeepAudio]=useState(true);
   const [exportMode,setExportMode]=useState<VideoExportMode>('compatible');
-  const videoPlan=videoInfo?videoExportPlan({...videoInfo,hasAudio:videoInfo.hasAudio&&keepAudio},exportMode):null;
+  const videoPlan=videoInfo?videoExportPlan({...videoInfo,hasAudio:videoInfo.hasAudio&&keepAudio},exportMode,currentMediaPlatform()):null;
   const [hdrConverting,setHdrConverting]=useState(false),[hdrProgress,setHdrProgress]=useState(0);
   const [modelStatus,setModelStatus]=useState('');
   const [customOpen,setCustomOpen]=useState(false),[customModel,setCustomModel]=useState<CustomModel|null>(null),[rememberedModel,setRememberedModel]=useState<CustomModel|null>(null),[customAccepted,setCustomAccepted]=useState(false),[customLoading,setCustomLoading]=useState(false),[customFile,setCustomFile]=useState<Blob|null>(null),[customCandidate,setCustomCandidate]=useState<File|null>(null);
@@ -163,7 +165,12 @@ export default function App() {
   function disposeHdrWorkingCopy(id:string){hdrWorkingCopies.current.delete(id);}
   function disposeHdrWorkingCopies(){hdrWorkingCopies.current.clear();}
   async function cancelHdrWorkingCopy(){const id=hdrJobId.current;if(id)await cancelAndroidHdrWorkingCopy(id);}
-  const notify=(message:string)=>setNotice(message);
+  const notify=(text:string)=>setNotice(text);
+  useEffect(()=>{
+    const host=window as Window&{__clearwaterMemoryReady?:()=>boolean};
+    host.__clearwaterMemoryReady=()=>{const error=new PlatformLimitError('out-of-memory',currentMediaPlatform());console.error(error);setNotice(error.message);return true;};
+    return ()=>{delete host.__clearwaterMemoryReady;};
+  },[]);
   async function syncIOSCaptureRecords(selectLatest=false):Promise<void>{
     if(!capabilities.nativeCamera)return;
     if(selectLatest)iosSyncSelectLatest.current=true;
@@ -325,8 +332,10 @@ export default function App() {
     if(clearingCollectionRef.current){if(!fromFolder)deferredFiles.current.push(files);return [];}
     const valid=files.filter(supportedMedia);
     if(valid.length!==files.length)notify(t("Choose JPEG, PNG, HEIC, HEIF, DNG, MP4 or MOV files."));
-    const accepted=valid.filter(f=>f.size<=mediaLimit(f));
-    if(accepted.length!==valid.length)notify(t("Files above the 512 MB safety ceiling were skipped."));
+    const platform=currentMediaPlatform();
+    const accepted=valid.filter(f=>f.size<=mediaLimit(f,platform));
+    const skipped=valid.find(f=>f.size>mediaLimit(f,platform));
+    if(skipped)notify(presentMediaError(new PlatformLimitError(isVideo(skipped)?'too-large':'photo-too-large',platform,{unit:'bytes',actual:skipped.size,limit:mediaLimit(skipped,platform)}),platform));
     const addedAt=Date.now();
     const items:Photo[]=accepted.map((file,i)=>({id:crypto.randomUUID(),file,sourceUri,addedAt:addedAt-i/1000,url:URL.createObjectURL(file),past:[],future:[],...(initialRecipe?{recipe:clone(initialRecipe)}:{})}));
     if(items.length){if(!fromFolder){folderRequest.current++;setFolderLoading(false);setFolderBrowser(null);}items.forEach(item=>pendingPhotoWrites.current.add(item.id));setPhotos(all=>newestPhotos([...all,...items]));if(!librarySwitchLock.current){setReady(false);setActive(items[0].id);}items.forEach(persist);}
@@ -419,7 +428,7 @@ export default function App() {
         if(!current){setBusy('');setRendering(false);return;}
         if(!isAndroid()){
           setBusy('');setRendering(false);setReady(false);
-          notify(t("HDR video needs an SDR copy. Open it in the Android app on a supported device to make a working copy."));
+          notify(presentMediaError(new PlatformLimitError('hdr-unsupported',currentMediaPlatform())));
           return;
         }
         const token=data.gen,photoId=current.id;
@@ -429,13 +438,13 @@ export default function App() {
             if(!copy)return;
             for(const id of hdrWorkingCopies.current.keys())if(id!==photoId)disposeHdrWorkingCopy(id);
             hdrWorkingCopies.current.set(photoId,copy);hdrJobId.current=null;hdrActive.current=null;setHdrConverting(false);setBusy(t("Opening video…"));
-            videoProcessor.current?.postMessage({type:'load',gen:token,blob:copy.file,photoResolution,photoDevice});
+            videoProcessor.current?.postMessage({type:'load',gen:token,blob:copy.file,photoResolution,photoDevice,platform:currentMediaPlatform()});
           })
           .catch(error=>{
             if(token!==generation.current)return;
             hdrJobId.current=null;hdrActive.current=null;setHdrConverting(false);setBusy('');setRendering(false);setReady(false);
             if(error instanceof DOMException&&error.name==='AbortError')notify(t("HDR conversion cancelled."));
-            else notify(error instanceof Error?error.message:t("This HDR video could not be converted on this device."));
+            else notify(presentMediaError(error)||t("This HDR video could not be converted on this device."));
           });
         return;
       }
@@ -567,7 +576,7 @@ export default function App() {
     (clip?photoProcessor.current:videoProcessor.current)?.postMessage({type:'unload',gen:generation.current});
     if(customFile&&customModel)worker.current?.postMessage({type:'custom-model',gen:generation.current,permission:true,blob:customFile,name:customModel.name,inputRange:customModel.inputRange,outputRange:customModel.outputRange,silent:true,expectedConfig:customModel});
     const hdrCopy=hdrWorkingCopies.current.get(p.id);
-    worker.current?.postMessage({type:'load',gen:loadGeneration,blob:hdrCopy?.file??p.file,photoResolution,photoDevice});
+    worker.current?.postMessage({type:'load',gen:loadGeneration,blob:hdrCopy?.file??p.file,photoResolution,photoDevice,platform:currentMediaPlatform()});
     return ()=>{const conversion=hdrActive.current;if(conversion?.generation===loadGeneration){hdrActive.current=null;void cancelHdrWorkingCopy();}const previous=photoRef.current.find(item=>item.id===active);if(previous?.recipe)persist(previous);if(previous?.nativeCapture?.loaded&&previous.previewFile&&!clearingCollectionRef.current)setPhotos(all=>all.map(item=>item.id===previous.id?{...item,file:previous.previewFile!,nativeCapture:{...item.nativeCapture!,loaded:false}}:item));};
   },[active,photoResolution,photoReload,cameraOpen,processorEpoch]);
   useEffect(()=>{
@@ -651,7 +660,7 @@ export default function App() {
     try {
       if(saveGallery&&isAndroid()&&photo.cameraCapture?.uri){
         exportTarget.current={name:photo.cameraCapture.name??photo.file.name,cameraId:photo.id,cameraUri:photo.cameraCapture.uri};
-        exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:video?'mp4':'jpg',keepAudio,keepMetadata,exportMode,jpegQuality});return;
+        exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:video?'mp4':'jpg',keepAudio,keepMetadata,exportMode,jpegQuality,platform:currentMediaPlatform()});return;
       }
       let folder=downloadOnly||shareOnly?undefined:outputFolder??undefined;
       if(!downloadOnly&&!shareOnly&&supportsFolder()&&(chooseNewFolder||!folder)) {
@@ -660,7 +669,7 @@ export default function App() {
       }
       const name=saveAs&&saveDialog?restoredName(saveName,exportFormat,false):restoredName(photo.file.name,exportFormat,!folder);
       setSaveDialog(false);exportTarget.current={name,folder,share:shareOnly};
-      exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:exportFormat,keepAudio,keepMetadata,exportMode,jpegQuality});
+      exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:exportFormat,keepAudio,keepMetadata,exportMode,jpegQuality,platform:currentMediaPlatform()});
     }catch(error){setExporting(false);if(!(error instanceof DOMException&&error.name==='AbortError'))notify(error instanceof Error?error.message:t("Could not open the save folder."));}
   }
   async function exportCameraOriginal(){
@@ -668,11 +677,11 @@ export default function App() {
     if(!photo?.cameraCapture||saving||exporting)return;setSaving(true);
     const stem=photo.file.name.replace(/\.[^.]+$/,''),extension=photo.file.name.match(/\.[^.]+$/)?.[0]??(video?'.mp4':'.jpg'),name=stem+'-original'+extension;
     try{if(isAndroid()){const folder=outputFolder??await chooseFolder(),target=await createUniqueFile(folder,name);await writeFile(target.handle,photo.file);notify(t('Saved {0}.',[target.name]));}else if(capabilities.platform==='ios'){if(!capabilities.nativeMediaSave)throw new Error(t('Photo export is unavailable in this iOS build.'));const shared=await shareIOSFile(photo.file,name);if(shared.completed)notify(t('Saved {0}.',[name]));}else if(iosWeb)setIosWebSave({blob:photo.file,name});else download(photo.file,name);}
-    catch(error){if(!(error instanceof DOMException&&error.name==='AbortError'))notify(t('Could not export the camera original.'));}finally{setSaving(false);}
+    catch(error){console.error(error);if(!(error instanceof DOMException&&error.name==='AbortError'))notify(presentMediaError(error)||t('Could not export the camera original.'));}finally{setSaving(false);}
   }
   async function shareNativeVideo(){
     if(!photo?.nativeCapture||photo.nativeCapture.descriptor.kind!=='video'||saving||exporting)return;
-    setSaving(true);try{const result=await shareIOSCapture(photo.id,'source');if(result.completed)notify(t('Saved {0}.',[photo.nativeCapture.descriptor.name]));}catch(error){notify(error instanceof Error?error.message:t('Could not export the camera original.'));}finally{setSaving(false);}
+    setSaving(true);try{const result=await shareIOSCapture(photo.id,'source');if(result.completed)notify(t('Saved {0}.',[photo.nativeCapture.descriptor.name]));}catch(error){notify(presentMediaError(error)||t('Could not export the camera original.'));}finally{setSaving(false);}
   }
   async function saveNativeEnhancedPhoto(){
     if(!photo?.nativeCapture||photo.nativeCapture.descriptor.kind!=='photo'||saving||exporting)return;
@@ -685,7 +694,7 @@ export default function App() {
     if(iosWeb){setIosWebSave({blob,name});return;}
     if(capabilities.platform==='ios'){
       if(!capabilities.nativeMediaSave){notify(t('Photo export is unavailable in this iOS build.'));return;}
-      try{const shared=await shareIOSFile(blob,name);if(shared.completed)notify(t('Saved {0}.',[name]));}catch(error){notify(error instanceof Error?error.message:t('Photo export is unavailable in this iOS build.'));}
+      try{const shared=await shareIOSFile(blob,name);if(shared.completed)notify(t('Saved {0}.',[name]));}catch(error){notify(presentMediaError(error)||t('Photo export is unavailable in this iOS build.'));}
     }else download(blob,name);
   }
   function cancelExport(){if(saving)return;pauseVideoPreview();clearPreviewRenderQueue();generation.current++;exportTarget.current=null;worker.current?.postMessage({type:'cancel',gen:generation.current});setExporting(false);notify(t("Export cancelled."));}

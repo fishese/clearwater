@@ -34,7 +34,7 @@ describe('video worker HDR import protocol',()=>{
   media.input.computeDuration.mockResolvedValueOnce(601);await import('../src/video.worker');
   const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
   await handler({data:{type:'load',gen:2,blob:new File([new Uint8Array(10)],'long.mp4',{type:'video/mp4'})}});
-  expect(messages.some(message=>message.type==='hdr-needed')).toBe(false);expect(messages.find(message=>message.type==='error')).toMatchObject({operation:'load',gen:2,message:'Video clips can be up to 10 minutes long.'});
+  expect(messages.some(message=>message.type==='hdr-needed')).toBe(false);expect(messages.find(message=>message.type==='error')).toMatchObject({operation:'load',gen:2,code:'too-long',limit:'10:00',message:'Video is 10:01 long. Max: 10:00. Trim it into shorter clips.'});
  });
  it('bounds a stalled metadata read and marks only the timeout retryable',async()=>{
   vi.useFakeTimers();

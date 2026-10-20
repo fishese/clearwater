@@ -2,14 +2,16 @@
 import {LibRaw} from '@colorhythm/libraw-wasm';
 import wasmUrl from '@colorhythm/libraw-wasm/libraw.wasm?url';
 import {fitPhoto,photoInfo,validatePhotoSize} from './core/photo-size';
+import {currentMediaPlatform,isMediaPlatform,PlatformLimitError} from './core/platform-limits';
 self.onmessage=async({data})=>{
+ const platform=isMediaPlatform(data.platform)?data.platform:currentMediaPlatform();
  let decoder:LibRaw|undefined;
  try{
   const response=await fetch(wasmUrl);if(!response.ok)throw new Error('RAW decoder unavailable. Connect once to download it, then retry.');
   await LibRaw.initialize(await response.arrayBuffer());decoder=new LibRaw();await decoder.waitUntilReady();decoder.open(await data.blob.arrayBuffer());
   const swap=[5,6,7].includes(decoder.getFlip()),w=decoder.getActiveWidth(),h=decoder.getActiveHeight();
-  validatePhotoSize(decoder.getRawWidth(),decoder.getRawHeight());
-  const info=photoInfo(swap?h:w,swap?w:h,data.blob.size,true,data.mode,data.device);
+  validatePhotoSize(decoder.getRawWidth(),decoder.getRawHeight(),data.blob.size,platform);
+  const info=photoInfo(swap?h:w,swap?w:h,data.blob.size,true,data.mode,data.device,platform);
   self.postMessage({type:'info',info});
   let [width,height]=[info.exportWidth,info.exportHeight];
   if(data.preview&&info.large)[width,height]=fitPhoto(info.sourceWidth,info.sourceHeight,2_560_000,1600);
@@ -26,6 +28,6 @@ self.onmessage=async({data})=>{
   const bitmap=await createImageBitmap(canvas,{resizeWidth:size[0],resizeHeight:size[1],resizeQuality:'high'});
   if(!data.preview){info.exportWidth=bitmap.width;info.exportHeight=bitmap.height;}
   decoder.dispose();decoder=undefined;self.postMessage({type:'decoded',bitmap,info},[bitmap]);
- }catch(error){self.postMessage({type:'error',message:'Could not develop this DNG. Its compression or camera variant may be unsupported, or device memory may be insufficient. Try Reduced resolution. '+(error instanceof Error?error.message:'')});}
+ }catch(error){console.error(error);const message=error instanceof PlatformLimitError?error.message:'Could not develop this DNG. Its compression or camera variant may be unsupported, or device memory may be insufficient. Try Reduced resolution. '+(error instanceof Error?error.message:'');self.postMessage({type:'error',message});}
  finally{decoder?.dispose();}
 };

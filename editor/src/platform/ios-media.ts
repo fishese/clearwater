@@ -1,4 +1,5 @@
 import {Capacitor,registerPlugin} from '@capacitor/core';
+import {assertExportBytes,detectMediaPlatform,normalizeMediaError,type MediaPlatform} from '../core/platform-limits';
 
 interface IOSPhotoExportPlugin {
  beginExport(options:{name:string;type:string;size:number}):Promise<{id:string}>;
@@ -9,7 +10,10 @@ interface IOSPhotoExportPlugin {
 }
 
 const exportPlugin=registerPlugin<IOSPhotoExportPlugin>('ClearWaterExport');
-const MAX_EXPORT_BYTES=512*1024*1024;
+function exportPlatform():MediaPlatform {
+ const nav=typeof navigator==='undefined'?undefined:navigator;
+ return detectMediaPlatform({capacitorPlatform:Capacitor.getPlatform(),userAgent:nav?.userAgent??'',navigatorPlatform:nav?.platform??'',maxTouchPoints:nav?.maxTouchPoints??0});
+}
 const CHUNK_BYTES=256*1024;
 const ALLOWED_TYPES=new Set(['image/jpeg','image/png','image/heic','image/heif','image/dng','image/x-adobe-dng','video/mp4','video/quicktime','application/json']);
 const TYPE_BY_EXTENSION:Record<string,string>={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',heic:'image/heic',heif:'image/heif',dng:'image/x-adobe-dng',mp4:'video/mp4',mov:'video/quicktime',json:'application/json'};
@@ -33,7 +37,8 @@ export async function shareIOSFile(blob:Blob,name='ClearWater-Export'):
  const type=!declared||declared==='application/octet-stream'?TYPE_BY_EXTENSION[extension]||declared:declared;
  if(!ALLOWED_TYPES.has(type))throw new Error('This file type cannot be shared from the iOS app.');
  if(blob.size<=0)throw new Error('The exported file is empty.');
- if(blob.size>MAX_EXPORT_BYTES)throw new Error('The exported file exceeds the 512 MB safety ceiling.');
+ const platform=exportPlatform();
+ assertExportBytes(blob.size,type.startsWith('video/')?'video':'photo',platform);
  const {id}=await exportPlugin.beginExport({name,type,size:blob.size});
  let staged=false;
  try{
@@ -43,9 +48,12 @@ export async function shareIOSFile(blob:Blob,name='ClearWater-Export'):
   }
   await exportPlugin.finishExport({id,abort:false});staged=true;
   return await exportPlugin.shareExport({id});
+ }catch(error){
+  console.error(error);
+  throw normalizeMediaError(error,platform);
  }finally{
-  if(!staged)await exportPlugin.finishExport({id,abort:true}).catch(()=>{});
-  await exportPlugin.discardExport({id}).catch(()=>{});
+  if(!staged)await exportPlugin.finishExport({id,abort:true}).catch(error=>{console.error(error);});
+  await exportPlugin.discardExport({id}).catch(error=>{console.error(error);});
  }
 }
 
