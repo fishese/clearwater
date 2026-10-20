@@ -1,13 +1,18 @@
 # Handoff
 
-## Active release checkpoint (20 October 2026)
+## Release 1.0.9 completed (20 October 2026)
 
-User authorized releasing APK and IPA after merging PR #11 (4de45d9). Preparing v1.0.9: Android versionCode 28, iOS build 7, unsigned arm64 iOS 26+. This also includes the PR #10 Save/Share correction absent from native 1.0.8. Shared tests: 203 pass. Release publication is pending package and native checks; do not treat the historical published sections below as current acceptance.
+User authorized APK/IPA publication after merging PR #11. [v1.0.9](https://github.com/fishese/clearwater/releases/tag/v1.0.9) is published as latest from `96f6e59b9fd5c980231f48ccbdcfbb417e4000b2`, including PR #11 platform-specific error messages and PR #10 Save/Share readiness fixes. Android versionCode 28; unsigned physical-device arm64 IPA build 7, iOS 26+. Release review also repaired the iOS memory proxy's optional Capacitor delegate forwarding and duplicate reload, with two hosted regressions.
 
-Release review fixed PR #11's iOS memory proxy so optional Capacitor navigation-policy/authentication/lifecycle callbacks still forward, and recovery reloads once. Two hosted native regressions accompany it. Run the full iOS hosted suite on this changed native source.
+- [x] Preserve photo finish: branch `codex/adaptive-finish-plan` at `43d3d3b`; unfinished UI/tests in stash `9bd4ff0`. Natural and Vivid remain the selected future choices. Other stashes, unrelated `editor/.idea/`, private samples and comparisons are untouched. Local `.git/info/exclude` keeps `analysis/adaptive-finish/` ignored on main. No adaptive finish is shipped.
+- [x] Review merged PR #11 and run 203 shared tests; production build passes. Android's 9 native tests and minified debug/release builds pass.
+- [x] Verify 36 localized error cases: byte size, duration, photo dimensions and corrupt video across desktop/Android/iPhone browser profiles in EN/zh-HK/ja. This is Chromium profile coverage, not physical Safari memory-pressure acceptance. Production output-folder/collision/cancel, iPhone browser export readiness/cancel/retry/recipe sharing/superseded enhancement, and mocked native iOS shell regressions pass.
+- [x] [iOS run 39385092860](https://github.com/fishese/clearwater/actions/runs/39385092860): all 33 hosted native tests and unsigned physical-device packaging pass on the exact release source. [Pages run 39385091752](https://github.com/fishese/clearwater/actions/runs/39385091752) passed and deployed it.
+- [x] APK signature verifies and matches 1.0.8 certificate SHA-256 `0af8355d7d93be664de03099c7b3d9c38d12845bdb6a77c36c4860410dddd7e8`. App identity, versions, ZIP integrity and every bundled model hash pass. APK/IPA bundled web bytes match the production build, allowing only static-text Windows/macOS line endings. IPA is unsigned; CI verifies physical iOS arm64, native plugins and compiled Metal library.
+- [x] Publish all 14 assets with canonical APK/IPA names, SHA-256 sidecars, provenance, LICENSE and NOTICE; every uploaded GitHub asset digest matches local bytes.
+- [ ] Next action: user device acceptance of iPhone memory recovery and existing automatic/manual lens transitions. Keep adaptive finish deferred until explicitly resumed; then restore its branch/stash carefully and continue the documented P2/P3 checkpoint without losing the selected Natural/Vivid direction.
 
-Photo finish is deferred: committed work stays on codex/adaptive-finish-plan at 43d3d3b, and unfinished UI/tests are preserved in stash 9bd4ff0. Keep that stash, other stashes, unrelated editor/.idea files and private comparisons untouched. Local .git/info/exclude ignores analysis/adaptive-finish on main. No photo-finish code belongs in this release.
-
+Release APK SHA-256: `21a231e3a30c3f9f6d268c434eb19e6d7f6858f558730cef93adf750da456dad`; debug APK: `a0ff6ffbbdc6d9dedeb04d3f3672b4a3ad9ea9b3986a65c4063e737716005f14`; unsigned IPA: `a66f50d521dc21c4fb55e09b5114bb10778099ed933343ab5cca7cbf0b4dba9d`. Verification evidence and staged assets are ignored under `editor/android/build/release-1.0.9`; CI IPA/provenance under `editor/ios/App/output/release-1.0.9`. Historical checkpoints below describe earlier states.
 
 ## Coordinated 1.0.5 published and licensed (17 October 2026)
 
