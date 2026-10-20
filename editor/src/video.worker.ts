@@ -2,7 +2,8 @@
 import {Input,BlobSource,MP4,QTFF,CanvasSink,Conversion,Output,Mp4OutputFormat,BufferTarget,canEncodeVideo,type InputVideoTrack} from 'mediabunny';
 import {isAIEngine} from './core/bundled-models';
 import {analyse,renderPixels,parseRecipe} from './core/engine';
-import {MAX_VIDEO_BYTES,MAX_VIDEO_SECONDS,patchMp4CreationDate,readMp4CreationDate,videoExportPlan,videoMetadataTags,videoSize,type VideoExportMode,type VideoInfo} from './core/media';
+import {patchMp4CreationDate,readMp4CreationDate,videoExportPlan,videoMetadataTags,videoSize,type VideoExportMode,type VideoInfo} from './core/media';
+import {assertVideoBytes,assertVideoDuration,assertVideoFrame,classifyMediaFailure,currentMediaPlatform,isMediaPlatform,PlatformLimitError,type MediaPlatform} from './core/platform-limits';
 import {fitColour,colourHistogram,colourAt,applyColour,sampleTimes,bracket,type ColourNode} from './core/video-colour';
 import {hasHdrTransfer,hasDolbyVisionMetadata,isDolbyVisionCodec} from './core/video-hdr';
 import {pickNeutralFromPixels} from './core/white-balance';
@@ -45,6 +46,7 @@ async function frame(time:number){if(!sink||!info)throw new Error('Open a video 
 function bitmap(image:ImageData){const canvas=new OffscreenCanvas(image.width,image.height);canvas.getContext('2d')!.putImageData(image,0,0);return canvas.transferToImageBitmap();}
 ctx.onmessage=async({data})=>{
  const {type,gen,request}=data;
+ const platform:MediaPlatform=isMediaPlatform(data.platform)?data.platform:currentMediaPlatform();
  let opening:Input|undefined;
  try {
   if(type==='custom-model'){customTask=aiQueue.catch(()=>{}).then(async()=>{const {loadCustomModel}=await import('./models');customModel=await loadCustomModel(data);return customModel;});aiQueue=customTask;const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config});return;}
@@ -53,17 +55,18 @@ ctx.onmessage=async({data})=>{
   if(type==='load'){
    generation=gen;lastRequest++;nodes.clear();pendingNodes.clear();const deadline=Date.now()+45000;const previous=input,pending=conversion;input=undefined;track=undefined;pixels=undefined;info=undefined;sink=undefined;frameTime=-1;start=0;if(pending)await bounded(pending.cancel(),10000,'Video export cancellation timed out.').catch(()=>{});previous?.dispose();if(gen!==generation)return;
    if(typeof VideoDecoder==='undefined')throw new Error('This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.');
-   if(data.blob.size>MAX_VIDEO_BYTES)throw new Error('This first video version supports clips up to 512 MB.');
+   assertVideoBytes(data.blob.size,platform);
    const opened=new Input({source:new BlobSource(data.blob),formats:[MP4,QTFF]});opening=opened;
    const video=await readLoad(opened.getPrimaryVideoTrack(),deadline);checkLoad(gen);if(!video)throw new Error('No video track was found in this MP4/MOV file.');
    const duration=await readLoad(opened.computeDuration(),deadline);checkLoad(gen);
    const width=await readLoad(video.getDisplayWidth(),deadline),height=await readLoad(video.getDisplayHeight(),deadline);checkLoad(gen);
-   if(!Number.isFinite(duration)||duration<=0||duration>MAX_VIDEO_SECONDS+.01)throw new Error('Video clips can be up to 10 minutes long.');
-   if(width*height>34_000_000)throw new Error('This video resolution is too large for the editor. Use a smaller copy.');
+   assertVideoDuration(duration,platform);
+   assertVideoFrame(width,height,platform);
    const colorSpace=await readLoad(video.getColorSpace(),deadline);
    const codecString=await readLoad(video.getCodecParameterString(),deadline);
    if(hasHdrTransfer(colorSpace)||isDolbyVisionCodec(codecString)||await readLoad(hasDolbyVisionMetadata(data.blob),deadline)){
     checkLoad(gen);
+    if(isMediaPlatform(data.platform)&&data.platform!=='android-apk')throw new PlatformLimitError('hdr-unsupported',data.platform);
     if(gen===generation){opened.dispose();opening=undefined;send({type:'hdr-needed',gen,width,height,duration,name:typeof data.blob.name==='string'?data.blob.name:''});}
     return;
    }
@@ -71,7 +74,7 @@ ctx.onmessage=async({data})=>{
    const stats=await readLoad(video.computePacketStats(100),deadline);checkLoad(gen);
    const [outputWidth,outputHeight]=videoSize(width,height);
    const first=Math.max(0,await readLoad(video.getFirstTimestamp(),deadline));checkLoad(gen);
-   let creationDate:Date|undefined;try{if(deadline-Date.now()>5000)creationDate=await bounded(readMp4CreationDate(data.blob),5000,'Video date metadata timed out.');}catch{/* Embedded date parsing is best-effort; video decoding remains available. */}checkLoad(gen);
+   let creationDate:Date|undefined;try{if(deadline-Date.now()>5000)creationDate=await bounded(readMp4CreationDate(data.blob),5000,'Video date metadata timed out.');}catch(error){console.error(error);}checkLoad(gen);
    const codec=await readLoad(video.getCodec(),deadline),hasAudio=!!(await readLoad(opened.getPrimaryAudioTrack(),deadline));checkLoad(gen);
    const metadata:VideoInfo={duration:Math.max(.001,duration-first),codec:codec??'unknown',hasAudio,outputWidth,outputHeight,frameRate:Math.min(30,Math.max(1,stats.averagePacketRate||30)),sourceWidth:width,sourceHeight:height,sourceFrameRate:Math.max(1,stats.averagePacketRate||30),...(creationDate?{creationDate}:{})};
    const [previewWidth,previewHeight]=videoSize(width,height,960,540);
@@ -103,13 +106,13 @@ ctx.onmessage=async({data})=>{
    send({type:'rendered',gen,request,bitmap:edited,original,analysis:analyse(image.data,image.width,image.height)},[edited,original]);
   }else if(type==='export'&&gen===generation&&input&&track&&info){
    if(conversion?.state==='executing')throw new Error('A video export is already running.');
-   const recipe:Recipe=ensureRecipe(data.recipe),mode:VideoExportMode=data.exportMode==='source'?'source':'compatible',exportPlan=videoExportPlan({...info,hasAudio:info.hasAudio&&data.keepAudio!==false},mode),target=new BufferTarget();
-   if(!exportPlan.supported)throw new Error(exportPlan.reason??'This video is too large to export with the selected quality.');
+   const recipe:Recipe=ensureRecipe(data.recipe),mode:VideoExportMode=data.exportMode==='source'?'source':'compatible',exportPlan=videoExportPlan({...info,hasAudio:info.hasAudio&&data.keepAudio!==false},mode,platform),target=new BufferTarget();
+   if(!exportPlan.supported)throw new PlatformLimitError('too-large',platform,{unit:'bytes',actual:exportPlan.estimatedBytes,limit:exportPlan.maxOutputBytes});
    if(!(await canEncodeVideo('avc',{width:exportPlan.width,height:exportPlan.height,bitrate:exportPlan.bitrate,frameRate:exportPlan.frameRate??info.sourceFrameRate??info.frameRate})))throw new Error(`This device cannot encode H.264 at the requested resolution, frame rate and quality. Choose compatible quality or use a device that supports this export.`);
    const times=timesFor(recipe,info.duration),plan:ColourNode[]=[];
    if(isAI(recipe)){for(let i=0;i<times.length;i++){plan.push(await getNode(recipe,times[i],gen,request));if(gen!==generation)return;send({type:'progress',gen,request,progress:Math.round((i+1)/times.length*20)});}}
    if(gen!==generation)return;
-   target.on('write',({end})=>{if(end>exportPlan.maxOutputBytes)throw new Error(mode==='source'?'Source-quality output exceeded its 512 MB limit. Choose Compact or a shorter clip.':'Compact output exceeded its 256 MB limit. Choose a shorter clip.');});
+   target.on('write',({end})=>{if(end>exportPlan.maxOutputBytes)throw new PlatformLimitError('too-large',platform,{unit:'bytes',actual:end,limit:exportPlan.maxOutputBytes});});
    const output=new Output({format:new Mp4OutputFormat({fastStart:false}),target});let lastActivity=Date.now();
    const sourceTags=data.keepMetadata===true?await input.getMetadataTags():undefined;
    const tags=videoMetadataTags(sourceTags??{},data.keepMetadata===true);
@@ -130,8 +133,8 @@ ctx.onmessage=async({data})=>{
    let watchdog:ReturnType<typeof setInterval>|undefined;
    const stalled=new Promise<never>((_,reject)=>{watchdog=setInterval(()=>{if(Date.now()-lastActivity>60000)reject(new Error('Video processing stopped responding. Try an H.264 SDR copy or a shorter clip.'));},5000);});
    try{await Promise.race([current.execute(),stalled]);if(gen!==generation)return;if(!target.buffer)throw new Error('Video export produced no output.');let metadataWarning:string|undefined;if(data.keepMetadata===true&&info.creationDate&&!patchMp4CreationDate(target.buffer,info.creationDate))metadataWarning='The video was exported, but its source creation date could not be preserved.';send({type:'exported',gen,request,blob:new Blob([target.buffer],{type:'video/mp4'}),...(metadataWarning?{metadataWarning}:{})});}
-   catch(error){await current.cancel().catch(()=>{});throw error;}
+   catch(error){await current.cancel().catch(cancelError=>{console.error(cancelError);});throw error;}
    finally{clearInterval(watchdog);if(conversion===current)conversion=undefined;canvas.width=canvas.height=1;}
   }
- }catch(error){if(type==='custom-model'&&data.silent)return;opening?.dispose();let message=error instanceof Error?error.message:'This video could not be processed.';if(/unsupported configuration/i.test(message))message='This device cannot decode or encode this video configuration. HEVC support varies by device. Try an H.264 SDR copy.';if(gen===generation)send({type:'error',gen,request,operation:type,message,retryable:error instanceof VideoTransientError});}
+ }catch(error){if(type==='custom-model'&&data.silent)return;opening?.dispose();if(error instanceof VideoTransientError){console.error(error);if(gen===generation)send({type:'error',gen,request,operation:type,message:error.message,retryable:true});return;}const classified=classifyMediaFailure(error,platform,type==='export'?'export':'load');const limit=classified instanceof PlatformLimitError?classified:undefined;const message=classified instanceof Error?classified.message:'This video could not be processed.';if(gen===generation)send({type:'error',gen,request,operation:type,message,retryable:false,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});}
 };

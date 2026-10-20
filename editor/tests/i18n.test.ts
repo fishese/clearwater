@@ -83,6 +83,8 @@ describe('localisation',()=>{
  it('localises variable worker diagnostics and retained English recipe explanations',()=>{
   expect(translateMessage('ja','Loading and running Shallow-UWnet…')).toBe('Shallow-UWnet を読み込み・実行中…');
   expect(translateMessage('zh-HK','Video clips can be up to 10 minutes long.')).toBe('影片長度上限為 10 分鐘。');
+  expect(translateMessage('zh-HK','Video is 10:01 long. Max: 10:00. Trim it into shorter clips.')).toBe('影片長度為 10:01，上限為 10:00。請先剪成較短片段。');
+  expect(translateMessage('ja','Photo is 600 MB. Max on this device: 512 MB.')).toBe('写真は 600 MB、この端末の上限は 512 MB です。');
   expect(translateMessage('ja','OS error 123')).toBe('OS error 123');
  });
 });

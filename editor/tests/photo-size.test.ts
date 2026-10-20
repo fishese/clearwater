@@ -21,8 +21,8 @@ describe('photo resource policy',()=>{
  });
  it('accepts supported DNG MIME types and rejects absurd dimensions before pixel decoding',async()=>{
   expect(isRaw({name:'photo.DNG'})).toBe(true);expect(supportedMedia({name:'photo',type:'image/x-adobe-dng'})).toBe(true);expect(mediaLimit({name:'large.dng'})).toBe(512*1024*1024);
-  expect(()=>validatePhotoSize(20001,10000)).toThrow('safety ceiling');expect(()=>validatePhotoSize(40000,1)).toThrow();
+  expect(()=>validatePhotoSize(20001,10000)).toThrow('200.1 MP');expect(()=>validatePhotoSize(40000,1)).toThrow('32768 px');
   const head=new Uint8Array(33),v=new DataView(head.buffer);head.set([137,80,78,71]);v.setUint32(16,20001);v.setUint32(20,10000);
-  await expect(photoHeader(new Blob([head]))).rejects.toThrow('safety ceiling');
+  await expect(photoHeader(new Blob([head]))).rejects.toThrow('200.1 MP');
  });
 });

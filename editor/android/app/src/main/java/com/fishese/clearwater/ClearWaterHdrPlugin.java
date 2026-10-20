@@ -50,6 +50,32 @@ public class ClearWaterHdrPlugin extends Plugin {
     private static final long MAX_DURATION_US = 600_000_000L;
     private static final long MAX_FRAME_PIXELS = 34_000_000L;
     private static final int CHUNK_BYTES = 256 * 1024;
+
+    /** Machine-readable ceiling. JS formats it from the android-apk row in platform-limits.ts. */
+    private static String limitToken(String code, String unit, long actual, long limit) {
+        String token = "cw-limit/" + code + "/" + unit + "/" + actual + "/" + limit;
+        Log.w(TAG, token);
+        return token;
+    }
+
+    private static String frameToken(int width, int height) {
+        String token = "cw-limit/resolution/frame/" + width + "/" + height + "/" + MAX_FRAME_PIXELS;
+        Log.w(TAG, token);
+        return token;
+    }
+
+    private static boolean isEncoderOrMemory(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof OutOfMemoryError) return true;
+            String name = current.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+            String message = current.getMessage() == null ? "" : current.getMessage().toLowerCase(Locale.ROOT);
+            if (name.contains("outofmemory") || message.contains("out of memory") || message.contains("failed to allocate")
+                || message.contains("encoder init") || message.contains("encoder failed")) return true;
+            current = current.getCause();
+        }
+        return false;
+    }
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, InputSession> inputSessions = new ConcurrentHashMap<>();
@@ -134,7 +160,7 @@ public class ClearWaterHdrPlugin extends Plugin {
             try {
                 long size = call.getLong("size", -1L);
                 if (Build.VERSION.SDK_INT < 29) throw new IOException("HDR-to-SDR conversion requires Android 10 or later.");
-                if (size <= 0 || size > MAX_INPUT_BYTES) throw new IOException("Videos must be no larger than 512 MB.");
+                if (size <= 0 || size > MAX_INPUT_BYTES) throw new IOException(limitToken("too-large", "bytes", Math.max(0L, size), MAX_INPUT_BYTES));
                 cleanStaleFiles();
                 String id = UUID.randomUUID().toString();
                 File file = new File(workingDirectory(), "source-" + id + ".stage");
@@ -250,8 +276,9 @@ public class ClearWaterHdrPlugin extends Plugin {
                     }
                 }
             } finally { extractor.release(); }
-            if (durationUs <= 0 || durationUs > MAX_DURATION_US) throw new IOException("Video clips can be up to 10 minutes long.");
-            if (width <= 0 || height <= 0 || (long)width * height > MAX_FRAME_PIXELS) throw new IOException("This video resolution is too large for the editor. Use a smaller copy.");
+            if (durationUs <= 0 || width <= 0 || height <= 0) throw new IOException("cw-limit/unreadable");
+            if (durationUs > MAX_DURATION_US) throw new IOException(limitToken("too-long", "seconds", (durationUs + 999_999L) / 1_000_000L, MAX_DURATION_US / 1_000_000L));
+            if ((long)width * height > MAX_FRAME_PIXELS) throw new IOException(frameToken(width, height));
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(job.input));
             if (rotation % 90 != 0) throw new IOException("This video's rotation metadata is not supported.");
             int displayWidth = width, displayHeight = height;
@@ -292,7 +319,7 @@ public class ClearWaterHdrPlugin extends Plugin {
                     if (job.finished || job.transformer == null) return;
                     if (job.output.length() > MAX_OUTPUT_BYTES) {
                         try { job.transformer.cancel(); } catch (Exception ignored) { }
-                        finishConversion(job, false, new IOException("The SDR working copy exceeded the 256 MB export limit."));
+                        finishConversion(job, false, new IOException(limitToken("too-large", "bytes", job.output.length(), MAX_OUTPUT_BYTES)));
                         return;
                     }
                     int state = job.transformer.getProgress(holder);
@@ -319,16 +346,18 @@ public class ClearWaterHdrPlugin extends Plugin {
             synchronized (jobs) { jobs.remove(job.id); pendingCancels.remove(job.id); }
             job.output.delete();
             Exception failure = error;
-            if (success && failure == null) failure = new IOException("The SDR working copy exceeded the 256 MB export limit.");
-            String message = failure == null ? "HDR conversion was cancelled." : failure.getMessage() != null && failure.getMessage().contains("256 MB")
-                ? "The SDR working copy exceeded the 256 MB export limit."
+            if (success && failure == null) failure = new IOException(limitToken("too-large", "bytes", job.output.length(), MAX_OUTPUT_BYTES));
+            String raw = failure == null || failure.getMessage() == null ? "" : failure.getMessage();
+            String message = failure == null ? "HDR conversion was cancelled."
+                : raw.startsWith("cw-limit/") ? raw
+                : isEncoderOrMemory(failure) ? "cw-limit/out-of-memory"
                 : "This device could not tone-map this HDR video. Try an SDR copy or a supported Android 10+ device.";
             callReject(job.call, message, failure);
         }
     }
 
     private void callResolve(PluginCall call, JSObject result) { main.post(() -> call.resolve(result)); }
-    private void callReject(PluginCall call, String message, Exception error) { main.post(() -> { if (error == null) call.reject(message); else call.reject(message, error); }); }
+    private void callReject(PluginCall call, String message, Exception error) { main.post(() -> { if (error != null) Log.w(TAG, "reject", error); else Log.w(TAG, message); if (error == null) call.reject(message); else call.reject(message, error); }); }
 
     @PluginMethod public void cancelHdrConversion(PluginCall call) {
         String id = call.getString("id"); ConversionJob job;
