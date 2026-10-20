@@ -1,5 +1,14 @@
 # Handoff
 
+## Active release checkpoint (20 October 2026)
+
+User authorized releasing APK and IPA after merging PR #11 (4de45d9). Preparing v1.0.9: Android versionCode 28, iOS build 7, unsigned arm64 iOS 26+. This also includes the PR #10 Save/Share correction absent from native 1.0.8. Shared tests: 203 pass. Release publication is pending package and native checks; do not treat the historical published sections below as current acceptance.
+
+Release review fixed PR #11's iOS memory proxy so optional Capacitor navigation-policy/authentication/lifecycle callbacks still forward, and recovery reloads once. Two hosted native regressions accompany it. Run the full iOS hosted suite on this changed native source.
+
+Photo finish is deferred: committed work stays on codex/adaptive-finish-plan at 43d3d3b, and unfinished UI/tests are preserved in stash 9bd4ff0. Keep that stash, other stashes, unrelated editor/.idea files and private comparisons untouched. Local .git/info/exclude ignores analysis/adaptive-finish on main. No photo-finish code belongs in this release.
+
+
 ## Coordinated 1.0.5 published and licensed (17 October 2026)
 
 Published [v1.0.5](https://github.com/fishese/clearwater/releases/tag/v1.0.5) as latest from merge commit `306aa9f198a52f13786ae39d030fbca69cb0bd35`; PR #3 is merged with history preserved. Android is 1.0.5 (24), iOS is 1.0.5 (3), unsigned arm64 for iOS 26+. [Pages run 39022283938](https://github.com/fishese/clearwater/actions/runs/39022283938) and [iOS package run 39022439849](https://github.com/fishese/clearwater/actions/runs/39022439849) passed. The live web editor has active canonical latest APK/IPA links in all three languages. Earlier pending-merge/release statements below are historical.

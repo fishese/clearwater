@@ -3,15 +3,30 @@ import UIKit
 import WebKit
 
 /// Forwards Capacitor's navigation delegate and reports a web-content termination as an out-of-memory notice.
-private final class WebContentTerminationProxy: NSObject, WKNavigationDelegate {
+final class WebContentTerminationProxy: NSObject, WKNavigationDelegate {
     weak var forward: WKNavigationDelegate?
     var pendingMemoryNotice = false
+
+    // WebKit caches optional delegate capabilities. Keep all Capacitor policy,
+    // authentication and lifecycle callbacks visible through this proxy.
+    override func responds(to selector: Selector!) -> Bool {
+        super.responds(to: selector) || (forward?.responds(to: selector) ?? false)
+    }
+
+    override func forwardingTarget(for selector: Selector!) -> Any? {
+        if forward?.responds(to: selector) == true { return forward }
+        return super.forwardingTarget(for: selector)
+    }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         NSLog("ClearWater web content process terminated")
         pendingMemoryNotice = true
-        forward?.webViewWebContentProcessDidTerminate?(webView)
-        webView.reload()
+        if forward?.responds(to: #selector(WKNavigationDelegate.webViewWebContentProcessDidTerminate(_:))) == true {
+            // Capacitor resets its bridge and reloads; avoid issuing a second reload.
+            forward?.webViewWebContentProcessDidTerminate?(webView)
+        } else {
+            webView.reload()
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
