@@ -52,9 +52,9 @@ jobs:
             sleep 1
           done
           curl --fail --silent http://127.0.0.1:4173/ >/dev/null
-          CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-smoke.mjs
           CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
           CHECK_BROWSER=webkit CHECK_IOS_SHELL=1 CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
+          CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-smoke.mjs
   unsigned-device-ipa:
     name: Build unsigned iPhone IPA
     runs-on: macos-26
