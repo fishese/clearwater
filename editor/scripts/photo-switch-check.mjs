@@ -6,23 +6,23 @@ const engine=process.env.CHECK_BROWSER==='webkit'?webkit:chromium;
 const browser=await (engine===webkit?engine.launch({headless:true}):engine.launch({channel:process.env.CHECK_BROWSER??'msedge',headless:true}));
 try{
  const context=await browser.newContext({viewport:{width:1280,height:900}});
- const page=await context.newPage(),errors=[];page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(error.message));
+ const page=await context.newPage(),errors=[],consoleErrors=[];page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text().slice(0,300));});
  await page.addInitScript(iosShell=>{
-  const state=window.__photoSwitchCheck={messages:[],handlers:new Map(),photoWorker:null,holdGeneration:null,held:[]};
+  const state=window.__photoSwitchCheck={messages:[],incoming:[],handlers:new Map(),photoWorker:null,holdGeneration:null,held:[]};
   if(iosShell){
    window.webkit={messageHandlers:{bridge:{postMessage(){}}}};
    window.Capacitor={getPlatform:()=> 'ios',isNativePlatform:()=>true,isPluginAvailable:()=>false};
   }
   const post=Worker.prototype.postMessage;
   Worker.prototype.postMessage=function(message,...args){
-   state.messages.push({worker:this,type:message?.type,gen:message?.gen,request:message?.request});
+   state.messages.push({worker:this,type:message?.type,gen:message?.gen,request:message?.request,operation:message?.operation,message:typeof message?.message==='string'?message.message.slice(0,240):undefined});
    if(message?.type==='load'&&message.blob?.type?.startsWith('image/'))state.photoWorker=this;
    return Reflect.apply(post,this,[message,...args]);
   };
   let owner=Worker.prototype,descriptor;
   while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onmessage');owner=Object.getPrototypeOf(owner);}
   if(descriptor?.get&&descriptor?.set){
-   state.hookInstalled=true;
+   state.hookInstalled=true;state.hookOwner=owner?.constructor?.name??'Worker';
    Object.defineProperty(Worker.prototype,'onmessage',{
     configurable:true,enumerable:descriptor.enumerable,
     get(){return descriptor.get.call(this);},
@@ -30,6 +30,8 @@ try{
      if(typeof handler!=='function'){descriptor.set.call(this,handler);return;}
      state.handlers.set(this,handler);
      descriptor.set.call(this,event=>{
+      const data=event.data;
+      state.incoming.push({type:data?.type,gen:data?.gen,request:data?.request,operation:data?.operation,message:typeof data?.message==='string'?data.message.slice(0,240):undefined,keys:data&&typeof data==='object'?Object.keys(data):[]});
       if(state.holdGeneration!==null&&event.data?.type==='rendered'&&event.data.gen===state.holdGeneration){
        state.held.push({worker:this,handler,event});return;
       }
@@ -88,7 +90,11 @@ try{
  assert.equal(Number(await warmth.inputValue()),nextWarmth,'warmth slider must accept the new value');
  await waitForRenderAfter(previousRenderCount);
  await page.waitForFunction(()=>window.__photoSwitchCheck.held.length===1,{timeout:30000}).catch(async error=>{
-  console.error('HELD RENDER NOT INTERCEPTED',JSON.stringify(await page.evaluate(()=>({hookInstalled:window.__photoSwitchCheck.hookInstalled,held:window.__photoSwitchCheck.held.length,renderCount:window.__photoSwitchCheck.messages.filter(message=>message.type==='render').length,handlers:window.__photoSwitchCheck.handlers.size}))));
+  const pageState=await page.evaluate(()=>{
+   const state=window.__photoSwitchCheck,canvas=document.querySelector('canvas[aria-label="Edited photo"]'),primary=document.querySelector('.top-actions .primary');
+   return {hookInstalled:state.hookInstalled,hookOwner:state.hookOwner,holdGeneration:state.holdGeneration,held:state.held.length,handlers:state.handlers.size,messages:state.messages.slice(-16).map(({type,gen,request,operation,message})=>({type,gen,request,operation,message})),incoming:state.incoming.slice(-16),canvas:canvas?{generation:canvas.dataset.generation,request:canvas.dataset.request,width:canvas.width,height:canvas.height}:null,primary:primary?{disabled:primary.disabled,label:primary.getAttribute('aria-label')}:null,toasts:[...document.querySelectorAll('.toast')].map(node=>node.textContent),body:document.body.innerText.slice(0,900)};
+  });
+  console.error('HELD RENDER NOT INTERCEPTED',JSON.stringify({page:pageState,errors,consoleErrors}));
   throw error;
  });
 
