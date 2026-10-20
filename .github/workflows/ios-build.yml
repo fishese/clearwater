@@ -17,6 +17,43 @@ permissions:
   contents: read
 
 jobs:
+  safari-photo-switch-regression:
+    name: Test photo switching in WebKit and mocked iOS shell
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: editor/package-lock.json
+      - name: Install locked dependencies
+        working-directory: editor
+        run: npm ci
+      - name: Build production web assets
+        working-directory: editor
+        run: npm run build
+      - name: Install Playwright WebKit
+        working-directory: editor
+        run: npx playwright install webkit
+      - name: Run WebKit photo-switch regression
+        working-directory: editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > "$RUNNER_TEMP/clearwater-web-preview.log" 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4173/ >/dev/null
+          CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
+          CHECK_BROWSER=webkit CHECK_IOS_SHELL=1 CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
   unsigned-device-ipa:
     name: Build unsigned iPhone IPA
     runs-on: macos-26

@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
-import {chromium} from 'playwright';
+import {chromium,webkit} from 'playwright';
 
 const url=process.env.CHECK_URL??'http://127.0.0.1:5173/';
-const browser=await chromium.launch({channel:process.env.CHECK_BROWSER??'msedge',headless:true});
+const engine=process.env.CHECK_BROWSER==='webkit'?webkit:chromium;
+const browser=await (engine===webkit?engine.launch({headless:true}):engine.launch({channel:process.env.CHECK_BROWSER??'msedge',headless:true}));
 try{
  const context=await browser.newContext({viewport:{width:1280,height:900}});
  const page=await context.newPage(),errors=[];page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(error.message));
- await page.addInitScript(()=>{
+ await page.addInitScript(iosShell=>{
   const state=window.__photoSwitchCheck={messages:[],handlers:new Map(),photoWorker:null,holdGeneration:null,held:[]};
+  if(iosShell){
+   window.webkit={messageHandlers:{bridge:{postMessage(){}}}};
+   window.Capacitor={getPlatform:()=> 'ios',isNativePlatform:()=>true,isPluginAvailable:()=>false};
+  }
   const post=Worker.prototype.postMessage;
   Worker.prototype.postMessage=function(message,...args){
    state.messages.push({worker:this,type:message?.type,gen:message?.gen,request:message?.request});
@@ -31,8 +36,12 @@ try{
   });
   state.releaseHeld=()=>{const held=state.held.splice(0);for(const item of held)item.handler.call(item.worker,item.event);};
   state.inject=(worker,data)=>state.handlers.get(worker)?.call(worker,{data});
- });
+ },process.env.CHECK_IOS_SHELL==='1');
  await page.goto(url);
+ if(process.env.CHECK_IOS_SHELL==='1'){
+  assert.equal(await page.evaluate(()=>window.Capacitor?.getPlatform?.()),'ios','mocked native shell must be active for the iOS switch run');
+  assert.equal(await page.locator('.camera-launch').getAttribute('aria-label'),'Native camera is unavailable in this iOS build.','application runtime must recognize the mocked iOS platform');
+ }
  const images=await page.evaluate(async()=>{
   const make=(base,accent)=>new Promise(resolve=>{
    const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
@@ -44,7 +53,10 @@ try{
   async function blobToBase64(blob){return await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(blob);});}
  });
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles(images.map(item=>({name:item.name,mimeType:item.type,buffer:Buffer.from(item.base64,'base64')})));
- const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
+ const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false).catch(async error=>{
+  console.error('PHOTO SWITCH READINESS FAILED',JSON.stringify({errors,body:(await page.locator('body').innerText()).slice(0,1400),messages:await page.evaluate(()=>window.__photoSwitchCheck.messages.slice(-12).map(({type,gen,request})=>({type,gen,request})))}));
+  throw error;
+ });
  const navigate=async name=>page.getByRole('button',{name,exact:true}).evaluate(button=>button.click());
  const settled=()=>page.waitForFunction(()=>{
   const state=window.__photoSwitchCheck,canvas=document.querySelector('canvas[aria-label="Edited photo"]');
@@ -79,6 +91,6 @@ try{
   await navigate(direction);await ready();await settled();
  }
  assert.deepEqual(errors,[],'photo switching must not produce browser errors');
- console.log('PASS held stale render and error replies are ignored while switching JPGs back and forth');
+ console.log(`PASS ${process.env.CHECK_BROWSER==='webkit'?'WebKit ':''}${process.env.CHECK_IOS_SHELL==='1'?'mocked iOS shell ':''}held stale render and error replies are ignored while switching JPGs back and forth`);
  await context.close();
 }finally{await browser.close();}
