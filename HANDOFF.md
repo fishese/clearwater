@@ -1,5 +1,10 @@
 # Handoff
 
+## P3 optional UI completed (20 October 2026)
+
+Restored optional photo-only Off/Natural/Vivid Effects, amount, explicit update, three-language wording/guide and existing undo/reset/preset behavior. Full `photo-finish-check.mjs` passes: Balanced, all bundled engines and a compatible ONNX loaded through Custom; pending analysis locks Save/Export; recipe roundtrip, undo/redo, clear/reset, input invalidation, PNG parity, video exclusion, mobile translations and stale success/error. No model-specific UI gate is present. Shared tests/build and Save/Share/destination/iOS-shell checks pass. New stronger-fit visuals and source-resolution export timing remain the next P4 work; no release/default change is implied.
+
+
 ## Resumed photo finish (20 October 2026)
 
 User resumed optional photo-only Natural/Vivid work after the 1.0.9 release and supplied three paired visual benchmarks. All six source/reference files and generated comparisons are gitignored; only general processing code and reusable tooling may be committed. The finish must be available for Balanced, every bundled neural engine and custom ONNX. No model-specific finish tuning or extra inference is intended.
