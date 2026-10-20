@@ -17,16 +17,16 @@ Open http://127.0.0.1:5173. Import files with Open files or drag and drop. Devel
 ## Included
 
 - JPEG, PNG, HEIC and HEIF import; multi-photo library and local IndexedDB persistence.
-- Select multiple images in one file-picker operation; Previous/Next controls browse the imported library with a position counter and retain each photo's edits. Import order is preserved after reload (older library entries without timestamps fall back to filename order).
+- Select multiple images in one file-picker operation; Previous/Next controls browse the imported library with a position counter and retain each photo's edits. Newest additions appear first, with order retained after reload. Android folder browsing lazily loads supported entries without decoding the whole folder at once.
 - Automatic, adjustable classical colour correction, including severe red deficiency, red/magenta filter casts and conservative haze/contrast treatment.
 - Original RGB-average heuristic as an alternative engine for comparison.
-- WWE-UIE, Five A+ and Shallow-UWnet local ONNX inference, plus a generic ONNX adapter requiring the user's own compatible local model. New photos default to WWE-UIE plus a 30% Balanced after AI pass; existing edits remain unchanged. New videos default to Five A+ sampled colour. The live camera preview stays on Balanced and does not run a neural model.
+- WWE-UIE, Five A+ and Shallow-UWnet local ONNX inference, plus a generic ONNX adapter requiring the user's own compatible local model. New photos default to WWE-UIE plus a 30% Balanced after AI pass; existing edits remain unchanged. New videos default to Five A+ sampled colour. Live camera uses GPU Balanced with optional sampled Five A+ global colour assistance, not full per-frame neural restoration.
 - Surface/underwater, red-filter, blue/green water and approximate-depth hints.
 - Before/after divider, hold for original, zoom, undo, redo and reset.
 - Warmth, green/magenta tint, signed red correction, vibrance, exposure, highlights, shadows, contrast and haze controls.
 - Neutral-point eyedropper and versioned JSON recipe save/load.
 - Full-resolution JPEG or PNG export from the decoded source, using the same deterministic processing function as the preview. Export is cancellable.
-- Wide screens use compact collapsible groups with vertical colour sliders and five side-by-side Light & clarity controls. Narrow screens show Correction / Enhancement / Export tabs, then Engine / Dive conditions or Colour / Light / Clarity / Effects, with one group visible at a time. Tabs share the existing image and workers. Primary tabs use an underline and secondary choices sit in an inset segmented row. Effects uses a distinct outline with a neutral panel and adds optional brightness alongside contrast and detail finishing. Analysis is always shown below Restoration strength. Touch areas are wider than the icon artwork; the narrowest layouts keep toolbar controls separate without horizontal overflow. Installable PWA manifest, offline asset caching and file share target for supporting browsers.
+- Wide screens use compact collapsible groups with vertical colour sliders and five side-by-side Light & clarity controls. Narrow screens show Correction / Enhancement / Export tabs, then Engine / Dive conditions or Colour / Light / Clarity / Effects, with one group visible at a time. Tabs share the existing image and workers. Primary tabs use an underline and secondary choices sit in an inset segmented row. Effects uses a distinct outline with a neutral panel and adds optional brightness alongside contrast and detail finishing. Optional photo-only Natural and Vivid finishes start Off, with one amount control and an explicit Update finish action. Analysis is always shown below Restoration strength. Touch areas are wider than the icon artwork; the narrowest layouts keep toolbar controls separate without horizontal overflow. Installable PWA manifest, offline asset caching and file share target for supporting browsers.
 
 Files and recipes remain in the browser profile. Remove a photo with the X on its library tile to delete that app copy. Clearing browser site data removes the library. Local storage can be evicted or run out of space; keep originals and export results you want to retain.
 
@@ -167,7 +167,7 @@ The Android app uses native CameraX still/video capture through 'src/native-came
 
 Balanced live correction runs on the GPU. Optional Five A+ colour assist samples raw 256px frames at most once per second, off-thread, and reuses a global affine colour change. It does not run full spatial restoration per frame. The recipe retains that matrix for photo editing. Red-filter/depth hints apply to Balanced when AI assist is off. White-balance picks replace earlier picks. Recording freezes correction and stores enhanced video only, importing at zero strength. The linked Android gallery photo shows the enhancement, while the untouched photo and settings remain private. Camera mode stays open after shots; duration and file-size guards remain configurable.
 
-Zoom cycles supported ratios; long press opens actual lens/zoom options, including ultra-wide when exposed. Android launcher shortcuts or 'clearwater://camera' / 'clearwater://edit' open the selected mode. PWA shortcuts use '?mode=camera|edit'. The iOS backend must use AVFoundation; see the root IOS_PLAN.md.
+Zoom cycles supported ratios; long press opens actual lens/zoom options, including ultra-wide when exposed. Native Auto chooses a suitable reported optical module plus digital crop; a manual lens stays selected until Auto is chosen again. Lens switching is unavailable during recording. Android launcher shortcuts or 'clearwater://camera' / 'clearwater://edit' open the selected mode. PWA shortcuts use '?mode=camera|edit'. iOS uses AVFoundation and supports home-screen quick actions and App Shortcuts; see the root IOS_PLAN.md.
 
 Native camera builds compile, but physical-device camera/GL parity, front/rear orientation, lens switching and long-recording thermal/audio checks remain necessary. Browser fake-camera checks do not satisfy that acceptance gate.
 
@@ -175,7 +175,7 @@ Native camera builds compile, but physical-device camera/GL parity, front/rear o
 
 Open the gear beside the brand for language and web offline model preferences. Automatic downloading applies to installed/Home Screen launches and can use mobile data; disable it for manual-only downloading. Individual model checkboxes control caching. Unchecking removes that cached model without changing photos, recipes or custom ONNX storage; using the model again can download it on demand. Completed files survive interruption and unchanged files are reused across updates. Browser retention is best effort; check readiness before travel.
 
-Web Settings links to the latest signed stable Android APK using `https://github.com/fishese/clearwater/releases/latest/download/clearwater-release.apk`, with separate release notes. Stable releases must include that constant asset filename; experimental debug APKs keep their own names.
+Web Settings includes PWA installation and links to the latest signed Android APK and unsigned sideload IPA, with release notes. Stable releases must include the constant filenames `clearwater-release.apk` and `clearwater-unsigned.ipa` under GitHub's `releases/latest/download/` endpoint. Native shells hide this web Install section; experimental artifacts keep separate names.
 
 ### Linked camera gallery photos
 
@@ -187,3 +187,11 @@ The collection shows newest additions first. Preview text and controls suppress 
 
 
 Export quality: JPEG High requests .95, Maximum .99; PNG is lossless for the rendered 8-bit sRGB result. UserComment bytes in JPEG EXIF are retained where readable. Optional video metadata preserves supported title/description/comment/date fields and source MP4 creation headers; it is not a complete metadata copy. Source export does not recover detail/range already lost during HDR working-copy conversion.
+
+### Optional photo finish
+
+Off keeps the selected restoration and manual edits. Natural combines restrained colour balance and tone; Vivid adds a stronger warm colour-separation and contrast look. All correction engines, including compatible custom ONNX, share the same finish logic. New analyses store algorithmVersion 2; earlier versionless saved fits retain their original rendering. One validated fit is stored in the version-1 recipe and reused for preview/export strips. Amount changes reuse the model inference and fit. Engine, restoration strength, dive hints, Balanced follow-up or white balance changes clear the fit; ordinary light/detail edits retain it until Update finish. Absence, zero amount and inactive/identity fits preserve the legacy path. Reset/Auto restore/Clear enhancement clear the finish, and undo/redo/presets retain the saved fit.
+
+The finish follows restoration/manual colour and tone, and precedes spatial detail finishing. It replaces automatically applied Auto enhance contrast to avoid stacking stretches; deliberate manual contrast remains available. Red-filter context, weak-red evidence, cool water, shadows and highlights receive conservative protection. This estimates a look, not missing true colour. Video/live camera do not use it. Shared imported/capture editor photos use the same worker; iOS captured Photos copies remain independent and edited captures use normal export/share.
+
+Run scripts/photo-finish-check.mjs against the dev or production preview for focused lifecycle/preset/PNG parity/supersession checks. The isolated comparison runner is documented in scripts/adaptive-finish/README.md; all personal comparisons stay ignored. Desktop warm microbenchmarks still exceed the initial 10% extra-render target, especially Vivid. Full export/mobile cost and human/device acceptance remain separate P4 gates in IMPLEMENTATION_PLAN.md. No release is implied.

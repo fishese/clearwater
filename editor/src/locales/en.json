@@ -390,6 +390,7 @@
   "Ran out of memory. Try Reduced quality or a shorter clip.": "Ran out of memory. Try Reduced quality or a shorter clip.",
   "HDR video isn't supported here yet. Export an SDR copy first.": "HDR video isn't supported here yet. Export an SDR copy first.",
   "Couldn't read this file. Re-export it as a standard MP4.": "Couldn't read this file. Re-export it as a standard MP4.",
+  "Couldn't read this photo. Try exporting a fresh copy.": "Couldn't read this photo. Try exporting a fresh copy.",
   "This video resolution is too large for the editor. Use a smaller copy.": "This video resolution is too large for the editor. Use a smaller copy.",
   "Could not decode the first video frame.": "Could not decode the first video frame.",
   "A video export is already running.": "A video export is already running.",
@@ -823,5 +824,18 @@
   "Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.": "Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.",
   "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.": "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.",
   "Clear collection hides all iOS camera captures but keeps their private files in ClearWater. In Settings, restore hidden captures or delete all private camera files. For one capture, choose Hide capture to keep its files recoverable, or Delete permanently to remove its private files and saved edits. Separately saved Photos copies are unchanged. Uninstalling ClearWater removes its private files.": "Clear collection hides all iOS camera captures but keeps their private files in ClearWater. In Settings, restore hidden captures or delete all private camera files. For one capture, choose Hide capture to keep its files recoverable, or Delete permanently to remove its private files and saved edits. Separately saved Photos copies are unchanged. Uninstalling ClearWater removes its private files.",
-  "iOS 26+ · Requires sideloading": "iOS 26+ · Requires sideloading"
+  "iOS 26+ · Requires sideloading": "iOS 26+ · Requires sideloading",
+  "Photo finish": "Photo finish",
+  "Off": "Off",
+  "Natural": "Natural",
+  "Vivid": "Vivid",
+  "Finish amount": "Finish amount",
+  "Update finish": "Update finish",
+  "Optional colour and tone for photos.": "Optional colour and tone for photos.",
+  "Analysing photo finish…": "Analysing photo finish…",
+  "No reliable finish could be estimated.": "No reliable finish could be estimated.",
+  "Photo finish is available for photos only.": "Photo finish is available for photos only.",
+  "Could not update photo finish.": "Could not update photo finish.",
+  "Photo finish is optional and works with every correction engine. Off keeps your current restoration and edits. Natural gently balances colour and tone; Vivid adds stronger warm colour separation and contrast. Finish amount changes the strength without rerunning AI. Update finish estimates the look again from the current edits. Missing colours cannot be recovered, and stronger settings can emphasise noise.": "Photo finish is optional and works with every correction engine. Off keeps your current restoration and edits. Natural gently balances colour and tone; Vivid adds stronger warm colour separation and contrast. Finish amount changes the strength without rerunning AI. Update finish estimates the look again from the current edits. Missing colours cannot be recovered, and stronger settings can emphasise noise.",
+  "Preview and export use the same fitted finish. Engine, restoration strength and white balance changes clear it; other manual light and detail edits keep it. It replaces Auto enhance's automatic contrast stretch while retaining brightness, local contrast and sharpness. Manual contrast remains available. Clear enhancement, Reset manual edits and Auto restore clear the finish. Use the normal export and share actions for edited iOS captures; the captured Photos copy is independent.": "Preview and export use the same fitted finish. Engine, restoration strength and white balance changes clear it; other manual light and detail edits keep it. It replaces Auto enhance's automatic contrast stretch while retaining brightness, local contrast and sharpness. Manual contrast remains available. Clear enhancement, Reset manual edits and Auto restore clear the finish. Use the normal export and share actions for edited iOS captures; the captured Photos copy is independent."
 }

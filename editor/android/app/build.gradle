@@ -24,8 +24,8 @@ android {
         applicationId limitsSideBySide ? "com.fishese.clearwater.limits" : "com.fishese.clearwater"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 28
-        versionName limitsSideBySide ? "1.0.9-limits" : "1.0.9"
+        versionCode 29
+        versionName limitsSideBySide ? "1.0.10-limits" : "1.0.10"
         manifestPlaceholders = [appLabel: limitsSideBySide ? "ClearWater Limits" : "ClearWater"]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

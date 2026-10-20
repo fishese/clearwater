@@ -390,6 +390,7 @@
   "Ran out of memory. Try Reduced quality or a shorter clip.": "記憶體不足。請改用「精簡」畫質或較短片段。",
   "HDR video isn't supported here yet. Export an SDR copy first.": "此平台暫不支援 HDR 影片，請先匯出 SDR 版本。",
   "Couldn't read this file. Re-export it as a standard MP4.": "無法讀取此檔案。請重新匯出為標準 MP4。",
+  "Couldn't read this photo. Try exporting a fresh copy.": "未能讀取此相片。請輸出一份新的副本。",
   "This video resolution is too large for the editor. Use a smaller copy.": "影片解像度過高，請使用較小的副本。",
   "Could not decode the first video frame.": "未能解碼首個影片幀。",
   "A video export is already running.": "已有影片正在輸出。",
@@ -823,5 +824,18 @@
   "Clear collection hides all iOS camera captures but keeps their private files in ClearWater. In Settings, restore hidden captures or delete all private camera files. For one capture, choose Hide capture to keep its files recoverable, or Delete permanently to remove its private files and saved edits. Separately saved Photos copies are unchanged. Uninstalling ClearWater removes its private files.": "「清空相片庫」只會隱藏所有 iOS 相機拍攝項目，私人檔案仍保留在 ClearWater 內。你可在「設定」還原已隱藏的拍攝項目，或刪除所有私人相機檔案。個別拍攝項目可選「隱藏拍攝項目」以保留檔案供日後還原，或選「永久刪除」以移除私人檔案及已儲存的編輯內容。另存至「相片」的副本不受影響。解除安裝 ClearWater 會移除私人檔案。",
   "Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.": "在此刪除私人拍攝檔會從 ClearWater 永久移除私人來源檔案及已儲存的編輯內容。「相片」中的副本不受影響。",
   "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.": "這會從此裝置永久移除此拍攝項目的私人來源檔案及已儲存的編輯內容，且無法復原。「相片」中的副本不受影響。",
-  "iOS 26+ · Requires sideloading": "iOS 26 或以上 · 須側載安裝"
+  "iOS 26+ · Requires sideloading": "iOS 26 或以上 · 須側載安裝",
+  "Photo finish": "相片潤飾",
+  "Off": "關閉",
+  "Natural": "自然",
+  "Vivid": "鮮明",
+  "Finish amount": "潤飾強度",
+  "Update finish": "更新潤飾",
+  "Optional colour and tone for photos.": "可選的相片色彩及色調潤飾。",
+  "Analysing photo finish…": "正在分析相片潤飾…",
+  "No reliable finish could be estimated.": "未能估算可靠的潤飾效果。",
+  "Photo finish is available for photos only.": "相片潤飾僅適用於相片。",
+  "Could not update photo finish.": "未能更新相片潤飾。",
+  "Photo finish is optional and works with every correction engine. Off keeps your current restoration and edits. Natural gently balances colour and tone; Vivid adds stronger warm colour separation and contrast. Finish amount changes the strength without rerunning AI. Update finish estimates the look again from the current edits. Missing colours cannot be recovered, and stronger settings can emphasise noise.": "「相片潤飾」為可選功能，適用於所有修復引擎。「關閉」保留目前的修復效果及編輯。「自然」輕柔調整色彩及色調；「鮮明」則帶來較強的暖色色彩層次及對比。「潤飾強度」可調整效果，毋須重新執行 AI。「更新潤飾」會根據目前的編輯重新估算效果。已流失的色彩無法還原，較強的設定亦可能突出雜訊。",
+  "Preview and export use the same fitted finish. Engine, restoration strength and white balance changes clear it; other manual light and detail edits keep it. It replaces Auto enhance's automatic contrast stretch while retaining brightness, local contrast and sharpness. Manual contrast remains available. Clear enhancement, Reset manual edits and Auto restore clear the finish. Use the normal export and share actions for edited iOS captures; the captured Photos copy is independent.": "預覽及輸出會使用相同的潤飾參數。更改引擎、修復強度或白平衡會清除潤飾；其他手動光線及細節調整則會保留。潤飾會取代「自動增強」的自動對比度拉伸，同時保留亮度、局部對比度及銳利度調整。你仍可手動設定對比度。「清除增強」、「重設手動調整」及「自動修復」亦會清除潤飾。編輯 iOS 拍攝的相片後，請使用一般輸出及分享操作；拍攝時儲存到相簿的副本維持獨立。"
 }

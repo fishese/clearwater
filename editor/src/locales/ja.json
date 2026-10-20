@@ -390,6 +390,7 @@
   "Ran out of memory. Try Reduced quality or a shorter clip.": "メモリが不足しました。「軽量」画質か短いクリップでお試しください。",
   "HDR video isn't supported here yet. Export an SDR copy first.": "この環境ではHDR動画に未対応です。SDR版を書き出してからお試しください。",
   "Couldn't read this file. Re-export it as a standard MP4.": "このファイルを読み込めません。標準のMP4で書き出し直してください。",
+  "Couldn't read this photo. Try exporting a fresh copy.": "写真を読み込めません。新しいコピーを書き出してお試しください。",
   "This video resolution is too large for the editor. Use a smaller copy.": "動画の解像度が高すぎます。小さいコピーを使ってください。",
   "Could not decode the first video frame.": "最初の動画フレームを読み込めません。",
   "A video export is already running.": "動画の書き出しが実行中です。",
@@ -823,5 +824,18 @@
   "Clear collection hides all iOS camera captures but keeps their private files in ClearWater. In Settings, restore hidden captures or delete all private camera files. For one capture, choose Hide capture to keep its files recoverable, or Delete permanently to remove its private files and saved edits. Separately saved Photos copies are unchanged. Uninstalling ClearWater removes its private files.": "「ライブラリを消去」しても、iOSの撮影データは非表示になるだけで、非公開ファイルはClearWater内に残ります。設定から非表示の撮影データを戻すか、非公開のカメラファイルをすべて削除できます。個別の撮影データは「撮影データを非表示」にするとファイルを残して再表示でき、「完全に削除」を選ぶと非公開ファイルと保存した編集内容が削除されます。「写真」に別途保存したコピーは変更されません。ClearWaterをアンインストールすると非公開ファイルは削除されます。",
   "Deleting private captures here permanently removes their private source files and saved edits from ClearWater. Copies in Photos are unchanged.": "ここで撮影データを削除すると、非公開の撮影ファイルと保存した編集内容がClearWaterから完全に削除されます。「写真」のコピーは変更されません。",
   "This permanently removes this capture’s private source files and saved edits from this device. It cannot be undone. Any Photos copy stays untouched.": "この撮影データの非公開ファイルと保存した編集内容をこの端末から完全に削除します。この操作は取り消せません。「写真」のコピーは変更されません。",
-  "iOS 26+ · Requires sideloading": "iOS 26 以降 · サイドロードが必要"
+  "iOS 26+ · Requires sideloading": "iOS 26 以降 · サイドロードが必要",
+  "Photo finish": "写真の仕上げ",
+  "Off": "オフ",
+  "Natural": "ナチュラル",
+  "Vivid": "鮮やか",
+  "Finish amount": "仕上げの強さ",
+  "Update finish": "仕上げを更新",
+  "Optional colour and tone for photos.": "写真の色とトーンを任意で仕上げます。",
+  "Analysing photo finish…": "写真の仕上げを解析中…",
+  "No reliable finish could be estimated.": "信頼できる仕上げを推定できませんでした。",
+  "Photo finish is available for photos only.": "写真の仕上げは写真にのみ適用できます。",
+  "Could not update photo finish.": "写真の仕上げを更新できませんでした。",
+  "Photo finish is optional and works with every correction engine. Off keeps your current restoration and edits. Natural gently balances colour and tone; Vivid adds stronger warm colour separation and contrast. Finish amount changes the strength without rerunning AI. Update finish estimates the look again from the current edits. Missing colours cannot be recovered, and stronger settings can emphasise noise.": "「写真の仕上げ」は任意で、すべての補正エンジンで使えます。「オフ」は現在の補正と編集を保ちます。「ナチュラル」は色と階調を穏やかに整え、「鮮やか」は暖色の分離とコントラストを強めます。「仕上げの強さ」はAIを再実行せずに効果を調整します。「仕上げを更新」は現在の編集から仕上げを再推定します。失われた色は復元できず、強い設定ではノイズが目立つ場合があります。",
+  "Preview and export use the same fitted finish. Engine, restoration strength and white balance changes clear it; other manual light and detail edits keep it. It replaces Auto enhance's automatic contrast stretch while retaining brightness, local contrast and sharpness. Manual contrast remains available. Clear enhancement, Reset manual edits and Auto restore clear the finish. Use the normal export and share actions for edited iOS captures; the captured Photos copy is independent.": "プレビューと書き出しには同じ仕上げパラメーターを使います。エンジン、補正の強さ、ホワイトバランスを変えると仕上げが解除され、その他のライトや細部の手動調整では保持されます。「自動仕上げ」の自動コントラスト伸張を置き換え、明るさ、局所コントラスト、シャープネスは保持します。コントラストは引き続き手動で設定できます。「仕上げを解除」、「手動調整をリセット」、「自動補正」でも仕上げを解除します。編集したiOS撮影画像には通常の書き出し・共有を使ってください。撮影時に「写真」に保存したコピーは独立しています。"
 }

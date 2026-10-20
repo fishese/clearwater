@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react';
 import { readdirSync, createReadStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+function workerManualChunk(id:string):string|undefined {
+  const normalized=id.replaceAll('\\','/');
+  if(normalized.endsWith('/src/core/bundled-models.ts')||normalized.endsWith('/src/core/model-contract.ts'))return 'model-metadata';
+}
+
 // Local development convenience only. Never copy personal samples into dist.
 function localSamples():Plugin {
   return { name:'local-samples', configureServer(server) {
@@ -23,4 +28,4 @@ function localSamples():Plugin {
     });
   }};
 }
-export default defineConfig({base:process.env.VITE_BASE_PATH || '/',plugins:[react(),localSamples()],worker:{format:'es'},server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{strict:true},watch:{ignored:['**/android/**']}},build:{target:'es2022'}});
+export default defineConfig({base:process.env.VITE_BASE_PATH || '/',plugins:[react(),localSamples()],worker:{format:'es',rollupOptions:{output:{manualChunks:workerManualChunk}}},server:{host:'127.0.0.1',port:5173,strictPort:true,fs:{strict:true},watch:{ignored:['**/android/**']}},build:{target:'es2022'}});

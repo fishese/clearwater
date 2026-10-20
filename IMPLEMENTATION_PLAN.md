@@ -1,4 +1,71 @@
-# ClearWater implementation plan
+# Adaptive photo colour-and-tone finish plan
+
+## 1.0.10 Safari verification completed (20 October 2026)
+
+- [x] User accepted Android testing and authorized merge/release. macOS WebKit gate passes at `f1a88c63a49ea868f3b1dbf9419cc6712b3436ea`, [run 39424646617](https://github.com/fishese/clearwater/actions/runs/39424646617): real JPG editing/switching without hooks, held stale render/error replies, and the mocked native iOS platform path. This is actual WebKit engine coverage, not a spoofed Chromium user agent; physical iPhone/WKWebView memory/performance remains manual.
+- [x] Diagnosed and fixed a Safari worker reset in the emitted production graph: lazy model chunks imported shared metadata from their side-effectful worker entry. WebKit evaluated that entry again, clearing generation/source state; the next render was silently ignored. Separate leaf metadata/contract chunks preserve lazy model/session reuse. Every production build now rejects direct/transitive worker-entry back-imports; its regression fixture includes minified import/re-export/dynamic-import syntax. Independent review found no further issue.
+- [x] 262 shared tests and production build pass; full finish/all-engine/custom ONNX/lifecycle/strip-parity/translated-layout browser checks pass after the chunk fix. The earlier Android 9-test/minified signed candidates pass and keep the existing certificate. [Native run 39420154974](https://github.com/fishese/clearwater/actions/runs/39420154974) passed all 33 hosted iOS tests on unchanged native code; its earlier WebKit harness failed and is superseded by the new gate. Prior diagnostic failures remain evidence, not accepted Safari passes.
+- [ ] Next action: merge [PR #12](https://github.com/fishese/clearwater/pull/12), then verify Pages and package debug/release APKs plus unsigned device IPA from the exact merged source, publish all checksummed/licensed assets, and record final provenance. Version 1.0.10, Android 29, iOS 8. Finish remains optional/photo-only/Off by default. Initial desktop 10% overhead target remains unmet; retain physical iPhone memory/performance and camera/lens checks as manual limitations.
+
+## Authorized 1.0.10 release preparation (20 October 2026)
+
+User confirmed the updated Android test build works and authorized Safari/iOS verification, merge and release. This supersedes earlier no-merge/no-release instructions for this feature.
+
+- [x] Android device acceptance reported by the user. Prepare version 1.0.10, Android code 29 and unsigned physical-device iOS build 8 (iOS 26+), preserving signing identity and production defaults.
+- [ ] Verify the shared photo-switch fix with actual WebKit on macOS and the iOS shell integration path; run hosted iOS native regressions and physical-device packaging. A spoofed iPhone user agent or Chromium bridge mock alone is not Safari/WKWebView hardware evidence.
+- [ ] Merge the reviewed feature, deploy Pages, and build APK/IPA from the exact merged source. Verify versions, signatures, ZIP/model assets and source provenance; publish the coordinated release with canonical and versioned assets/checksums/licence notices.
+- [ ] Next action: finish the macOS WebKit release gate and source review before merge. Physical iPhone memory/performance and camera/lens acceptance remain manual limitations; desktop finish overhead remains above the initial 10% target. Keep the optional finish Off by default. Preserve ignored private samples, unrelated IDE files and all stashes.
+
+## Photo finish mobile layout and JPG switching fix (20 October 2026)
+
+- [x] Add 12px above the optional photo-finish description, equally sized 40px look buttons matching Auto enhance, and right-aligned Update finish. Production mobile layout checks pass at 320/390px in EN/zh-HK/ja; screenshot inspected.
+- [x] Close the selection-commit/passive-load stale-reply window by invalidating worker generations during the selection commit. JPG decode checks cancellation after header/decode/resize work, closes late bitmaps, and drops obsolete load errors. Export owns its full-resolution decoded bitmap per request, preventing an old cleanup from closing a newer export bitmap; cleanup also covers setup failures.
+- [x] Photo decode and processing failures no longer pass through the video-specific MP4 advice. Preserve typed platform limits, memory errors and actionable RAW/custom-model diagnostics; add photo-specific wording using the glossary. Video messages and platform limits stay unchanged.
+- [x] 262 shared tests across 39 files and production build pass, including bitmap ownership, late JPG cancellation and photo/video classification. Production finish lifecycle/all-engine/custom ONNX/strip parity/video exclusion/translated layouts and legacy enhancement, iPhone-browser Save/Share, output destinations and mocked iOS shell pass. Independent code review found no further actionable issue. The legacy broad limit-browser harness is inconclusive here: its hardcoded external fixtures are missing, and Windows WebKit reports worker origin failures; do not count it as passing.
+- [x] Repeated-JPG production browser check passes: held old render bitmap and injected old MP4 error cannot overwrite the new photo or show a toast; switching back and forth completes. This validates stale-reply handling, not a physical-device reproduction.
+- [x] Updated debug APK built from `b82d9dd2bbbcc499972f0dab85cddf893730a78a`: `editor/android/build/photo-finish-switch-fix-debug/clearwater-1.0.9-photo-finish-fix-debug.apk` (10,658,111 bytes), SHA-256 `13fd69082807d31e2a9a1ce857f6ccb8513fe0891ad2b31c7f2c5bbaef1bc753`. Signature matches the previous debug certificate; package/version remain unchanged. ZIP integrity, all 47 bundled production files, root-relative index and 9 unchanged native tests verify. APK/checksum/provenance remain ignored.
+- [ ] Next action: Android hardware retest of the originally reported failure. Native bitmap decoding itself remains non-cancellable and can briefly overlap; late results are disposed. The exact physical-device failure has not been reproduced locally; stale-reply/cancellation and shared error-classification defects were identified by source review. Existing finish performance and iPhone hardware gates remain open. Keep version 1.0.9/code 28 and all release defaults; no merge, release publication or version bump.
+
+## Photo-finish debug APK checkpoint (20 October 2026)
+
+- [x] User accepted the stronger Vivid comparison visuals and requested an Android debug APK for device testing. Built from `097b37ffbb9072389b5f6d7f9d3354bbe805712a` on `codex/adaptive-finish-plan`; no runtime change in this checkpoint.
+- [x] `npm run android:sync` production build and `testDebugUnitTest assembleDebug` succeed (9 native tests, cached unchanged results). APK signature, package identity, ZIP CRC and all 47 packaged production files verify. Debug certificate matches the previous 1.0.9 debug APK. Private samples/comparisons are absent.
+- [x] Ignored artifact: `editor/android/build/photo-finish-debug/clearwater-1.0.9-photo-finish-debug.apk` (10,657,447 bytes); SHA-256 `147799170138e0c72d4b700d4bca64165daf161d14521148a1b5eba60ed4a466`. SHA-256 sidecar and provenance are alongside it. Package remains `com.fishese.clearwater`, version 1.0.9 / code 28; standard debug signing only. Existing debug configuration remains minified and non-debuggable. This can update a matching debug-signed install; release-signed installs have a different certificate. Preserve app data rather than suggesting an uninstall.
+- [ ] Next action: user Android testing via Enhancement → Effects → Photo finish (Off / Natural / Vivid), including original versus finished preview/export, Auto enhance interaction, Save/Share destinations, responsiveness and larger-photo memory pressure. Desktop overhead remains +26.7% Natural / +48.4% Vivid, above the original 10% target; profiling and iPhone hardware acceptance remain open. No installation, release signing, publication, merge, iOS build or version bump occurred or is authorized by this request. Earlier pending visual-acceptance/build statements below are historical.
+
+## P4 measured handoff (20 October 2026)
+
+Core/style milestone: `1a74c62` on `codex/adaptive-finish-plan`. All 258 shared tests, production build, full production finish/legacy platform browser checks and 192 private visual treatments pass. The three selected choices are Off (existing result), Natural (restrained middle), and Vivid (stronger reference-inspired warm separation). New fits are V2; versionless recipes and old fitted results remain unchanged. Main/latest release remains 1.0.9; no feature publication, merge, version bump, native signing or installation occurred.
+
+- [x] Source-resolution export benchmark: one authorized 4032×3024 (12.2 MP) JPEG, WWE at its unchanged photo default plus 30% Balanced follow-up, finish 100%, high-quality JPEG. All six downloads have JPEG signatures, decode to the source dimensions and raise no page errors. Full ignored report: `analysis/adaptive-finish/export-v2-checked-20261020-r5/report.json`. Earlier harness failures are retained separately and produced no accepted timing evidence; repaired stale heading, desktop navigation, and extensionless temporary-file MIME assumptions.
+- [x] First/repeat export latency: Off 3460.6/3105.3 ms; Natural 3931.1/3933.5 ms; Vivid 4629.5/4607.8 ms. Repeat-2 overhead over Off is +828.2 ms (+26.7%) Natural and +1502.5 ms (+48.4%) Vivid. The initial 10% target is **not met**. These are one-photo, two-run desktop measurements, not mobile/native guarantees or broad benchmark statistics.
+- [x] Fit latency 35.4 ms Natural /49.7 ms Vivid. One prepared kernel has 902,160 typed-array bytes (82,952 shared and 819,208 protection tables). One 4032×256 RGBA strip is 4,128,768 bytes; these exclude other intermediates, output/decoder/canvas/GPU storage and object overhead. Diagnostic JS heap is not peak-memory evidence. Worker-owned in-place finishing removes one extra RGBA copy; inference reuse remains covered by worker/browser checks.
+- [x] Private local comparison viewer: `analysis/adaptive-finish/benchmark-checked/compare.html`, currently served at `http://127.0.0.1:5182/compare.html`. All three pairs, four engines and two looks load; mobile width and page-error checks pass. It provides a benchmark wipe plus full-resolution links and the Off contact sheet. Everything in this directory, including copied source/reference images, is gitignored. Reports are visual-style targets rather than true-colour evidence; cyan texture and model-induced clipping can still differ.
+- [ ] Next action: user visual acceptance of the stronger Vivid (especially anemone/reef textures), followed by profiling the export-strip finish pass to reduce the measured cost while preserving rendering semantics. Record any revised speed/quality tradeoff honestly instead of claiming 10%. Real Android/iPhone performance, memory pressure and native share destinations remain hardware gates before feature release acceptance. Do not merge/publish/bump versions without separate authorization.
+
+## Current optional photo-finish checkpoint (20 October 2026)
+
+Branch `codex/adaptive-finish-plan` includes main through released 1.0.9. User selected **Off** for the existing restoration/edits, **Natural** as a restrained colour/tone middle ground, and **Vivid** for the stronger reference-inspired warm look. The feature stays opt-in and photo-only; all bundled engines and compatible custom ONNX use the same finish logic. Model defaults, recipes without a finish, inference reuse, video/live camera, Save/Share and platform-specific limits remain unchanged.
+
+- [x] P3 controls/guide/lifecycle committed as `fd11cfb`; local benchmark tooling/checkpoint as `d751af4`; 1.0.9 integration as `71d55a3`. Original stash `9bd4ff0`, other stashes and unrelated IDE files remain intact.
+- [x] New analyses store algorithmVersion 2. Natural combines mild estimated colour balance and restrained tone. Vivid uses bounded green/yellow/violet subject evidence, selective warm separation, denser midtones, protected shadows and a soft positive-tone highlight shoulder. Versionless stored fits retain V1 rendering; old candidate output hashes pass. Known physical-red-filter correction disables colour/chroma/warm shifts. Poor/weak-red evidence safely falls back.
+- [x] Share active-effect detection between UI/worker, including warm-only saved fits. Apply only to worker-owned corrected preview/strip buffers in place, removing one extra RGBA copy. One persisted fit, bounded reference/kernels and cached model inference serve preview/export.
+- [x] 258 shared tests across 38 files and production build pass. Independent review caught/fixed early-white highlight plateaus and a compiled/scalar water-guard mismatch; the new hue fixture and broader fast/reference checks retain the one-byte bound. No shadow-ramp reversal; alpha and legacy paths pass.
+- [x] Final comparisons: three private pairs × four engines × four treatments = 48; nine earlier protection samples × four engines × four treatments = 144. All 192 complete without engine/browser errors. Reports/full-preview outputs/crops are ignored under `analysis/adaptive-finish/benchmark-checked/` and `protection-checked/`. Earlier attempts remain separate. No private samples, reference images, manifests or generated comparisons are versioned or shipped.
+- [x] Production photo-finish regression: every bundled engine plus user-loaded compatible ONNX, pending-fit Save/Export locks, saved-fit JSON reuse, undo/redo/clear/reset/invalidation, exact opaque PNG strip parity, partial-alpha PNG within one RGB level/exact alpha, video exclusion, EN/zh-HK/ja mobile layouts and stale replies. Existing enhancement, iPhone browser Save/Share, output destination/collision/cancel and mocked iOS shell checks pass.
+- [ ] Next action: finish source-resolution desktop export timing and record actual cost, then obtain user visual feedback and real-phone cost/memory acceptance. Vivid is an estimated style, not true-colour recovery or an exact replica; some cyan rock texture and model-induced clipping/colour differences remain. Off/Natural remain useful alternatives. No feature merge, version bump, publication, native signing or installation is authorized.
+
+## Resumed photo finish (20 October 2026)
+
+User resumed optional photo-only Natural/Vivid work after the 1.0.9 release and supplied three paired visual benchmarks. All six source/reference files and generated comparisons are gitignored; only general processing code and reusable tooling may be committed. The finish must be available for Balanced, every bundled neural engine and custom ONNX. No model-specific finish tuning or extra inference is intended.
+
+- [x] Integrate main through 1.0.9 (`71d55a3`); preserve PR #11 platform limits, Save/Share and iOS navigation/recovery fixes. Restore only feature source and regression scripts from stash `9bd4ff0`, leaving the stash and unrelated IDE state intact.
+- [x] Existing-fit baseline: three benchmark inputs × four engines × six treatments = 72 comparisons, zero engine/browser errors. Current colour fitting remains too subtle and sometimes falls back to tone-only. Baseline report is ignored under `analysis/adaptive-finish/benchmark-baseline/`. Restored shared suite: 244 tests and production build pass.
+- [x] Add opt-in paired-reference harness mode with full preview outputs and explicit visual-reference limitations; default isolated comparisons remain available.
+- [ ] Next: finish versioned stronger fitting while retaining old stored-fit rendering, then rerun paired comparisons and representative water/highlight/shadow/filter cases. P3 lifecycle/model-independence browser regression now passes; complete revised-fit visuals and P4 export timing. No merge, publish, version bump or native signing is authorized for this resumed feature.
+
+
+Updated 19 October 2026. This is the active feature plan, replacing completed MVP/lens checklists. Current release and platform contracts are in HANDOFF.md; procedures/history are in MAINTENANCE.md. Earlier plan revisions remain in Git history.
 
 ## Release 1.0.9 completed (20 October 2026)
 
@@ -16,199 +83,80 @@ Release APK SHA-256: `21a231e3a30c3f9f6d268c434eb19e6d7f6858f558730cef93adf750da
 
 Prepared 12 October 2026. Updated 13 October after adding local Shallow-UWnet / FUnIE-GAN inference and a generic, user-loaded ONNX adapter. See editor/README.md for run instructions, verified behaviour and remaining milestones. AI currently transfers a 256×256 colour residual onto source-resolution pixels; full-resolution neural restoration remains future work.
 
-## Active follow-up plan — 19 October 2026
+## Goal and evidence
 
-Save/Share readiness follow-up: fix the permanent busy lock when a preview supersedes Auto enhance, reject late enhancement errors, and remove redundant post-export preview renders while retaining deferred real edits. Browser regression covers delayed enhancement/preset load and a stale error while the replacement preview is unfinished. Full tests/build and platform-specific save regressions are recorded in MAINTENANCE.md. Publish as a web update; include shared fixes in the next native build. Physical iPhone reports may have additional causes; do not claim full device reproduction.
+Explore a more vivid underwater restoration with a natural option and predictable manual edits. Public before/after examples suggested stronger cyan/green cast removal, warm-colour separation and firmer black levels. Two displayed before images were compared in an isolated ClearWater browser session at preview resolution: exploratory evidence, not a full-resolution benchmark or proof of the competitor's automatic settings. No proprietary code was accessed or copied.
 
-Release completion: user authorized merge/publication after Auto validation. PR #8 merged at `0eae50c`; v1.0.8 is published as latest with signed release APK, debug APK and unsigned IPA. Android version code 27 / iOS build 6. Pages run 39187121298 and iOS packaging run 39187142233 passed. All 14 uploaded asset hashes match; Android release certificate matches 1.0.7. Native Android tests/builds and bundled models pass. No unfinished implementation remains for this request; iPhone lens transitions remain a user hardware-acceptance check. Earlier no-publication instructions below are superseded by this explicit authorization.
+Current photos default to WWE-UIE at 80% restoration plus a 30% Balanced follow-up. Optional Auto enhance changes luminance contrast, local contrast and sharpness, not independent channel balance. Balanced uses bounded channel gains/red mixing and a conservative veil estimate. Start with explainable finishing improvements rather than another neural model.
 
-New authorized task: native Android/iOS Auto lens selection for requested absolute zoom, with explicit manual lens lock and an Auto chooser option. Use reported optical ratios and per-lens zoom capabilities, not a model database. Near-native matches such as 5.1x for requested5x are allowed within a small tolerance; a 4x telephoto can supply requested5x with digital1.25x. Shared lower-cost agent owns selection policy, serialized UI/native transactions, manual override and regressions. Native lower-cost agent exposes local min/max zoom per lens and preserves picked white balance on automatic switching. Keep browser camera behavior and recording restrictions. Parent owns real Android tests, integrated checks and iOS CI. No stable publication or PR merge is requested by this step.
+Public inspiration: https://deepcolors.app/ describes hue adjustment, channel stretching and black-point correction. These are general processing ideas; do not reproduce source code, assets or branding, or adopt unverified marketing claims. Reference images/comparisons stay out of Git and production assets.
 
-The completed physical-routing checkpoint below remains the baseline; do not repeat already-passed tests unless the new Auto behavior affects them.
+## Scope
 
-Completed Auto checkpoint: `e77f1b7` exposes native lens ranges and preserves picked neutral calibration during automatic switches; `18c1972` adds the shared selection policy, serialized zoom transactions, manual override and tests; `f45fa00` documents native Auto behavior in all three languages; `8489cb8` pins Android's primary wide entry to the reported physical wide sensor and records bounded physical crop diagnostics. Auto is the native camera default, with manual lens selection retained until Auto is chosen again. No device database or browser lens behavior change.
+- Initially opt-in and photo-only on a codex/ branch. No production changes or default changes during the experiment.
+- Evaluate Balanced, WWE-UIE, Five A+ and Shallow-UWnet output; custom ONNX follows the same shared contract. Do not rerun inference for finish adjustments.
+- Reuse Effects if a candidate proves useful. Prefer one amount/look choice over many sliders. Decide exact labels and whether it belongs in Auto enhance after comparison.
+- Existing recipes must render identically with the new field absent/off. No silent re-grading of collections or changed default engine/strength.
+- Video, live camera/native shaders, HDR/RAW colour management, weights and gallery ownership are out of scope. Segmentation models, physical dehazing, local masks and LUT export are separate projects.
 
-Validation: 193 shared tests, production build, native-camera browser regression and iOS shell regression pass. Android minified debug build and three geometry/range unit tests pass. S24 Ultra verifies Auto 3x and 5x select the expected physical telephoto modules; 5x uses the reported 5.1x module. Same-lens 5.1x to 10x updates the physical crop by approximately 1.976x. Manual wide at 5x remains on the wide physical sensor with a 5x crop; returning to Auto selects telephoto again. Camera returned to Auto 1x. Debug installed in place; ignored test APK `editor/android/build/clearwater-pr8-auto-lens-debug.apk`, SHA-256 `2369b06323e18fd1522961541c5e900a94573b0a28ec919a06d272a017dd409d`. Blurred preview screenshots were inconclusive; physical capture-result crops established actual zoom rather than relying on labels or logical metadata.
+## Progress and commit checkpoints
 
-iOS source `f45fa00` passed unsigned device packaging and all 31 hosted native tests in run 39185483253. Test IPA artifact 12158220837 is available from that run. Actual iPhone automatic/manual lens transitions and picked-neutral preservation need hardware acceptance. PR #8 remains open; no stable release or main deployment changed.
-
-Current branch: `codex/android-lens-discovery-fix` / PR #8 incorporates current main, Settings install options and the iOS preview framing repair. Android lens fix `1c79343` is now verified on the connected Galaxy S24 Ultra. CameraX 1.6.2 normal lifecycle binding did not forward the selector physical ID to outputs; Camera2Interop now targets every preview/analysis/JPEG/video stream consistently. Physical/logical JPEG capability intersection preserves full advertised still dimensions (4000x3000 short telephoto; 4080x3060 long telephoto), and physical zoom ranges constrain UI, requests and restore. No phone database is used.
-
-Validation: settled frames identify both requested physical sensors with their correct focal lengths and visibly narrower fields of view. Both telephoto stills save at full advertised dimensions; a short long-telephoto 1080p video saved and returned to the same lens. Ultra-wide/front/rear transitions and a physical zoom step pass. Final menu excludes out-of-range physical zoom stops, while ordinary rear zoom retains 0.6x through 10x. Three Android geometry/range unit tests and minified debug build pass. Latest matching-debug APK is installed in place; existing user media is preserved, and test captures were added. Camera returned to rear 1x. Detailed raw evidence stays in ignored build output. PR #8 remains open; no stable release or main merge is performed. Broader device coverage and user iPhone framing acceptance remain open.
-
-Settings install entries completed: web Settings offers browser/PWA installation, Android APK and configured unsigned iPhone IPA. The deferred install prompt is captured before Settings opens; manual instructions cover iOS, desktop Safari and other browsers. Native shells hide this section. Focused install tests and production build passed. EN/zh-HK/ja additions follow the glossary; existing user wording is preserved.
-
-iOS preview framing repair committed as `2f60db6`: when still resolution is equal, prefer the video format whose aspect matches the still over a wider cropped format. This uses the existing preview/picker transform and actual-frame recording sizes without changing Android/web layout or lowering still resolution. A Swift regression covers 4:3 versus 16:9, still-resolution priority and video-only fallback. Shared suite 189 tests and production build passed. Settings browser checks cover all three languages at 390 px, manual/prompt/installed PWA states and APK/IPA links; mocked iOS shell checks pass. Native iOS build/test run 39160894942 passed at af72fa1: unsigned device package and 31 hosted native tests, including preview format ranking. The first run caught a missing CoreMedia import in the new test, corrected in af72fa1. Later 4085136 changes only hidden-on-native Settings labels; native sources are identical. Hardware framing confirmation remains pending.
-
-Earlier offline checkpoint (superseded by the live device validation above): Android lens evidence was insufficient for a specific fix. All saved immediate preview screenshots are black, including rear 1x, and stream counters have no produced frames at the sample instant. Bind success is not first-frame success; available metadata can be stale. No additional lens-code change is made. Next phone session must first establish a settled working 1x stream, then compare physical selection with actual capture results, output surfaces and effect enabled/disabled. Detailed raw evidence and notes stay in ignored build output. Do not merge PR #8 as device-accepted. Wait for the phone after these non-device tasks.
-The following 18 October checkpoints are historical; preserve them for continuity.
-
-
-Latest checkpoint: web update tip merged via PR #7 (`c6bc012`), Pages run 39098032471 passed and live bundle verified. Exact EN/zh-HK/ja notice appears on web only and OK remembers dismissal; normal update activation is unchanged and no collection/settings data is cleared. Already-open cached clients cannot be remotely forced to show it.
-
-Android lens follow-up `1a1abd8` uses Camera2 physical IDs omitted by CameraX, with an API 28 guard for minSdk 24 and stable ordering. Unit tests/debug build passed. Matching-debug update installed in place on Galaxy S24 Ultra R5CX20B0QTR; missing 2.7×/5.1× telephoto choices now appear and both bind, with live preview and transitions back to rear 1×. CameraService exposes logical ID0 only, so OEM active physical sensor routing is not independently proven. These are measured optical ratios, not Samsung marketing labels. Phone left at rear 1×. This follow-up is committed on `codex/android-lens-discovery-fix`; published v1.0.6 binaries remain unchanged.
-
-SDR Display P3 MOV fix completed on `codex/sdr-mov-import`: `af49cbe` classifies HDR by PQ/HLG or Dolby Vision instead of gamut; `f1a6121` validates Android containers by ftyp and cleans failed/cancelled staging state with specific storage errors. Existing sRGB canvas conversion and AAC transcoding remain in use; primary-track selection ignores Live Photo metadata. Shared suite: 186 tests passed; production build passed; Android container unit tests and 17 native bridge tests passed. A local HEVC fixture no longer triggers HDR, but desktop decoder support prevented end-to-end colour validation. Physical-device import/colour/recording checks remain pending. Lens work remains paused. Published v1.0.7 predates this fix.
-
-
-Current priority (18 October, resumed after quota): lens work is explicitly PAUSED because the phone is off ADB. User reports the newly listed telephoto selections do not change field of view. Prior successful binding/live preview was not proof of optical switching; actual sensor routing remains unresolved. Preserve `codex/android-lens-discovery-fix` / PR #8 separately and do not include it in the next release. Resume with same-scene 1×/telephoto preview comparison, CameraX selector/stream physical-ID propagation and logical zoom-reset investigation. No completed corrective field-of-view test was recorded before quota interruption. The user's `.gitignore` stash is separate; do not reapply automatically.
-
-Release review completed: user main `3c56b8a` iOS Chrome detection fix is preserved. PR #4 merged as `b2b4e1d` after lower-cost algorithm and browser/model reviews found no additional defect. 182 shared tests, production build, guided-strip tests, direct browser WASM inference and WebKit sharing checks passed. Android 1.0.7/code26 signed/debug packages and iOS 1.0.7/build5 package (run39116599851) passed integrity/model/version checks. Pages run39116597145 passed; live manifest exposes the 81,476-byte Five A+ model. v1.0.7 is published as latest; all five remote binary hashes matched before publication.
-
-Review context: main `3c56b8a` contains the user's iOS Chrome detection fix. Review branch `codex/review-photo-upscale` merges PR #4 head `175d4aa` with main; validate photo-only guided residual upscaling and smaller Five A+ model, repair substantive issues, then merge and publish web plus signed Android/unsigned iOS packages. Lower-cost agents split algorithm review and web/model-contract review. Preserve user translations and unrelated IDE files.
-
-
-
-Working branch: `codex/native-camera-followups`, starting after `5c82544` (About Other projects link; web deployment passed). v1.0.6 is now the published native release (source `7085d63`). This section is the resumable progress tracker; the older plan below is historical.
-
-Commit each completed item separately, including its validation and remaining device checks. Use lower-cost capable agents for implementation. Preserve user `.gitignore`/IDE edits and corrected translations; consult `reference/i18n-glossary.md` for new wording. Android phone testing is authorized; preserve existing media and edits.
-
-| Item | Plan and acceptance criteria | Status |
+| ID | Deliverable and acceptance | Status |
 | --- | --- | --- |
-| Urgent iPhone Safari | Integrate `3d3d403`, fix repeated persistence warnings after removal, and audit related save/preset paths. Preserve native-platform storage behavior and user files. | `3d3d403` merged in `a0f6d51`; storage sidecar committed `0ab462d`, Safari save/preset flow `64df1fb`; Edge IndexedDB migration/delete/edit/reload and share regressions pass. Physical Safari confirmation pending |
-| Android folder import | Trace enumeration and lazy loading; show all supported entries with selection/next/previous, without eagerly decoding every original. Test multiple files, existing imports and read failures. Verify on Android where possible. | Committed `e2c3ad7`; lazy listing, return-to-collection, reuse/edit retention and missing-file recovery browser checks pass. Physical SAF picker verification pending |
-| iOS camera launch | Reuse `clearwater://camera` cold/warm routing; add long-press home-screen Camera action and discoverable Shortcuts launch support. Confirm ordinary editor launch, single delivery and busy-state handling. Assess a widget separately; prefer a Shortcuts widget using the launch action if a native extension adds disproportionate signing/build complexity. | Committed `c94bd74` / `d6e86cc`; home quick actions and App Shortcuts (also usable from Shortcuts widget). iOS CI passed; physical iPhone launch checks pending |
-| Per-device lenses | Discover selectable cameras from Android CameraX/Camera2 and iOS AVFoundation, keeping front/back and physical lenses distinct from digital zoom stops. Preserve ultra-wide support, honest magnification labels, rollback and orientation. Avoid a device database unless native detection cannot supply the needed information. | Committed `7b0d8e4`; Android optics tests/compile and iOS CI passed. Device lens selection checks pending; phone off ADB on resume |
-| Cross-platform media reliability | Review import, load, export, save/share readiness across Android web, Safari web and both native apps; fix confirmed issues with regressions. | Committed `9f03c4e` bounded/stale video loads, `64df1fb` consistent export gating and decode-only preview, `e6659d1` complete iOS HTTP 200 video responses. 177 shared tests pass |
-| Integrated verification | Shared tests/build, targeted regressions, Android debug/device checks, iOS CI compile/native tests as available. Record exact results and device-only limitations. | iOS run 39041096683 passed: 30 native tests and unsigned device package. Android debug rebuild passed at `04bb6e8`; ADB has no connected device. Main hotfix PR #5 merged as `370ddf5`; Pages run 39079668206 passed and live site responds HTTP 200. Unsigned iOS package run 39079696983 passed; 30 native tests passed earlier on unchanged native sources |
+| P0 | Review public examples/current renderer; record hypothesis, limits and baseline | Complete, 19 Oct; research only |
+| P1 | Isolated candidate transforms and comparison harness; compare current default and Auto enhance | Complete: 72295d2 baseline; 7557c4b adds bounded Vivid. Follow-up: 9 photos x 4 engines x 6 treatments, no engine/browser errors. Natural/Vivid selected as optional experiments |
+| P2 | Select candidate; store/reuse fit; integrate shared photo preview/export with legacy-safe validation | Complete: c1744a5 plus 20 Oct V2 styles. Versionless fits stay unchanged; shared effect gates and owned-buffer application. 258 tests/build pass; timing/human acceptance tracked in P4 |
+| P3 | Minimal optional Effects UI, translations, guide and undo/reset/preset behavior | Complete, 20 Oct: optional Off/Natural/Vivid UI, EN/zh-HK/ja and full lifecycle regression pass, including all bundled engines/custom ONNX, pending Save locks, video exclusion and stale replies. Next: revised-fit paired visuals/P4 |
+| P4 | Correctness, visual/performance checks, necessary native-shell acceptance and test handoff | Automated correctness/production regressions pass; 192 final comparisons have no errors. Desktop source export passes, with +26.7% Natural/+48.4% Vivid cost (10% target missed). User accepted the visuals; verified debug APK supplied for Android testing. Cost optimization, mobile memory and hardware acceptance remain open; no release acceptance claimed |
 
-Urgent web reliability fixes are deployed. Remaining acceptance work is physical Android folder/lens checks, physical iPhone launch/lens/Safari checks, with both debug Android and unsigned iOS packages now built. Debug APK: `editor/android/app/build/outputs/apk/debug/app-debug.apk`. User subsequently authorized publication: v1.0.6 published with signed APKs and unsigned IPA, all binary hashes verified. Connected S24 Ultra lens investigation is next.
+After each row, commit and replace its status with the commit, checks and precise next step. Record partial work/failures if quota interrupts. Numerical tests do not establish visual acceptance.
 
-Resume from this table and latest commits. Inspect current diff and live agents before restarting to avoid duplicate work. Signing credentials stay in the configured ignored source; never inspect unrelated keys. Stable publication was subsequently authorized and completed on 18 October.
+## P1: isolated experiment
 
-Recovery checkpoint: prior uncommitted native work was saved in `stash@{0}` while the urgent Safari change was authored on main. It has been restored onto this branch after merging main; the backup stash is intentionally retained. Do not apply it a second time. User `.gitignore` and IDE changes remain unrelated. Lower-model agents completed the reliability fixes after quota reset. The native iOS launch tests passed. Windows Playwright WebKit cannot seed a File into IndexedDB and the synthetic full-photo fixture does not become ready; WebKit share-wrapper checks pass, but do not claim physical Safari reproduction. The collection remains available and existing originals are preserved.
+1. Select a small authorized comparison set: blue water, green water, naturally warm/yellow subjects, pale sand/highlights, low-red/noisy shadows, naturally red subjects and physical-red-filter surface shots. Synthetic images test math, not aesthetics. Keep private filenames/device observations in ignored notes.
+2. Record current Balanced and WWE-UIE + Balanced-after-AI results, with and without current Auto enhance. Compare the same inputs/recipes and inspect whole images plus 100% crops. Marketing screenshots and original files are not equivalent quality references.
+3. Try constrained per-channel percentile fitting plus a stronger luminance black/white-point or gentle curve finish. Estimate from a bounded corrected reference (initial target 256x256), excluding alpha-zero, clipped and very dark samples. Use confidence checks, bounded gains and identity fallback for flat/empty/poor evidence. Do not force RGB means to grey.
+4. If global fitting damages water colours, test cheap soft water-likelihood weighting for analysis or application. Cyan/blue alone does not establish background: blue subjects must remain valid. Add spatial complexity only if simpler fitting fails and quality gains justify measured cost.
+5. Protect red-deficient shadow noise, use smooth highlight handling and preserve red-removal behavior near the surface with physical filters. Avoid forcing all greens yellow or describing guessed colour as ground truth.
+6. Compare a few bounded parameter sets, not an open-ended tuning search. Keep/reject each with concise reasons and cold/warm timings. P1 may establish that only tone or only colour fitting is useful.
 
-## Recommendation (historical)
+Deliverable: ignored local comparison report/contact sheet plus committed reusable math/harness/tests. Do not commit personal images, competitor examples or generated galleries.
 
-Build a local-first photo editor with a shared TypeScript web interface and processing recipe, packaged for Android using Capacitor. Use native Kotlin adapters for Android import, incoming shares, durable file storage, export, HEIC decoding, and eventually video. The web version can retain the main editing functions as a PWA. Do not make cloud inference or accounts a prerequisite.
+## P2: integration gates
 
-Start with an explainable, deterministic correction engine. Evaluate Shallow-UWnet and FUnIE-GAN as competing optional enhancement paths. Do not automatically chain a strong colour correction, FUnIE-GAN and Shallow-UWnet: each may duplicate the other's work and encounter inputs outside its training distribution.
+- Audit recipe readers/writers, parseRecipe, reset/undo/presets, photo workers, iOS capture recipe storage and export paths before choosing schema. New fields must be optional, finite, bounded and identity when absent; retain version-1 compatibility.
+- Explicitly decide pass order. Current engine/strength, optional Balanced follow-up and manual edits produce the fitting reference; do not recursively fit a result already containing the new finish. Store the chosen fit rather than refitting on every manual slider movement; re-analysis is explicit. Verify neutral picking and subsequent manual refinements remain predictable.
+- Apply adaptive colour/tone before spatial detail finishing. Use a single automatic contrast fit, avoiding a second automatic stretch over an already stretched result. Intentional manual contrast remains available. Document/test any different order before integration.
+- Reuse one bounded-reference fit across preview and all export strips. No strip-local colour/black-point fitting. Preserve alpha and source detail, linear work per pixel and bounded strip memory; reuse existing halos for spatial detail.
+- Cache against corrected reference/relevant settings and model identity. Invalidate on source/model/strength/white-balance changes as appropriate, not tab switches. Preserve inference reuse, bounded caches and saved-fit reproducibility.
+- Test shared imported-photo editing in web/Android/iOS. Native capture quick-sharing and camera shaders must not silently ignore a finish displayed in the editor. Gate to the supported shared photo path and check capture-to-editor transitions.
 
+## P3: UI/language
 
-## User workflow
+Expose only a useful candidate. Keep it opt-in and separate from restoration through the existing Effects treatment. Preserve applied-state design, undo/redo, clear, Auto restore and Reset semantics. Keep EN/zh-HK/ja labels concise and follow reference/i18n-glossary.md without re-auditing user wording. Explain estimated colour/contrast and possible noise amplification, not physical recovery of missing information.
 
-1. Open photos from the system picker or share photos into the Android app. Multiple imports create an edit queue.
-2. Display the photo immediately, analyse a reduced preview in a worker, then suggest a conservative automatic edit.
-3. Offer a draggable before/after divider, hold-to-view-original, zoom/pan and an overall restoration-strength slider. The comparison divider controls visibility only; it does not change edit strength.
-4. Provide optional scene inputs: environment Auto/Underwater/Surface; red filter Auto/Yes/No; water Auto/Blue/Green; depth Unknown or approximate metres; artificial lighting Unknown/No/Strobe or torch.
-5. Manual adjustments: warmth, green-magenta tint, exposure, highlights, shadows, contrast, haze, vibrance, signed red correction, and a neutral-point eyedropper. Advanced controls can include separate RGB gains, sharpening and denoise.
-6. Undo, redo, reset, save recipe, export a new photo, or share the export. Preserve the original.
+## P4: acceptance/performance
 
-Depth and water type influence the suggested settings; changing them explicitly recomputes the suggestion while preserving a recoverable previous edit. Manual controls are applied after the suggested base. Do not silently overwrite user edits when an asynchronous AI result arrives.
+- Legacy/no-op recipes stay pixel-identical. Reject invalid parameters and preserve fitted results through JSON round-trips.
+- Check ramps, flat fields, alpha edges, clipped highlights, saturated colours and noisy shadows for banding, halos, clipping or colour inversion. Inadequate statistics fall back safely.
+- Check preview/export parity at equal dimensions and strip/full-buffer equivalence, including coordinates/halos. No per-strip colour changes.
+- Repeated finish edits reuse ONNX inference. Bounded analysis sample, no new model download and no full-resolution auxiliary image. Initial target: at most 10% additional warm render/export time over the same recipe; measure/report actual time and memory rather than promising it. Reconsider complexity if materially slower.
+- Run npm test and npm run build after meaningful changes. Focused scripts include enhancement-check.mjs, ios-web-export-check.mjs, export-destination-check.mjs and ios-shell-check.mjs. Add meaningful tests for new math/state; avoid unrelated native builds during the isolated experiment.
+- Seek human feedback over the representative set and report both gains/failures. Two public demos cannot establish general superiority. Physical iPhone browser memory/saving acceptance differs from mocks.
+- Finish with committed progress, limitations and test artifact locations. Next native build must include the already-merged Save/Share fix. Merge/version bump/publication require separate authorization.
 
-## Automatic processing pipeline
+## P1 result and next action (19 October 2026)
 
-Import -> orientation/profile normalization -> analysis preview -> scene/cast assessment -> suggested base -> user adjustments -> output tone/gamut mapping -> preview/export.
+Code checkpoint: 72295d2. Isolated tone, colour-tone and soft-water candidates, bounded corrected-reference fitting, reusable application, explicit filtered-surface protection and a local comparison runner are implemented. All 205 shared tests and production build pass. Nine authorized local photos across Balanced, WWE-UIE + 30% Balanced, Five A+ and Shallow-UWnet produced 180 comparisons with zero engine/browser errors. Inspectable private reports/contact sheets/source-pixel crops are gitignored under analysis/adaptive-finish/. Reproduction and limits: editor/scripts/adaptive-finish/README.md.
 
-### Decode and colour management
+Initial baseline finding (72295d2, superseded by the following follow-up): no candidate was selected for production. The natural tone result is subtle; colour fitting frequently falls back and did not show a consistent useful gain. Standalone active application averaged about 38%/38%/42% of measured transfer-plus-render time for tone/colour-tone/soft-water, above the initial 10% target; these are exploratory desktop preview timings, not export/mobile measurements. Preserve the first report before revising. Next action: one bounded vivid/chroma-separation experiment with the same protections, followed by human visual feedback and a feasible fused-pass performance check before P2. P2-P4, native hardware acceptance, merge and release remain incomplete.
 
-- Android: use platform image decoding where supported, verify HEIC on target devices, and preserve orientation and source metadata deliberately.
-- Web: JPEG/PNG first, with HEIC decoding fallback validated against representative files. Browser HEIC decoding must not be assumed. Evaluate a lazy-loaded WASM decoder and its licensing, file size, memory use and colour handling.
-- Normalize to an explicit SDR sRGB working/output contract for the MVP, converting embedded profiles and tone-mapping HDR sources where needed. Do not merely relabel Display-P3 or HDR pixels as sRGB.
-- Analyse a roughly 256-512 px preview. Render an approximately 1-2 MP interactive preview. Export from the original, not from the analysis image or neural-network thumbnail.
-- A 24 MP RGBA8 buffer uses about 98 MB before extra copies, GPU textures or float tensors. Bound memory use; investigate region decoding and tiled export. Avoid bridging full images as base64 strings.
+## Bounded follow-up and P2 checkpoint (19 October 2026)
 
-### Analysis
+7557c4b adds one protected Vivid candidate; all three earlier candidate outputs remain byte-identical in hash regressions. The same nine local photos across four engines and six treatments produced 216 comparisons without engine/browser errors. User preference is Natural and Vivid choices. Natural uses the restrained tone fit; Vivid uses bounded colour/chroma separation with weak-channel, water, shadow, highlight and filter protection. These are optional editing choices, not a claim of true-colour recovery or general superiority. Private reports remain under analysis/adaptive-finish/ (baseline and vivid runs separated).
 
-Compute channel means and robust percentiles, luminance distribution, channel clipping, chroma distribution, spatial tile statistics and confidence. Exclude very dark, clipped and strongly saturated samples from neutral estimation. Weight plausible neutral regions without assuming the ocean or a dominant reef colour is grey. Keep exposure analysis separate from white balance.
+c1744a5 completes P2: optional version-1 settings with strict bounds, one persisted fit reused by preview/export strips, amount changes without inference, bounded kernels, explicit re-analysis protocol and stale-request handling. The selected finish replaces automatically applied Auto enhance contrast; intentional manual contrast and brightness/detail finishing remain. Inactive/identity/zero-amount fits preserve the old path. Fit-context changes clear it; ordinary tone/detail edits retain it. No video/live-camera spatial pipeline or native source ownership changes.
 
-The proposed every-second-pixel approach is a reasonable fast baseline after downscaling. Treat red <60 as a benchmark heuristic, not a universal decision rule: a dark image can have low red without needing red synthesis. Use relative red deficiency, exposure, spatial agreement and available user hints together.
+234 shared tests and production build pass. Existing enhancement/PNG parity, iOS web prompt/cancel/retry and superseded enhancement, desktop destination/collision/cancel, and mocked iOS shell checks pass. An existing brightness browser check now waits for its actual render rather than racing Save readiness. P3 UI/wording is in review; next action is its finish-specific lifecycle, preset, preview/export and stale-result browser check, then commit P3.
 
-Use smooth strength curves rather than abrupt branches around thresholds. Start conservative when the image has few credible neutral pixels. Provide a manual override.
-
-### Colour balance and red correction
-
-- Keep the user's proposed gain ranges as a baseline experiment, not immutable production limits.
-- Separate chromatic balance from brightness. Driving all channel averages to 128 unnecessarily changes exposure and may neutralize intentionally blue water or a sunset.
-- For filter/surface mode, estimate both warmth and green-magenta tint; permit reduction of red and/or blue relative to green. Use a distinct safe parameter envelope from deep-water restoration.
-- For severely depleted red, distinguish amplification of existing signal from synthesis using other channels. Synthesis may improve appearance, but cannot identify original colours from missing information.
-- Gate synthesis using scene confidence and tonal/spatial masks. Protect highlights and naturally saturated objects, and limit amplification of noise in shadows.
-- A matrix can represent global channel gains/cross-channel mixing. It cannot express nonlinear tone curves, local haze correction, masks or neural-model output. Store a versioned recipe, not just a suggested matrix.
-- Use an explicit colour-space contract: analyse display-encoded values if thresholds are defined there; apply exposure and appropriate blending in linear light; match neural preprocessing to the model's training convention.
-
-Suggested base matrix interpolation: M(strength) = I + strength * (M_auto - I). This only applies to the matrix component. For the full base output B, blend with the original in a defined colour space, then apply manual adjustments. Strength zero disables the automatic base; Reset clears manual adjustments too.
-
-### Haze and exposure
-
-Use conservative highlight/shadow tone curves and modest edge-aware local contrast. Treat haze estimation as uncertain in water: bright backscatter, light shafts, particles and genuine low-detail water can mislead generic dehazing. Make haze independently adjustable. Do not claim to reconstruct detail lost to clipping or opaque haze.
-
-## AI evaluation and integration
-
-Evaluate on originals first, using each repository's expected channel order, scaling, size and normalization. Compare classical only, Shallow only, FUnIE only, classical then each model, and each model then light manual finishing. Keep both original and corrected inputs available during experiments. Ship a chain only if comparisons justify it.
-
-| Resource | Proposed role |
-| --- | --- |
-| Shallow-UWnet | First lightweight model candidate. Repository has MIT code and a pretrained checkpoint link. Its supplied test script defaults to square 256x256 resizing, so full-resolution/aspect-ratio behaviour needs validation. |
-| FUnIE-GAN | Alternative enhancement candidate. MIT repository; TensorFlow/Keras is the official implementation for reproducing paper results, while the PyTorch sample is convenient for export experiments. Published embedded GPU speeds are not Android performance guarantees. |
-| Sea-Thru-Impl | Research comparison, outside the MVP. Requires a per-pixel depth map; diver depth is not camera-to-scene distance. Monocular estimates do not automatically supply calibrated underwater range. |
-| UWEnhancement | Research benchmark harness/model zoo, including UIEC2-Net, UWCNN and WaterNet. Not a ready-made mobile engine. Verify each model's preprocessing and artifact terms separately. |
-| EDGE-tronics Underwater-Processing | Algorithm reference for white-world balance, contrast, dehazing and fusion. Older C++/OpenCV code; README declares GPLv3. Prefer independently implementing selected published techniques unless adopting its distribution obligations intentionally. |
-| TechRxiv ADCCA-GAN paper | Saved PDF reviewed locally. Add as a third optional model candidate: small reported parameter footprint and promising UIEB results, but 256x256 Tesla T4 benchmarks do not establish Android/full-resolution performance. Official code and weights remain unverified. See analysis/ADCCA_GAN_REVIEW.md. |
-
-Before bundling a model: verify exact checkpoint provenance and redistribution terms, export compatibility, numerical parity, supported operators, package size, peak memory and real-device speed. Code licenses alone do not establish the terms of every linked weight/dataset artifact.
-
-Prototype ONNX export and ONNX Runtime Web using WebGPU where available and WASM fallback. Keep models behind a lazy-loaded adapter. Test FP32 first; evaluate FP16/quantization against colour quality before adopting. Browser inference availability does not imply acceptable latency on every phone.
-
-Do not resize a 256x256 neural output to 24 MP and call it full-quality restoration. Compare higher-resolution inference, overlapping tiles with context/feathering, and an edge-aware low-resolution correction field applied to full-resolution pixels. Tiling can produce seams or inconsistent colours; correction fields preserve source detail but cannot reproduce every learned spatial effect. Select based on measured results.
-
-## Architecture
-
-- apps/editor: React + TypeScript + Vite, responsive editor, PWA manifest and service worker.
-- packages/core: versioned recipes, analysis, suggestion logic, deterministic CPU reference implementation and model adapter contracts.
-- packages/render: WebGL2 preview renderer; capability checks and CPU fallback. Separate analysis, preview and export resolutions.
-- android/: Capacitor host and Kotlin adapters for file access, incoming intents, HEIC/profile handling, MediaStore export and later Media3 video processing.
-- tools/benchmarks: local Python model comparison harness and source-resolution visual crops.
-- Local persistence: IndexedDB for web recipes/thumbnails; app-private files for durable Android imports and exports. Cache models separately, show download progress, and handle unavailable/offline models without breaking classical editing.
-- No backend required for initial editing. Treat imported personal photos as local data; do not include samples in public builds or commits by default.
-
-Android integration must handle ACTION_SEND and ACTION_SEND_MULTIPLE with image MIME types, content:// URIs, temporary read grants, cold starts, and new intents while running. Copy selected/shared input into app-private storage when needed for durable edits; do not assume every incoming URI supports persistable permission. Use the system Photo Picker rather than requesting unrestricted gallery access.
-
-Installed PWAs can receive files through Web Share Target on supported browsers. Use a multipart POST share target handled locally by a service worker, persist the file, then route to the editor. This is a useful web enhancement; native Android intents provide the main Android share route. Feature-detect web import/export/share APIs.
-
-## Delivery phases and acceptance criteria
-
-### 0. Image-quality prototype
-
-Implement the user's exact heuristic as a named baseline, then a robust balanced variant. Build local comparison sheets and 100% crops for a local regression set. Add explicit filter mode, tint control and separate highlight/haze processing. Record human preference and artifacts. Goal: agree on desirable output before committing to a model or UI framework details.
-
-### 1. Photo MVP
-
-Import JPEG/PNG/HEIC on Android, and JPEG/PNG plus tested HEIC fallback on web. Deliver one-tap classical correction, before/after divider, strength/manual controls, undo/reset and full-resolution SDR export. Support Android gallery selection and share-in. Verify offline editing after assets are cached. No AI requirement for this milestone.
-
-### 2. Optional AI enhancement
-
-Benchmark both candidate networks and integrate the best measured option. Include independent AI strength, cancellation/progress, capability fallback and source-resolution export validation. Keep the classical path available. Do not select a default based solely on UIQM/UCIQE scores; inspect naturalness, water colour, faces, reef texture, noise and clipping. PSNR/SSIM require appropriate paired reference images and cannot establish restoration accuracy on these unpaired samples.
-
-### 3. Batch workflow and polish
-
-Edit queue, copy/paste recipe, saved presets, re-edit persistence, export metadata choices, crash recovery and device performance tuning. Reanalyse each image when applying a preset to changing lighting conditions.
-
-### 4. Video
-
-Begin on Android with Media3 Transformer and reusable colour shaders. Start with SDR MP4/H.264 and preserved audio/timestamps. Analyse sparse frames, detect scene cuts and smooth correction within each shot to prevent flicker. Avoid independent aggressive one-click decisions on every frame. Add trim, preview, cancellable export and storage/thermal handling. Add temporal AI only after stable classical video. Keep web photo parity while evaluating web video export separately; it need not block Android video.
-
-Validation: supported orientations and dimensions; no original modification; red-filter and magenta cases; severe red loss; green water; local highlights; neutral/no-op scenes; slider reversibility; preview/export agreement; portrait and landscape model inputs; full-resolution detail/seams; app cold/warm share entry; cloud-backed picker URIs; cancellation; offline mode; low storage and memory; representative midrange Android devices. Establish latency targets through profiling rather than promising model speed now.
-
-## Sources reviewed
-
-- https://diverout.com/en/underwater-color-restoration (product behaviour claims, not an algorithm specification)
-- https://github.com/mkartik/Shallow-UWnet
-- https://github.com/mkartik/Shallow-UWnet/blob/main/test.py
-- https://github.com/xahidbuffon/FUnIE-GAN
-- https://github.com/xahidbuffon/FUnIE-GAN/tree/master/PyTorch
-- https://github.com/Teragion/Sea-Thru-Impl
-- https://github.com/BIGWangYuDong/UWEnhancement
-- https://github.com/EDGE-tronics/Underwater-Processing
-- https://capacitorjs.com/docs
-- https://developer.android.com/training/data-storage/shared/photo-picker
-- https://developer.android.com/training/sharing/receive
-- https://developer.chrome.com/docs/capabilities/web-apis/web-share-target
-- https://onnxruntime.ai/docs/tutorials/web/
-- https://developer.android.com/media/media3/transformer
-
-## Saved-paper review update
-
-The user supplied the TechRxiv PDF locally after the initial review. All seven pages have now been read, including visual comparisons and tables. ADCCA-GAN is added as an optional evaluation candidate, pending reproducible code/weights and licensing. The photo MVP, filter/surface handling, manual controls and separate-model evaluation remain the recommended first steps. Detailed findings and reported metrics are in analysis/ADCCA_GAN_REVIEW.md. No neural inference has been run.
-
-
-Resume checkpoint (18 October): main Safari hotfix is incorporated; native feature commits are pushed to `codex/native-camera-followups`. Safari fixes are still uncommitted. WebKit 2370 is installed, but the Windows runner rejects the first File/Blob IndexedDB write before application code; record that limitation separately from Chromium persistence tests. No native follow-up is published. Phone is currently not connected; continue non-device work.
+P4 performance remains unresolved: the warmed synthetic 1.92 MP desktop microbenchmark measured about 40 ms Natural and 106 ms Vivid versus a 138 ms Balanced renderer (about 29%/77% extra renderer time). Neural transfer, encoding, full export and mobile memory are outside that measurement. Natural/fallback kernels avoid large per-fit tables; colour kernels remain bounded. No 10% performance acceptance is claimed; keep optional/off defaults and investigate fusion or simpler math before release acceptance.

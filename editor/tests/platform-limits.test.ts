@@ -140,4 +140,16 @@ describe('limit error messages',()=>{
   expect(codec).not.toBeInstanceOf(PlatformLimitError);
   errorLog.mockRestore();
  });
+ it('keeps photo decode and processing errors out of the video-specific MP4 message',()=>{
+  const errorLog=vi.spyOn(console,'error').mockImplementation(()=>{});
+  const load=classifyMediaFailure(new Error('Could not decode the photo.'),'android-apk','photo-load');
+  expect(load.message).toBe("Couldn't read this photo. Try exporting a fresh copy.");
+  expect(translateMessage('zh-HK',load.message)).toBe('未能讀取此相片。請輸出一份新的副本。');
+  expect(translateMessage('ja',load.message)).toBe('写真を読み込めません。新しいコピーを書き出してお試しください。');
+  expect(classifyMediaFailure(new Error('The photo could not be processed.'),'android-apk','photo-process').message).toBe('The photo could not be processed.');
+  expect(classifyMediaFailure(new Error('RAW decoder stopped. Try Reduced resolution.'),'android-apk','photo-load').message).toBe('RAW decoder stopped. Try Reduced resolution.');
+  expect(classifyMediaFailure(new Error('Could not decode the first video frame.'),'android-apk','load').message).toBe("Couldn't read this file. Re-export it as a standard MP4.");
+  expect(classifyMediaFailure(new Error('Out of memory while rendering.'),'android-apk','photo-process')).toMatchObject({code:'out-of-memory',platform:'android-apk'});
+  errorLog.mockRestore();
+ });
 });

@@ -1,6 +1,10 @@
 # iOS native camera and sideloading plan
 
-## Automatic lens selection checkpoint (19 October 2026)
+## Current release and handoff (19 October 2026)
+
+iOS is integrated into main, not a separate unmerged implementation. PR #8 merged at `0eae50c` and ships in v1.0.8 (unsigned iOS build 6, iOS 26+); release packaging run 39187142233 passed. The same native implementation passed 31 hosted tests in run 39185483253 before the version bump. Public IPA links are enabled. Android physical lens/crop checks passed; actual iPhone Auto lens/white-balance acceptance remains open. PR #10's newer shared Save/Share readiness fix is deployed on web but must be included in the next native build. Use HANDOFF.md and MAINTENANCE.md for current status; pending-merge/no-release instructions below are historical, not current restrictions. New photo-finishing work is opt-in and shared-editor-only initially; do not apply it to live native capture implicitly.
+
+## Pre-merge automatic lens selection checkpoint (19 October 2026)
 
 PR #8 adds native Auto lens selection using reported optical ratios and per-device zoom bounds. A requested 5x may use a near-native 5.1x module, or a 4x module with 1.25x digital zoom. Manual lens selection stays fixed until Auto is selected again. Lens switches are serialized and unavailable during recording. Automatic switches preserve picked neutral calibration; stale sampled/AI frames are discarded. Browser camera selection is unchanged.
 
