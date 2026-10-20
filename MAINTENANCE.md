@@ -1,5 +1,12 @@
 # Maintenance
 
+## 1.0.10 Safari verification completed (20 October 2026)
+
+- [x] User accepted Android testing and authorized merge/release. macOS WebKit gate passes at `f1a88c63a49ea868f3b1dbf9419cc6712b3436ea`, [run 39424646617](https://github.com/fishese/clearwater/actions/runs/39424646617): real JPG editing/switching without hooks, held stale render/error replies, and the mocked native iOS platform path. This is actual WebKit engine coverage, not a spoofed Chromium user agent; physical iPhone/WKWebView memory/performance remains manual.
+- [x] Diagnosed and fixed a Safari worker reset in the emitted production graph: lazy model chunks imported shared metadata from their side-effectful worker entry. WebKit evaluated that entry again, clearing generation/source state; the next render was silently ignored. Separate leaf metadata/contract chunks preserve lazy model/session reuse. Every production build now rejects direct/transitive worker-entry back-imports; its regression fixture includes minified import/re-export/dynamic-import syntax. Independent review found no further issue.
+- [x] 262 shared tests and production build pass; full finish/all-engine/custom ONNX/lifecycle/strip-parity/translated-layout browser checks pass after the chunk fix. The earlier Android 9-test/minified signed candidates pass and keep the existing certificate. [Native run 39420154974](https://github.com/fishese/clearwater/actions/runs/39420154974) passed all 33 hosted iOS tests on unchanged native code; its earlier WebKit harness failed and is superseded by the new gate. Prior diagnostic failures remain evidence, not accepted Safari passes.
+- [ ] Next action: merge [PR #12](https://github.com/fishese/clearwater/pull/12), then verify Pages and package debug/release APKs plus unsigned device IPA from the exact merged source, publish all checksummed/licensed assets, and record final provenance. Version 1.0.10, Android 29, iOS 8. Finish remains optional/photo-only/Off by default. Initial desktop 10% overhead target remains unmet; retain physical iPhone memory/performance and camera/lens checks as manual limitations.
+
 ## Authorized 1.0.10 release preparation (20 October 2026)
 
 User confirmed the updated Android test build works and authorized Safari/iOS verification, merge and release. This supersedes earlier no-merge/no-release instructions for this feature.
