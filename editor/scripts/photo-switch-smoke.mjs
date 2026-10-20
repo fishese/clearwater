@@ -23,6 +23,7 @@ try{
  const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
  const hash=()=>canvas.evaluate(c=>{let h=2166136261;for(const value of c.getContext('2d').getImageData(0,0,c.width,c.height).data)h=Math.imul(h^value,16777619);return h>>>0;});
  await ready();
+ if(await page.locator('#web-update-hint-text').isVisible())await page.getByRole('button',{name:'OK',exact:true}).click();
  const request=await canvas.getAttribute('data-request');
  await page.getByRole('slider',{name:'Warmth',exact:true}).evaluate(input=>{
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'10');
