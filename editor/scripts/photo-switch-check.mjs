@@ -7,6 +7,11 @@ const browser=await (engine===webkit?engine.launch({headless:true}):engine.launc
 try{
  const context=await browser.newContext({viewport:{width:1280,height:900}});
  const page=await context.newPage(),errors=[],consoleErrors=[];page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(error.message));page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text().slice(0,300));});
+ if(process.env.CHECK_BROWSER==='webkit')await page.route('**/assets/processor.worker-*.js',async route=>{
+  const response=await route.fetch(),headers={...response.headers()};delete headers['content-length'];delete headers['content-encoding'];
+  const trace=`;(()=>{let owner=self,descriptor;while(owner&&!descriptor){descriptor=Object.getOwnPropertyDescriptor(owner,'onmessage');if(!descriptor)owner=Object.getPrototypeOf(owner);}if(descriptor?.get&&descriptor?.set){Object.defineProperty(self,'onmessage',{configurable:true,get(){return descriptor.get.call(self);},set(handler){if(typeof handler!=='function'){descriptor.set.call(self,handler);return;}self.postMessage({type:'__photo_switch_trace',stage:'handler-assigned',name:handler.name||'(anonymous)',snippet:Function.prototype.toString.call(handler).slice(0,160)});descriptor.set.call(self,event=>{const data=event.data||{},request=data.type==='render'?{gen:data.gen,request:data.request}:null;if(request)self.postMessage({type:'__photo_switch_trace',stage:'receive',...request});let result;try{result=handler.call(self,event);}catch(error){if(request)self.postMessage({type:'__photo_switch_trace',stage:'throw',...request,message:String(error?.stack||error)});throw error;}return Promise.resolve(result).then(value=>{if(request)self.postMessage({type:'__photo_switch_trace',stage:'done',...request});return value;},error=>{if(request)self.postMessage({type:'__photo_switch_trace',stage:'reject',...request,message:String(error?.stack||error)});throw error;});});}});}})();\n`;
+  await route.fulfill({status:response.status(),headers,body:trace+await response.text()});
+ });
  await page.addInitScript(iosShell=>{
   const state=window.__photoSwitchCheck={messages:[],incoming:[],handlers:new Map(),photoWorker:null,holdGeneration:null,held:[]};
   if(iosShell){
@@ -31,7 +36,7 @@ try{
      state.handlers.set(this,handler);
      descriptor.set.call(this,event=>{
       const data=event.data;
-      state.incoming.push({type:data?.type,gen:data?.gen,request:data?.request,operation:data?.operation,message:typeof data?.message==='string'?data.message.slice(0,240):undefined,keys:data&&typeof data==='object'?Object.keys(data):[]});
+      state.incoming.push({type:data?.type,stage:data?.stage,name:data?.name,snippet:data?.snippet,gen:data?.gen,request:data?.request,operation:data?.operation,message:typeof data?.message==='string'?data.message.slice(0,240):undefined,keys:data&&typeof data==='object'?Object.keys(data):[]});
       if(state.holdGeneration!==null&&event.data?.type==='rendered'&&event.data.gen===state.holdGeneration){
        state.held.push({worker:this,handler,event});return;
       }
@@ -61,7 +66,7 @@ try{
  });
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles(images.map(item=>({name:item.name,mimeType:item.type,buffer:Buffer.from(item.base64,'base64')})));
  const ready=()=>page.waitForFunction(()=>document.querySelector('.photo-tile')&&document.querySelector('canvas[aria-label="Edited photo"]')&&window.__photoSwitchCheck.messages.some(message=>message.type==='render')).catch(async error=>{
-  console.error('PHOTO SWITCH READINESS FAILED',JSON.stringify({errors,body:(await page.locator('body').innerText()).slice(0,1400),messages:await page.evaluate(()=>window.__photoSwitchCheck.messages.slice(-12).map(({type,gen,request})=>({type,gen,request})))}));
+  console.error('PHOTO SWITCH READINESS FAILED',JSON.stringify({errors,consoleErrors,body:(await page.locator('body').innerText()).slice(0,1400),trace:await page.evaluate(()=>({hookOwner:window.__photoSwitchCheck.hookOwner,messages:window.__photoSwitchCheck.messages.slice(-12).map(({type,gen,request,operation,message})=>({type,gen,request,operation,message})),incoming:window.__photoSwitchCheck.incoming.slice(-16)}))}));
   throw error;
  });
  const navigate=async name=>page.getByRole('button',{name,exact:true}).evaluate(button=>button.click());
