@@ -1,5 +1,14 @@
 # Handoff
 
+## Next version: photo picker and preview interaction (20 October 2026)
+
+Recorded at the user's request for the next planned version; documentation only. Do not issue an immediate release or bump versions for these items.
+
+- [ ] Web photo import: investigate an explicit Browse/files option. Reported behavior: the web picker exposes media/Google Photos without Browse, whereas the APK picker has Browse in its three-dot menu. Check the file-input configuration and browser/OS picker capabilities; provide a separate file-browse route where supported. Keep web, Android and iOS behavior distinct, and preserve existing media selection and multi-photo import. Record any browser-imposed limitation rather than promising control over the system picker.
+- [ ] Preview at 150% zoom: reproduce and fix clicks anywhere on the preview moving the before/after divider. Match the intended drag interaction at other zoom levels, preserving image panning, zooming and touch gestures; clicking away from the divider should not reposition it.
+- [ ] Comparison divider hit area: make the full vertical divider draggable within a horizontal band as wide as the <> handle, along the entire line, rather than only on the handle itself. Keep the visible handle/line and constrain the expanded drag target so it does not capture unrelated preview interactions.
+- [ ] Next action when implementation resumes: inspect the web import route and comparison pointer handling; reproduce at 150% and neighboring zoom levels, then verify mouse/touch behavior on web (including Safari), Android and iOS as applicable. Keep these requests pending until implemented and checked; no runtime fix is claimed here.
+
 Updated 20 October 2026. This current checkpoint supersedes older release/feature status in other documents; detailed history remains in Git and MAINTENANCE.md.
 
 ## 1.0.10 released (20 October 2026)
