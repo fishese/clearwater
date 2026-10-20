@@ -390,6 +390,7 @@
   "Ran out of memory. Try Reduced quality or a shorter clip.": "記憶體不足。請改用「精簡」畫質或較短片段。",
   "HDR video isn't supported here yet. Export an SDR copy first.": "此平台暫不支援 HDR 影片，請先匯出 SDR 版本。",
   "Couldn't read this file. Re-export it as a standard MP4.": "無法讀取此檔案。請重新匯出為標準 MP4。",
+  "Couldn't read this photo. Try exporting a fresh copy.": "未能讀取此相片。請輸出一份新的副本。",
   "This video resolution is too large for the editor. Use a smaller copy.": "影片解像度過高，請使用較小的副本。",
   "Could not decode the first video frame.": "未能解碼首個影片幀。",
   "A video export is already running.": "已有影片正在輸出。",

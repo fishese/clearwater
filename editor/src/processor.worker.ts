@@ -15,7 +15,7 @@ import {classifyMediaFailure,currentMediaPlatform,isMediaPlatform,PlatformLimitE
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
 let latestPreviewRequest=0;
-let sourceFile:File|null=null,exportSource:ImageBitmap|null=null,sourceInfo:PhotoInfo|null=null;
+let sourceFile:File|null=null,sourceInfo:PhotoInfo|null=null;
 let decoding:AbortController|null=null;
 let mode:PhotoResolution='auto',device:PhotoDevice={mobile:false};
 let fields=new Map<ModelName,Promise<GuidedField>>();
@@ -83,7 +83,7 @@ ctx.onmessage=async({data})=>{
       const config=await customTask;if(!data.silent)send({type:'custom-ready',gen,config,restore:data.restore===true});
     } else if(type==='load') {
       generation=gen;latestPreviewRequest=0;decoding?.abort();decoding=new AbortController();
-      source?.close();source=null;exportSource?.close();exportSource=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
+      source?.close();source=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
       photoFinishKernels.clear();
       mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
       const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
@@ -154,15 +154,19 @@ ctx.onmessage=async({data})=>{
       send({type:'rendered',gen,request,bitmap},[bitmap]);
     } else if(type==='export' && gen===generation && source) {
       const originalFile=sourceFile;
+      // A photo can change while this export is between strips. Keep the
+      // export's decoded bitmap local so its cleanup cannot close a newer one.
+      let decodedForExport:ImageBitmap|null=null;
+      try {
       const recipe=data.recipe as Recipe,guided=await neural(recipe,gen,request);
       if(gen!==generation)return;
       const followUp=balancedFollowUp(recipe,guided);
-      if(sourceInfo?.large&&!exportSource&&originalFile){
+      if(sourceInfo?.large&&originalFile){
         send({type:'progress',gen,request,progress:1});decoding=new AbortController();
         const decoded=await decodePhoto(originalFile,{mode,device,preview:false,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
-        if(gen!==generation){decoded.bitmap.close();return;}exportSource=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
+        if(gen!==generation){decoded.bitmap.close();return;}decodedForExport=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
       }
-      const bitmap=exportSource??source;
+      const bitmap=decodedForExport??source;
       const finish=currentPhotoFinish(recipe),autoContrastDisabled=finish!==undefined&&recipe.enhancement?.autoApplied===true;
       const settings=withoutAutoContrast(recipe.enhancement,finish),finishKernel=finish?photoFinishKernel(finish):undefined;
       let resolved=settings;
@@ -196,16 +200,18 @@ ctx.onmessage=async({data})=>{
       const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
       send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
-      }finally{canvas.width=1;canvas.height=1;strip.width=1;exportSource?.close();exportSource=null;}
+      }finally{canvas.width=1;canvas.height=1;strip.width=1;}
+      }finally{decodedForExport?.close();}
     } else if(type==='cancel') {generation=gen;decoding?.abort();}
-    else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;exportSource?.close();exportSource=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();followUpSuggestions.clear();photoFinishKernels.clear();}
+    else if(type==='unload'){generation=gen;decoding?.abort();source?.close();source=null;sourceInfo=null;sourceFile=null;pixels=null;fields=new Map();followUpSuggestions.clear();photoFinishKernels.clear();}
   } catch(error) {
+    if(type==='load'&&gen!==generation)return;
     if((type==='render'||type==='enhance')&&request!==latestPreviewRequest)return;
     if(type==='finish'&&(gen!==generation||request!==latestPreviewRequest))return;
     if(type==='custom-model'&&data.silent)return;
     const fallback=type==='custom-model'?'Could not load this ONNX file. Use a compatible self-contained image model.':'The photo could not be processed.';
     if(type==='custom-model')console.error(error);
-    const classified=type==='custom-model'?error instanceof Error?error:new Error(fallback):classifyMediaFailure(error instanceof Error?error:new Error(fallback),platform,type==='export'?'export':'load');
+    const classified=type==='custom-model'?error instanceof Error?error:new Error(fallback):classifyMediaFailure(error instanceof Error?error:new Error(fallback),platform,type==='export'?'export':type==='load'?'photo-load':'photo-process');
     const limit=classified instanceof PlatformLimitError?classified:undefined;
     send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
   }

@@ -1,5 +1,14 @@
 # Adaptive photo colour-and-tone finish plan
 
+## Photo finish mobile layout and JPG switching fix (20 October 2026)
+
+- [x] Add 12px above the optional photo-finish description, equally sized 40px look buttons matching Auto enhance, and right-aligned Update finish. Production mobile layout checks pass at 320/390px in EN/zh-HK/ja; screenshot inspected.
+- [x] Close the selection-commit/passive-load stale-reply window by invalidating worker generations during the selection commit. JPG decode checks cancellation after header/decode/resize work, closes late bitmaps, and drops obsolete load errors. Export owns its full-resolution decoded bitmap per request, preventing an old cleanup from closing a newer export bitmap; cleanup also covers setup failures.
+- [x] Photo decode and processing failures no longer pass through the video-specific MP4 advice. Preserve typed platform limits, memory errors and actionable RAW/custom-model diagnostics; add photo-specific wording using the glossary. Video messages and platform limits stay unchanged.
+- [x] 261 shared tests across 39 files and production build pass, including bitmap ownership, late JPG cancellation and photo/video classification. Production finish lifecycle/all-engine/custom ONNX/strip parity/video exclusion/translated layouts and legacy enhancement, iPhone-browser Save/Share, output destinations and mocked iOS shell pass. Independent code review found no further actionable issue. The legacy broad limit-browser harness is inconclusive here: its hardcoded external fixtures are missing, and Windows WebKit reports worker origin failures; do not count it as passing.
+- [x] Repeated-JPG production browser check passes: held old render bitmap and injected old MP4 error cannot overwrite the new photo or show a toast; switching back and forth completes. This validates stale-reply handling, not a physical-device reproduction.
+- [ ] Next action: build and verify an updated debug APK, then obtain Android hardware retest of the originally reported failure. The exact physical-device failure has not been reproduced locally; stale-reply/cancellation and shared error-classification defects were identified by source review. Existing finish performance and iPhone hardware gates remain open. Keep version 1.0.9/code 28 and all release defaults; no merge, release publication or version bump.
+
 ## Photo-finish debug APK checkpoint (20 October 2026)
 
 - [x] User accepted the stronger Vivid comparison visuals and requested an Android debug APK for device testing. Built from `097b37ffbb9072389b5f6d7f9d3354bbe805712a` on `codex/adaptive-finish-plan`; no runtime change in this checkpoint.

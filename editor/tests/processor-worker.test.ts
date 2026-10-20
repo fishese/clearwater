@@ -29,11 +29,12 @@ class FakeImageData {
  constructor(public data:Uint8ClampedArray,public width:number,public height:number){}
 }
 class FakeCanvas {
+ static throwOnPut=false;
  static lastBlobOptions:{type?:string;quality?:number}|undefined;
  static lastImageData:FakeImageData|undefined;
  constructor(public width:number,public height:number){}
  getContext(){return {
-  drawImage:vi.fn(),clearRect:vi.fn(),putImageData:(image:FakeImageData)=>{FakeCanvas.lastImageData=image;},
+  drawImage:vi.fn(),clearRect:vi.fn(),putImageData:(image:FakeImageData)=>{if(FakeCanvas.throwOnPut)throw new Error('Canvas state was lost.');FakeCanvas.lastImageData=image;},
   getImageData:()=>{const data=new Uint8ClampedArray(this.width*this.height*4);for(let i=0;i<data.length;i+=4){data[i]=40;data[i+1]=80;data[i+2]=120;data[i+3]=255;}return {data,width:this.width,height:this.height};},
  };}
  transferToImageBitmap(){return {width:this.width,height:this.height,close:vi.fn()};}
@@ -41,7 +42,7 @@ class FakeCanvas {
 }
 
 describe('photo processor request sequencing',()=>{
- afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();vi.clearAllMocks();FakeCanvas.lastImageData=undefined;});
+ afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();vi.clearAllMocks();FakeCanvas.lastImageData=undefined;FakeCanvas.throwOnPut=false;});
 
  it('drops superseded same-file previews and skips auto analysis for disabled enhancement',async()=>{
   const messages:Record<string,unknown>[]=[];
@@ -92,6 +93,19 @@ describe('photo processor request sequencing',()=>{
   expect(messages.filter(message=>message.type==='error').map(message=>message.request)).toEqual([21]);
  });
 
+ it('uses photo processing copy for a generic worker render failure',async()=>{
+  const messages:Record<string,unknown>[]=[];
+  const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
+  vi.stubGlobal('self',scope);vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
+  await import('../src/processor.worker');
+  const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
+  await handler({data:{type:'load',gen:1,blob:new Blob()}});
+  FakeCanvas.throwOnPut=true;
+  const recipe=makeRecipe(analyse(new Uint8ClampedArray([40,80,120,255]),1,1));
+  await handler({data:{type:'render',gen:1,request:22,recipe}});
+  expect(messages.find(message=>message.type==='error'&&message.operation==='render')?.message).toBe('The photo could not be processed.');
+ });
+
  it('uses the requested JPEG quality while keeping the default at 0.95',async()=>{
   const messages:Record<string,unknown>[]=[];
   const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
@@ -104,6 +118,42 @@ describe('photo processor request sequencing',()=>{
   expect(FakeCanvas.lastBlobOptions).toEqual({type:'image/jpeg',quality:.99});
   await handler({data:{type:'export',gen:1,request:2,recipe,format:'jpg',keepMetadata:false}});
   expect(FakeCanvas.lastBlobOptions).toEqual({type:'image/jpeg',quality:.95});
+ });
+
+ it('does not let an older photo export close the newly selected photo export bitmap',async()=>{
+  const messages:Record<string,unknown>[]=[];
+  const scope={postMessage:(message:Record<string,unknown>)=>messages.push(message)};
+  vi.stubGlobal('self',scope);vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
+  const stripWaiters:Array<()=>void>=[];
+  vi.stubGlobal('setTimeout',(callback:()=>void)=>{stripWaiters.push(callback);return 0;});
+  const decode=await import('../src/photo-decode');
+  const bitmap=()=>({width:2,height:2,close:vi.fn()});
+  const firstSource=bitmap(),firstExport=bitmap(),secondSource=bitmap(),secondExport=bitmap();
+  const info={sourceWidth:2,sourceHeight:2,exportWidth:2,exportHeight:2,large:true,raw:false,mode:'auto' as const};
+  vi.mocked(decode.decodePhoto)
+   .mockResolvedValueOnce({bitmap:firstSource as unknown as ImageBitmap,info})
+   .mockResolvedValueOnce({bitmap:firstExport as unknown as ImageBitmap,info})
+   .mockResolvedValueOnce({bitmap:secondSource as unknown as ImageBitmap,info})
+   .mockResolvedValueOnce({bitmap:secondExport as unknown as ImageBitmap,info});
+  await import('../src/processor.worker');
+  const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
+  const recipe=makeRecipe(analyse(new Uint8ClampedArray([40,80,120,255]),1,1));
+  await handler({data:{type:'load',gen:1,blob:new Blob()}});
+  const first=handler({data:{type:'export',gen:1,request:1,recipe,format:'png',keepMetadata:false}});
+  for(let i=0;i<10&&stripWaiters.length<1;i++)await Promise.resolve();
+  expect(stripWaiters).toHaveLength(1);
+
+  await handler({data:{type:'load',gen:2,blob:new Blob()}});
+  const second=handler({data:{type:'export',gen:2,request:2,recipe,format:'png',keepMetadata:false}});
+  for(let i=0;i<10&&stripWaiters.length<2;i++)await Promise.resolve();
+  expect(stripWaiters).toHaveLength(2);
+
+  stripWaiters[0]();
+  await first;
+  expect(secondExport.close).not.toHaveBeenCalled();
+  stripWaiters[1]();
+  await second;
+  expect(secondExport.close).toHaveBeenCalledOnce();
  });
 
  it('reuses cached AI inference when Balanced after AI strength or dive hints change',async()=>{

@@ -220,12 +220,20 @@ function isGenericDecodeMessage(message:string):boolean {
  return message==='This video could not be processed.'||message==='The photo could not be processed.';
 }
 /** Log the underlying failure, then return the specific limit error or the original diagnostic. */
-export function classifyMediaFailure(error:unknown,platform:MediaPlatform,operation:'load'|'export'|'decode'):Error {
+export function classifyMediaFailure(error:unknown,platform:MediaPlatform,operation:'load'|'export'|'decode'|'photo-load'|'photo-process'):Error {
  console.error(error instanceof PlatformLimitError?error.cause??error:error);
  if(error instanceof PlatformLimitError)return error;
  if(error instanceof Error&&error.name==='VideoTransientError')return error;
  if(isMemoryFailure(error)||(operation==='export'&&isEncoderFailure(error)))return new PlatformLimitError('out-of-memory',platform,undefined,error);
  const message=error instanceof Error?error.message:'';
+ if(operation==='photo-load'){
+  if(/^(Could not develop this DNG\.|RAW decoder stopped\.|RAW decoder unavailable\.)/.test(message))return error as Error;
+  return new Error("Couldn't read this photo. Try exporting a fresh copy.", {cause:error});
+ }
+ if(operation==='photo-process'){
+  if(/^(Load the matching|Balanced after AI)/.test(message))return error as Error;
+  return new Error('The photo could not be processed.', {cause:error});
+ }
  if(/unsupported configuration/i.test(message))return new Error('This device cannot decode or encode this video configuration. HEVC support varies by device. Try an H.264 SDR copy.');
  const knownDiagnostic=/^(This browser cannot decode|This device cannot decode|This device cannot encode|H\.264 video encoding is unavailable|The video decoder stopped|The video file stopped|Video processing stopped|Video export produced no output|This audio format cannot|A video export is already|Open a video first|Load the matching|Balanced after AI|Video load cancelled|Export cancelled|Analysis cancelled|Could not develop this DNG)/;
  if(isGenericDecodeMessage(message)||operation==='decode'||(operation==='load'&&!knownDiagnostic.test(message)))return new PlatformLimitError('unreadable',platform,undefined,error);

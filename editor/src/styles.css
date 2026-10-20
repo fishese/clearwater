@@ -485,3 +485,9 @@ body.native-camera .camera-close-button{background:#101c20e8}
 .photo-select .gallery-placeholder{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#789a92;pointer-events:none}
 
 .about-index .about-other-projects{margin-left:auto;white-space:nowrap}
+
+/* Keep the optional photo finish separate from the Effects faders. */
+.enhancement-subpanel>.photo-finish-group>.group-content{padding-top:12px}
+.photo-finish-group>.group-content>p{margin-bottom:10px}
+.photo-finish-choices .button{flex:1;min-width:0;min-height:40px;padding:5px 10px;font-size:11px}
+.photo-finish-group .photo-finish-update{justify-content:flex-end}

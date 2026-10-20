@@ -315,6 +315,7 @@ try{
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'photo-finish-mobile.png',mimeType:'image/png',buffer:Buffer.from(png)});
  await ready();
  assert.equal(await page.locator('.photo-finish-group').count(),1,'photo finish controls return for photos');
+ await selectBalanced();await applyLook('Natural');
  for(const locale of ['en','zh-HK','ja']){
   await changeLanguage(page,locale);
   for(const width of [320,390]){
@@ -323,6 +324,17 @@ try{
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${locale} mobile layout overflows at ${width}px`);
    await page.getByRole('button',{name:locales[locale].Natural,exact:true}).waitFor({state:'visible'});
    await page.getByRole('button',{name:locales[locale].Vivid,exact:true}).waitFor({state:'visible'});
+   const layout=await page.locator('.photo-finish-group').evaluate(group=>{
+    const content=group.querySelector('.group-content'),description=content.querySelector('p');
+    const auto=document.querySelector('.auto-enhance-button').getBoundingClientRect();
+    const choices=Array.from(group.querySelectorAll('.photo-finish-choices button'),button=>{const box=button.getBoundingClientRect();return {width:box.width,height:box.height};});
+    const update=group.querySelector('.photo-finish-update button').getBoundingClientRect();
+    return {space:description.getBoundingClientRect().top-content.getBoundingClientRect().top,autoHeight:auto.height,choices,rightGap:content.getBoundingClientRect().right-update.right};
+   });
+   assert.ok(layout.space>=10,`${locale} finish description needs space above it at ${width}px`);
+   assert.ok(layout.choices.every(button=>button.height>=layout.autoHeight),`${locale} finish choices match Auto enhance height`);
+   assert.ok(Math.max(...layout.choices.map(button=>button.width))-Math.min(...layout.choices.map(button=>button.width))<1,'finish choices have equal widths');
+   assert.ok(Math.abs(layout.rightGap)<2,'Update finish aligns to the right edge');
    if(width===390)await page.screenshot({path:resolve(output,`${locale}-effects.png`),fullPage:true});
   }
  }

@@ -390,6 +390,7 @@
   "Ran out of memory. Try Reduced quality or a shorter clip.": "メモリが不足しました。「軽量」画質か短いクリップでお試しください。",
   "HDR video isn't supported here yet. Export an SDR copy first.": "この環境ではHDR動画に未対応です。SDR版を書き出してからお試しください。",
   "Couldn't read this file. Re-export it as a standard MP4.": "このファイルを読み込めません。標準のMP4で書き出し直してください。",
+  "Couldn't read this photo. Try exporting a fresh copy.": "写真を読み込めません。新しいコピーを書き出してお試しください。",
   "This video resolution is too large for the editor. Use a smaller copy.": "動画の解像度が高すぎます。小さいコピーを使ってください。",
   "Could not decode the first video frame.": "最初の動画フレームを読み込めません。",
   "A video export is already running.": "動画の書き出しが実行中です。",
