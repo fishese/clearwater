@@ -53,11 +53,13 @@ try{
   async function blobToBase64(blob){return await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(blob);});}
  });
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles(images.map(item=>({name:item.name,mimeType:item.type,buffer:Buffer.from(item.base64,'base64')})));
- const ready=()=>page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false).catch(async error=>{
+ const ready=()=>page.waitForFunction(()=>document.querySelector('.photo-tile')&&document.querySelector('canvas[aria-label="Edited photo"]')&&window.__photoSwitchCheck.messages.some(message=>message.type==='render')).catch(async error=>{
   console.error('PHOTO SWITCH READINESS FAILED',JSON.stringify({errors,body:(await page.locator('body').innerText()).slice(0,1400),messages:await page.evaluate(()=>window.__photoSwitchCheck.messages.slice(-12).map(({type,gen,request})=>({type,gen,request})))}));
   throw error;
  });
  const navigate=async name=>page.getByRole('button',{name,exact:true}).evaluate(button=>button.click());
+ const renderCount=()=>page.evaluate(()=>window.__photoSwitchCheck.messages.filter(message=>message.type==='render').length);
+ const waitForRenderAfter=count=>page.waitForFunction(count=>window.__photoSwitchCheck.messages.filter(message=>message.type==='render').length>count,count);
  const settled=()=>page.waitForFunction(()=>{
   const state=window.__photoSwitchCheck,canvas=document.querySelector('canvas[aria-label="Edited photo"]');
   const last=state.messages.filter(message=>message.type==='render').at(-1);
@@ -74,7 +76,7 @@ try{
  const warmth=page.getByRole('slider',{name:'Warmth',exact:true});await warmth.focus();await page.keyboard.press('ArrowUp');
  await page.waitForFunction(()=>window.__photoSwitchCheck.held.length===1,{timeout:30000});
 
- await navigate('Next photo');await ready();await settled();
+ let previousRenderCount=await renderCount();await navigate('Next photo');await waitForRenderAfter(previousRenderCount);await settled();
  assert.equal(await page.getByLabel('Photo position',{exact:true}).innerText(),'2 / 2');
  const secondHash=await hash();assert.notEqual(secondHash,originalHash,'next JPG must load its own pixels');
  await page.evaluate(()=>window.__photoSwitchCheck.releaseHeld());
@@ -88,7 +90,7 @@ try{
 
  for(let i=0;i<3;i++){
   const direction=i%2===0?'Previous photo':'Next photo';
-  await navigate(direction);await ready();await settled();
+  previousRenderCount=await renderCount();await navigate(direction);await waitForRenderAfter(previousRenderCount);await settled();
  }
  assert.deepEqual(errors,[],'photo switching must not produce browser errors');
  console.log(`PASS ${process.env.CHECK_BROWSER==='webkit'?'WebKit ':''}${process.env.CHECK_IOS_SHELL==='1'?'mocked iOS shell ':''}held stale render and error replies are ignored while switching JPGs back and forth`);
