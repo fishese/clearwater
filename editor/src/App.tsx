@@ -28,7 +28,7 @@ import {getPlatformCapabilities} from './platform/capabilities';
 import {shareIOSFile} from './platform/ios-media';
 import {acknowledgeIOSCapture,deleteIOSCapture,drainIOSCaptures,getIOSCameraPreferences,isIOSCameraAvailable,listIOSCaptures,readIOSCaptureFile,saveIOSCaptureToPhotos,setIOSCaptureRecipe,setIOSCaptureVisible,shareIOSCapture,toIOSStoredPhotos} from './platform/ios-camera';
 import {videoPreviewPlayhead} from './core/video-preview-playback';
-import {invalidatePhotoFinish,isValidPhotoFinishSettings} from './core/photo-finish';
+import {hasPhotoFinishEffect,invalidatePhotoFinish,isValidPhotoFinishSettings} from './core/photo-finish';
 import {supportsFileShare,shareExport,isIOSWebBrowser} from './export-share';
 import './editor-preview.css';
 
@@ -158,9 +158,7 @@ export default function App() {
   const photoCount=folderBrowser?folderBrowser.photos.length:photos.length;
   const canEdit=!!recipe && ready && !busy && !exporting && !saving && !folderLoading && !customOpen && !iosWebSave;
   const finishSettings=recipe?.adaptiveFinish;
-  const photoFinishApplied=!!finishSettings&&finishSettings.amount>0&&isValidPhotoFinishSettings(finishSettings)&&finishSettings.fit.active&&(
-    finishSettings.fit.colourGains.some(gain=>gain!==1)||finishSettings.fit.toneScale!==1||finishSettings.fit.toneOffset!==0||(finishSettings.fit.chromaGain??1)!==1
-  );
+  const photoFinishApplied=!!finishSettings&&isValidPhotoFinishSettings(finishSettings)&&hasPhotoFinishEffect(finishSettings);
   const canExport=canEdit&&!rendering&&(!video||capabilities.videoExport)&&(capabilities.platform!=='ios'||capabilities.nativeMediaSave);
   const canSaveRecipe=canEdit&&!rendering&&(capabilities.platform!=='ios'||capabilities.nativeMediaSave);
   const aspect=dimensions[0]/dimensions[1];
@@ -666,7 +664,7 @@ export default function App() {
   }
   async function forgetSavedModel(){if(customLoading)return;try{await forgetCustomModel();setRememberedModel(null);notify(t("Saved custom model removed from this device."));}catch{notify(t("Could not remove the saved custom model."));}}
   function autoEnhance(){if(!canEdit||video||rendering)return;const id=++request.current;latest.current=id;autoEnhancementRequest.current=id;setBusy(t('Analysing photo enhancement…'));worker.current?.postMessage({type:'enhance',gen:generation.current,request:id,recipe});}
-  function enhance(key:'contrast'|'clarity'|'sharpness'|'brightness',value:number){update(r=>{const previous={...r.enhancement??DEFAULT_ENHANCEMENT},finish=r.adaptiveFinish;if(previous.autoApplied===true&&finish&&finish.amount>0&&isValidPhotoFinishSettings(finish)&&finish.fit.active&&(finish.fit.colourGains.some(gain=>gain!==1)||finish.fit.toneScale!==1||finish.fit.toneOffset!==0||(finish.fit.chromaGain??1)!==1))previous.contrast=0;delete previous.autoApplied;return {...r,enhancement:{...previous,[key]:value}};},false);}
+  function enhance(key:'contrast'|'clarity'|'sharpness'|'brightness',value:number){update(r=>{const previous={...r.enhancement??DEFAULT_ENHANCEMENT},finish=r.adaptiveFinish;if(previous.autoApplied===true&&finish&&isValidPhotoFinishSettings(finish)&&hasPhotoFinishEffect(finish))previous.contrast=0;delete previous.autoApplied;return {...r,enhancement:{...previous,[key]:value}};},false);}
   function updatePhotoFinish(look:NonNullable<Recipe['adaptiveFinish']>['look'],amount=recipe?.adaptiveFinish?.look===look?recipe.adaptiveFinish.amount:100){
     if(!canEdit||video||rendering||!recipe||!photo)return;
     const target=worker.current;if(!target){notify(t('Could not update photo finish.'));return;}

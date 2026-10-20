@@ -4,12 +4,14 @@ import type { AdaptivePhotoFinish, Recipe } from '../src/core/types';
 import {
   applyPhotoFinish,
   fitPhotoFinish,
+  hasPhotoFinishEffect,
   invalidatePhotoFinish,
   isValidPhotoFinishSettings,
   preparePhotoFinish,
   recipeFinishContext,
 } from '../src/core/photo-finish';
 import { applyAdaptiveFinishFast } from '../src/core/adaptive-finish-fast';
+import { fitAdaptiveFinish } from '../src/core/adaptive-finish';
 
 function gradient(width = 24, height = 24) {
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -46,7 +48,17 @@ describe('optional saved photo finish', () => {
       expect(restored.adaptiveFinish).toEqual(selected);
       expect(isValidPhotoFinishSettings(restored.adaptiveFinish)).toBe(true);
       expect(restored.adaptiveFinish?.fit.variant).toBe(look === 'natural' ? 'tone' : 'vivid');
+      expect(restored.adaptiveFinish?.fit.algorithmVersion).toBe(2);
     }
+  });
+
+  it('accepts versionless saved fits with their original tighter bounds', () => {
+    const current = settings('vivid');
+    const savedV1Fit = fitAdaptiveFinish(gradient(), 24, 24, 'vivid');
+    const legacy: AdaptivePhotoFinish = { ...current, fit: savedV1Fit };
+    expect(isValidPhotoFinishSettings(legacy)).toBe(true);
+    expect(parseRecipe(JSON.parse(JSON.stringify({ ...recipe(), adaptiveFinish: legacy }))).adaptiveFinish).toEqual(legacy);
+    expect(isValidPhotoFinishSettings({ ...legacy, fit: { ...savedV1Fit, colourGains: [1.3, 1, 1] } })).toBe(false);
   });
 
   it('mixes amount in the fast output pass and reuses a prepared kernel', () => {
@@ -64,6 +76,17 @@ describe('optional saved photo finish', () => {
     expect(half[7]).toBe(255);
   });
 
+  it('reports active V2 effects and supports explicit in-place application', () => {
+    const fullSettings = settings('vivid', 100), input = new Uint8ClampedArray([82, 145, 112, 255, 20, 92, 190, 255]);
+    expect(hasPhotoFinishEffect(fullSettings)).toBe(true);
+    expect(hasPhotoFinishEffect({ ...fullSettings, amount: 0 })).toBe(false);
+    const copied = applyPhotoFinish(input, 2, 1, fullSettings);
+    const owned = input.slice();
+    expect(applyPhotoFinish(owned, 2, 1, fullSettings, undefined, { inPlace: true })).toBe(owned);
+    expect(owned).toEqual(copied);
+    expect(input).not.toEqual(copied);
+  });
+
   it('rejects invalid look, amount, fit range, and mismatched fit variants', () => {
     const valid = settings();
     const invalid = [
@@ -74,12 +97,12 @@ describe('optional saved photo finish', () => {
       { ...valid, amount: -1 },
       { ...valid, amount: 100.01 },
       { ...valid, fit: { ...valid.fit, toneScale: Infinity } },
-      { ...valid, fit: { ...valid.fit, colourGains: [1, 2, 1] } },
+      { ...valid, fit: { ...valid.fit, colourGains: [1, 2.3, 1] } },
       { ...valid, fit: { ...valid.fit, sampleCount: 65_537 } },
       { ...valid, fit: { ...valid.fit, variant: 'vivid' } },
       { ...valid, fit: { ...valid.fit, reason: ['fit'] } },
       { ...valid, fit: { ...valid.fit, colourReason: ['fit'] } },
-      { ...valid, fit: { ...valid.fit, colourGains: [1.1, 1, 1] } },
+      { ...valid, fit: { ...valid.fit, colourGains: [2.21, 1, 1] } },
     ];
     for (const candidate of invalid) {
       expect(isValidPhotoFinishSettings(candidate)).toBe(false);

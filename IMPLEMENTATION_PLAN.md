@@ -1,5 +1,17 @@
 # Adaptive photo colour-and-tone finish plan
 
+## Current optional photo-finish checkpoint (20 October 2026)
+
+Branch `codex/adaptive-finish-plan` includes main through released 1.0.9. User selected **Off** for the existing restoration/edits, **Natural** as a restrained colour/tone middle ground, and **Vivid** for the stronger reference-inspired warm look. The feature stays opt-in and photo-only; all bundled engines and compatible custom ONNX use the same finish logic. Model defaults, recipes without a finish, inference reuse, video/live camera, Save/Share and platform-specific limits remain unchanged.
+
+- [x] P3 controls/guide/lifecycle committed as `fd11cfb`; local benchmark tooling/checkpoint as `d751af4`; 1.0.9 integration as `71d55a3`. Original stash `9bd4ff0`, other stashes and unrelated IDE files remain intact.
+- [x] New analyses store algorithmVersion 2. Natural combines mild estimated colour balance and restrained tone. Vivid uses bounded green/yellow/violet subject evidence, selective warm separation, denser midtones, protected shadows and a soft positive-tone highlight shoulder. Versionless stored fits retain V1 rendering; old candidate output hashes pass. Known physical-red-filter correction disables colour/chroma/warm shifts. Poor/weak-red evidence safely falls back.
+- [x] Share active-effect detection between UI/worker, including warm-only saved fits. Apply only to worker-owned corrected preview/strip buffers in place, removing one extra RGBA copy. One persisted fit, bounded reference/kernels and cached model inference serve preview/export.
+- [x] 258 shared tests across 38 files and production build pass. Independent review caught/fixed early-white highlight plateaus and a compiled/scalar water-guard mismatch; the new hue fixture and broader fast/reference checks retain the one-byte bound. No shadow-ramp reversal; alpha and legacy paths pass.
+- [x] Final comparisons: three private pairs × four engines × four treatments = 48; nine earlier protection samples × four engines × four treatments = 144. All 192 complete without engine/browser errors. Reports/full-preview outputs/crops are ignored under `analysis/adaptive-finish/benchmark-checked/` and `protection-checked/`. Earlier attempts remain separate. No private samples, reference images, manifests or generated comparisons are versioned or shipped.
+- [x] Production photo-finish regression: every bundled engine plus user-loaded compatible ONNX, pending-fit Save/Export locks, saved-fit JSON reuse, undo/redo/clear/reset/invalidation, exact opaque PNG strip parity, partial-alpha PNG within one RGB level/exact alpha, video exclusion, EN/zh-HK/ja mobile layouts and stale replies. Existing enhancement, iPhone browser Save/Share, output destination/collision/cancel and mocked iOS shell checks pass.
+- [ ] Next action: finish source-resolution desktop export timing and record actual cost, then obtain user visual feedback and real-phone cost/memory acceptance. Vivid is an estimated style, not true-colour recovery or an exact replica; some cyan rock texture and model-induced clipping/colour differences remain. Off/Natural remain useful alternatives. No feature merge, version bump, publication, native signing or installation is authorized.
+
 ## Resumed photo finish (20 October 2026)
 
 User resumed optional photo-only Natural/Vivid work after the 1.0.9 release and supplied three paired visual benchmarks. All six source/reference files and generated comparisons are gitignored; only general processing code and reusable tooling may be committed. The finish must be available for Balanced, every bundled neural engine and custom ONNX. No model-specific finish tuning or extra inference is intended.
@@ -50,9 +62,9 @@ Public inspiration: https://deepcolors.app/ describes hue adjustment, channel st
 | --- | --- | --- |
 | P0 | Review public examples/current renderer; record hypothesis, limits and baseline | Complete, 19 Oct; research only |
 | P1 | Isolated candidate transforms and comparison harness; compare current default and Auto enhance | Complete: 72295d2 baseline; 7557c4b adds bounded Vivid. Follow-up: 9 photos x 4 engines x 6 treatments, no engine/browser errors. Natural/Vivid selected as optional experiments |
-| P2 | Select candidate; store/reuse fit; integrate shared photo preview/export with legacy-safe validation | Complete: c1744a5; validated saved fits, shared preview/export, cached kernels/inference, legacy off path. 234 tests/build pass; performance target remains open in P4 |
+| P2 | Select candidate; store/reuse fit; integrate shared photo preview/export with legacy-safe validation | Complete: c1744a5 plus 20 Oct V2 styles. Versionless fits stay unchanged; shared effect gates and owned-buffer application. 258 tests/build pass; timing/human acceptance tracked in P4 |
 | P3 | Minimal optional Effects UI, translations, guide and undo/reset/preset behavior | Complete, 20 Oct: optional Off/Natural/Vivid UI, EN/zh-HK/ja and full lifecycle regression pass, including all bundled engines/custom ONNX, pending Save locks, video exclusion and stale replies. Next: revised-fit paired visuals/P4 |
-| P4 | Correctness, visual/performance checks, necessary native-shell acceptance and test handoff | In progress: legacy Effects, iOS web Save/Share, destination/cancel and mocked iOS shell checks pass. New finish regression, visual feedback, export/mobile cost and hardware gates remain |
+| P4 | Correctness, visual/performance checks, necessary native-shell acceptance and test handoff | Automated correctness/production regressions pass; 192 final comparisons have no errors. Source export timing in progress. User visual feedback, mobile cost/memory and hardware acceptance remain open; no release acceptance claimed |
 
 After each row, commit and replace its status with the commit, checks and precise next step. Record partial work/failures if quota interrupts. Numerical tests do not establish visual acceptance.
 

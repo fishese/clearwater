@@ -11,8 +11,10 @@ export interface AdaptiveFinishFastKernel {
   /** Tone-only fits use direct scalar math and no per-fit protection tables. */
   readonly toneOnly: boolean;
   readonly variant: AdaptiveFinishVariant;
+  readonly algorithmVersion: 1 | 2;
   readonly colourGains: readonly [number, number, number];
   readonly chromaGain: number;
+  readonly warmSeparation: number;
   readonly toneScale: number;
   readonly toneOffset: number;
   readonly linearByByte: Float32Array;
@@ -37,6 +39,11 @@ const smooth = (low: number, high: number, value: number) => {
 const decode = (value: number) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
 const encode = (value: number) => value <= .0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - .055;
 const luminance = (r: number, g: number, b: number) => .2126 * r + .7152 * g + .0722 * b;
+const softenPositiveToneRatio = (targetRatio: number, headroom: number) => {
+  if (targetRatio <= 1) return targetRatio;
+  const room = Math.max(0, headroom - 1), delta = targetRatio - 1;
+  return 1 + room * delta / Math.max(room + delta, 1e-8);
+};
 
 const SHARED_TABLES = (() => {
   const linearByByte = new Float32Array(256);
@@ -55,14 +62,18 @@ const SHARED_TABLES = (() => {
 const compiledFits = new Map<string, AdaptiveFinishFastKernel>();
 
 function isValidFit(fit: AdaptiveFinishFit): boolean {
-  return !!fit && typeof fit === 'object' && ['tone', 'colour-tone', 'soft-water', 'vivid'].includes(fit.variant) &&
+  const v2 = !!fit && fit.algorithmVersion === 2;
+  const hasWarm = fit?.warmSeparation !== undefined;
+  return !!fit && typeof fit === 'object' && (fit.algorithmVersion === undefined || v2) && ['tone', 'colour-tone', 'soft-water', 'vivid'].includes(fit.variant) &&
     typeof fit.active === 'boolean' && Number.isInteger(fit.sampleCount) && fit.sampleCount >= 0 &&
     Array.isArray(fit.colourGains) && fit.colourGains.length === 3 &&
     ['fit', 'protected-surface', 'weak-channel'].includes(fit.colourReason) &&
-    fit.colourGains.every(gain => Number.isFinite(gain) && gain >= .82 && gain <= 1.2) &&
+    fit.colourGains.every(gain => Number.isFinite(gain) && gain >= (v2 ? .65 : .82) && gain <= (v2 ? 2.2 : 1.2)) &&
     (fit.chromaGain === undefined || (Number.isFinite(fit.chromaGain) && fit.chromaGain >= 1 && fit.chromaGain <= 1.15)) &&
-    Number.isFinite(fit.toneScale) && fit.toneScale >= .88 && fit.toneScale <= 1.12 &&
-    Number.isFinite(fit.toneOffset) && fit.toneOffset >= -.045 && fit.toneOffset <= .045;
+    (!hasWarm || (v2 && fit.variant === 'vivid' && Number.isFinite(fit.warmSeparation) && fit.warmSeparation >= 0 && fit.warmSeparation <= .45)) &&
+    (!hasWarm || fit.colourReason === 'fit') &&
+    Number.isFinite(fit.toneScale) && fit.toneScale >= (v2 ? .78 : .88) && fit.toneScale <= (v2 ? 1.24 : 1.12) &&
+    Number.isFinite(fit.toneOffset) && fit.toneOffset >= (v2 ? -.10 : -.045) && fit.toneOffset <= (v2 ? .06 : .045);
 }
 
 /** Compile the bounded fit once; kernels can be reused for preview and strips. */
@@ -78,15 +89,17 @@ export function prepareAdaptiveFinishFast(fit: AdaptiveFinishFit): AdaptiveFinis
     }
   }
   const variant = valid ? fit.variant : 'tone';
+  const algorithmVersion: 1 | 2 = valid && fit.algorithmVersion === 2 ? 2 : 1;
   const colourGains = valid ? [...fit.colourGains] as [number, number, number] : [1, 1, 1] as const;
   const chromaGain = valid && fit.variant === 'vivid' && fit.colourReason === 'fit' ? fit.chromaGain ?? 1 : 1;
+  const warmSeparation = valid && fit.algorithmVersion === 2 && fit.variant === 'vivid' ? fit.warmSeparation ?? 0 : 0;
   const active = valid && fit.active;
   const identity = !active || (fit.toneScale === 1 && fit.toneOffset === 0 &&
-    colourGains[0] === 1 && colourGains[1] === 1 && colourGains[2] === 1 && chromaGain === 1);
+    colourGains[0] === 1 && colourGains[1] === 1 && colourGains[2] === 1 && chromaGain === 1 && warmSeparation === 0);
   // Any candidate whose saved colour/chroma terms are neutral can use the
   // compact tone path; this also covers protected vivid fallback fits.
   const toneOnly = active && !identity &&
-    colourGains[0] === 1 && colourGains[1] === 1 && colourGains[2] === 1 && chromaGain === 1;
+    colourGains[0] === 1 && colourGains[1] === 1 && colourGains[2] === 1 && chromaGain === 1 && warmSeparation === 0;
   const lumaTables = active && !identity && !toneOnly ? new Float32Array(LUMA_BINS * 3) : new Float32Array(0);
   const peakTables = active && !identity && !toneOnly ? new Float32Array(PEAK_BINS * 2) : new Float32Array(0);
   if (active && !identity && !toneOnly) {
@@ -94,17 +107,20 @@ export function prepareAdaptiveFinishFast(fit: AdaptiveFinishFit): AdaptiveFinis
       const value = index / (LUMA_BINS - 1), at = index * 3;
       lumaTables[at] = smooth(.025, .15, value);
       lumaTables[at + 1] = smooth(.025, .14, value);
-      lumaTables[at + 2] = clamp(value * fit.toneScale + fit.toneOffset) / Math.max(value, 1e-5);
+      const fittedLuma = clamp(value * fit.toneScale + fit.toneOffset);
+      const targetLuma = algorithmVersion === 2 ? Math.max(value * .55, fittedLuma) : fittedLuma;
+      lumaTables[at + 2] = targetLuma / Math.max(value, 1e-5);
     }
     for (let index = 0; index < PEAK_BINS; index++) {
       const value = index / 4096, at = index * 2;
       peakTables[at] = 1 - smooth(.82, .98, value);
-      peakTables[at + 1] = 1 - .45 * smooth(.86, .99, value);
+      const toneHighlightProtection = algorithmVersion === 2 && variant === 'vivid' ? 0 : .45;
+      peakTables[at + 1] = 1 - toneHighlightProtection * smooth(.86, .99, value);
     }
   }
   const toneScale = valid ? fit.toneScale : 1;
   const toneOffset = valid ? fit.toneOffset : 0;
-  const kernel = { valid, identity, toneOnly, variant, colourGains, chromaGain, toneScale, toneOffset, ...SHARED_TABLES, lumaTables, peakTables };
+  const kernel = { valid, identity, toneOnly, variant, algorithmVersion, colourGains, chromaGain, warmSeparation, toneScale, toneOffset, ...SHARED_TABLES, lumaTables, peakTables };
   if (cacheKey) {
     compiledFits.set(cacheKey, kernel);
     if (compiledFits.size > MAX_COMPILED_FITS) compiledFits.delete(compiledFits.keys().next().value!);
@@ -129,6 +145,9 @@ export function applyAdaptiveFinishFast(
   if (!kernel.valid || kernel.identity) return input;
   const out = options.inPlace ? input : new Uint8ClampedArray(input);
   const [redGain, greenGain, blueGain] = kernel.colourGains;
+  const warmSeparation = kernel.algorithmVersion === 2 && kernel.variant === 'vivid' ? kernel.warmSeparation : 0;
+  const useCoolWater = kernel.variant === 'soft-water' || kernel.variant === 'vivid' ||
+    (kernel.algorithmVersion === 2 && kernel.variant === 'tone' && kernel.colourGains.some(gain => gain !== 1));
   const { linearByByte, srgbByLinear, lumaTables, peakTables, waterTable, toneScale, toneOffset } = kernel;
   if (kernel.toneOnly) {
     for (let at = 0; at < input.length; at += 4) {
@@ -139,9 +158,14 @@ export function applyAdaptiveFinishFast(
       const y = luminance(r, g, b);
       if (y <= 1e-5) continue;
       const peak = Math.max(r, g, b);
-      const toneAmount = smooth(.025, .14, y) * (1 - .45 * smooth(.86, .99, peak));
-      const targetLuma = clamp(y * toneScale + toneOffset);
-      const ratio = Math.min(1 / Math.max(peak, 1e-5), 1 + (targetLuma / y - 1) * toneAmount);
+      const toneHighlightProtection = kernel.algorithmVersion === 2 && kernel.variant === 'vivid' ? 0 : .45;
+      const toneAmount = smooth(.025, .14, y) * (1 - toneHighlightProtection * smooth(.86, .99, peak));
+      const fittedLuma = clamp(y * toneScale + toneOffset);
+      const targetLuma = kernel.algorithmVersion === 2 ? Math.max(y * .55, fittedLuma) : fittedLuma;
+      const headroom = 1 / Math.max(peak, 1e-5), targetRatio = targetLuma / y;
+      const ratio = kernel.algorithmVersion === 2
+        ? 1 + (softenPositiveToneRatio(targetRatio, headroom) - 1) * toneAmount
+        : Math.min(headroom, 1 + (targetRatio - 1) * toneAmount);
       if (ratio === 1) continue;
       out[at] = srgbByLinear[Math.round(clamp(r * ratio) * 4096)] * 255;
       out[at + 1] = srgbByLinear[Math.round(clamp(g * ratio) * 4096)] * 255;
@@ -165,13 +189,16 @@ export function applyAdaptiveFinishFast(
     const lumaIndex = Math.min(LUMA_BINS - 1, Math.round(originalLuma * (LUMA_BINS - 1)));
     const peakIndex = Math.min(PEAK_BINS - 1, Math.round(Math.max(r, g, b) * 4096));
     const lumaAt = lumaIndex * 3, peakAt = peakIndex * 2;
-    const useCoolWater = kernel.variant === 'soft-water' || kernel.variant === 'vivid';
     let coolWater = 0;
     if (useCoolWater) {
-      const cyan = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((g - r - .025) / .22 * 8192 + 8192)))];
-      const blue = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((b - r - .035) / .28 * 8192 + 8192)))];
-      const cool = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((g + b - 2 * r - .06) / .34 * 8192 + 8192)))];
-      coolWater = Math.max(cyan * .72, blue * .42, cool * .35);
+      if (kernel.algorithmVersion === 2) {
+        coolWater = clamp(smooth(.06, .3, b - r) * (1 - .8 * smooth(.015, .18, g - b)));
+      } else {
+        const cyan = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((g - r - .025) / .22 * 8192 + 8192)))];
+        const blue = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((b - r - .035) / .28 * 8192 + 8192)))];
+        const cool = waterTable[Math.min(DIFFERENCE_BINS - 1, Math.max(0, Math.round((g + b - 2 * r - .06) / .34 * 8192 + 8192)))];
+        coolWater = Math.max(cyan * .72, blue * .42, cool * .35);
+      }
     }
     let colourAmount = lumaTables[lumaAt] * peakTables[peakAt];
     if (useCoolWater) colourAmount *= 1 - .68 * coolWater;
@@ -194,12 +221,46 @@ export function applyAdaptiveFinishFast(
       else if (b < y - 1e-6) gain = Math.min(gain, y / (y - b));
       r = y + (r - y) * gain; g = y + (g - y) * gain; b = y + (b - y) * gain;
     }
+    if (warmSeparation > 0) {
+      const warmLuma = luminance(r, g, b), warmPeak = Math.max(r, g, b);
+      const protection = smooth(.025, .14, warmLuma) * (1 - smooth(.82, .98, warmPeak)) * (1 - .8 * coolWater);
+      const strength = Math.min(.9, warmSeparation * 2) * protection;
+      const greenLead = smooth(.03, .3, (g - r) / Math.max(g, .03));
+      const nonBlueSubject = 1 - smooth(-.18, .03, (b - g) / Math.max(g, .03));
+      const greenAmount = strength * greenLead * nonBlueSubject;
+      const supportedRed = smooth(.65, .95, r / Math.max(g, .03));
+      const redOverBlue = smooth(.22, .55, r / Math.max(b, .03));
+      const violetBlue = smooth(.05, .35, (b - g) / Math.max(b, .03));
+      const purpleLead = supportedRed * redOverBlue * violetBlue;
+      const purpleAmount = strength * purpleLead;
+      const yellowLead = smooth(.08, .4, (Math.min(r, g) - b) / Math.max(Math.min(r, g), .03));
+      const balancedYellow = smooth(.45, .9, Math.min(r, g) / Math.max(r, g, .03));
+      const yellowAmount = strength * yellowLead * balancedYellow;
+      if (greenAmount > 0) {
+        const warmRed = Math.min(1, g * 1.6);
+        const warmBlue = Math.min(b, Math.min(warmRed, g) * .52);
+        r += (warmRed - r) * greenAmount;
+        b += (warmBlue - b) * greenAmount;
+      }
+      if (purpleAmount > 0) {
+        const warmRed = Math.min(1, Math.max(r, b * 1.75));
+        const warmBlue = Math.min(b, warmRed * .4);
+        r += (warmRed - r) * purpleAmount;
+        b += (warmBlue - b) * purpleAmount;
+      }
+      if (yellowAmount > 0) {
+        r += (Math.min(1, Math.max(r, g * 1.6)) - r) * yellowAmount;
+        b *= 1 - .8 * yellowAmount;
+      }
+    }
     const changedLuma = luminance(r, g, b);
     const colourRatio = originalLuma / Math.max(changedLuma, 1e-5);
     const targetRatio = lumaTables[lumaAt + 2];
     r *= colourRatio; g *= colourRatio; b *= colourRatio;
     const headroom = 1 / Math.max(r, g, b, 1e-5);
-    const ratio = Math.min(headroom, 1 + (targetRatio - 1) * toneAmount);
+    const ratio = kernel.algorithmVersion === 2
+      ? 1 + (softenPositiveToneRatio(targetRatio, headroom) - 1) * toneAmount
+      : Math.min(headroom, 1 + (targetRatio - 1) * toneAmount);
     r *= ratio; g *= ratio; b *= ratio;
     out[at] = srgbByLinear[Math.round(clamp(r) * 4096)] * 255;
     out[at + 1] = srgbByLinear[Math.round(clamp(g) * 4096)] * 255;

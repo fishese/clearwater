@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAdaptiveFinish, fitAdaptiveFinish } from '../src/core/adaptive-finish';
+import { applyAdaptiveFinish, fitAdaptiveFinish, fitAdaptiveFinishV2 } from '../src/core/adaptive-finish';
 import { applyAdaptiveFinishFast, prepareAdaptiveFinishFast } from '../src/core/adaptive-finish-fast';
 
 function gradient(width = 48, height = 40, neutral = false) {
@@ -164,6 +164,104 @@ describe('compiled adaptive finish experiment', () => {
       for (let at = 0; at < source.length; at++) if (at % 4 !== 3) maximumDelta = Math.max(maximumDelta, Math.abs(actual[at] - expected[at]));
       expect(maximumDelta).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('matches the versioned V2 water and bounded-channel path within one byte', () => {
+    const reference = new Uint8ClampedArray(64 * 64 * 4);
+    for (let pixel = 0; pixel < 64 * 64; pixel++) {
+      const value = 64 + ((pixel * 17) % 150), at = pixel * 4;
+      reference[at] = Math.round(value * .48);
+      reference[at + 1] = value;
+      reference[at + 2] = Math.round(value * .84);
+      reference[at + 3] = 255;
+    }
+    const fit = fitAdaptiveFinishV2(reference, 64, 64, 'vivid');
+    expect(fit.algorithmVersion).toBe(2);
+    expect(fit.colourGains[0]).toBeGreaterThan(1.2);
+    const input = new Uint8ClampedArray([
+      82, 145, 112, 255,
+      20, 92, 190, 255,
+      3, 5, 9, 255,
+      247, 236, 222, 255,
+      ...gradient(4, 2),
+    ]);
+    const expected = applyAdaptiveFinish(input, 6, 2, fit);
+    const actual = applyAdaptiveFinishFast(input, 6, 2, prepareAdaptiveFinishFast(fit));
+    let maximumDelta = 0;
+    for (let at = 0; at < input.length; at++) {
+      if (at % 4 === 3) expect(actual[at]).toBe(expected[at]);
+      else maximumDelta = Math.max(maximumDelta, Math.abs(actual[at] - expected[at]));
+    }
+    expect(maximumDelta).toBeLessThanOrEqual(1);
+  });
+
+  it('matches the V2 purple-subject warm mask while keeping blue water and malformed warm terms unchanged', () => {
+    const base = fitAdaptiveFinishV2(gradient(64, 40), 64, 40, 'vivid');
+    const fit = { ...base, warmSeparation: .4 };
+    const input = new Uint8ClampedArray([
+      124, 58, 116, 255, // supported magenta foreground
+      20, 92, 190, 255,  // blue water
+      30, 112, 164, 255, // cyan water
+      3, 5, 9, 255,      // noisy shadow
+    ]);
+    const expected = applyAdaptiveFinish(input, 4, 1, fit);
+    const actual = applyAdaptiveFinishFast(input, 4, 1, prepareAdaptiveFinishFast(fit));
+    const withoutWarm = applyAdaptiveFinish(input, 4, 1, { ...fit, warmSeparation: 0 });
+    let maximumDelta = 0;
+    for (let at = 0; at < input.length; at++) {
+      if (at % 4 === 3) expect(actual[at]).toBe(expected[at]);
+      else maximumDelta = Math.max(maximumDelta, Math.abs(actual[at] - expected[at]));
+    }
+    expect(maximumDelta).toBeLessThanOrEqual(1);
+    expect(expected[0] - expected[2]).toBeGreaterThan(withoutWarm[0] - withoutWarm[2]);
+    expect(expected[4 + 2]).toBeGreaterThan(expected[4 + 1]);
+    expect(expected[12]).toBe(3);
+
+    const malformed = { ...fit, colourReason: 'weak-channel' as const };
+    expect(applyAdaptiveFinishFast(input, 4, 1, prepareAdaptiveFinishFast(malformed))).toBe(input);
+  });
+
+  it('keeps V2 negative-bias tone output monotone and within one byte of reference', () => {
+    const fit = {
+      variant: 'vivid' as const, algorithmVersion: 2 as const, active: true, reason: 'fit' as const,
+      sampleCount: 256, colourReason: 'fit' as const, colourGains: [1, 1, 1] as const, chromaGain: 1,
+      toneScale: 1.24, toneOffset: -.10,
+    };
+    const ramp = new Uint8ClampedArray(256 * 4);
+    for (let value = 0; value < 256; value++) ramp.set([value, value, value, 255], value * 4);
+    const expected = applyAdaptiveFinish(ramp, 256, 1, fit);
+    const actual = applyAdaptiveFinishFast(ramp, 256, 1, prepareAdaptiveFinishFast(fit));
+    for (let value = 1; value < 256; value++) {
+      expect(expected[value * 4]).toBeGreaterThanOrEqual(expected[(value - 1) * 4]);
+      expect(actual[value * 4]).toBeGreaterThanOrEqual(actual[(value - 1) * 4]);
+    }
+    expect(expected[243 * 4]).toBeLessThan(255);
+    expect(new Set(Array.from({ length: 13 }, (_, index) => expected[(243 + index) * 4])).size).toBeGreaterThan(1);
+    let maximumDelta = 0;
+    for (let at = 0; at < ramp.length; at++) maximumDelta = Math.max(maximumDelta, Math.abs(actual[at] - expected[at]));
+    expect(maximumDelta).toBeLessThanOrEqual(1);
+  });
+
+  it('matches V2 selective violet/yellow warm masks against the reference', () => {
+    const fit = {
+      variant: 'vivid' as const, algorithmVersion: 2 as const, active: true, reason: 'fit' as const,
+      sampleCount: 256, colourReason: 'fit' as const, colourGains: [1, 1, 1] as const,
+      chromaGain: 1, warmSeparation: .45, toneScale: 1, toneOffset: 0,
+    };
+    const source = new Uint8ClampedArray([
+      104, 105, 140, 255,
+      190, 160, 80, 255,
+      20, 92, 190, 255,
+      128, 128, 128, 255,
+    ]);
+    const expected = applyAdaptiveFinish(source, 4, 1, fit);
+    const actual = applyAdaptiveFinishFast(source, 4, 1, prepareAdaptiveFinishFast(fit));
+    let maximumDelta = 0;
+    for (let at = 0; at < source.length; at++) maximumDelta = Math.max(maximumDelta, Math.abs(actual[at] - expected[at]));
+    expect(maximumDelta).toBeLessThanOrEqual(1);
+    expect(expected[0] - expected[2]).toBeGreaterThan(source[0] - source[2]);
+    expect(expected[4] - expected[6]).toBeGreaterThan(source[4] - source[6]);
+    expect(expected.slice(8)).toEqual(source.slice(8));
   });
 
   it('uses the same error for mismatched dimensions and reuses a kernel across strips', () => {

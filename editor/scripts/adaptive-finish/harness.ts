@@ -169,7 +169,7 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
   const previewPixels = readPixels(previewCanvas, previewWidth, previewHeight);
   const crop = sourceCropPosition(spec, bitmap.width, bitmap.height), cropSource = squareCrop(bitmap, crop.x, crop.y, crop.width);
   const product=spec.productFinish===true, candidates:Candidate[]=product?['tone','vivid']:CANDIDATES;
-  const columns=product?['Corrected','Auto enhance','Natural','Vivid','Input','Benchmark reference']:COLUMNS;
+  const columns=product?['Off (current edits)','Auto enhance','Natural','Vivid','Input',...(spec.benchmark?['Benchmark reference']:[])]:COLUMNS;
   const outputs:{name:string;png:string}[]=[];
   const savePreview=(name:string,data:Uint8ClampedArray)=>{if(!product)return;const c=canvas(previewWidth,previewHeight);c.getContext('2d')!.putImageData(new ImageData(data,previewWidth,previewHeight),0,0);outputs.push({name,png:c.toDataURL('image/png')});};
   let benchmarkPixels:Uint8ClampedArray|undefined,benchmarkCrop:Uint8ClampedArray|undefined;
@@ -213,8 +213,8 @@ window.runAdaptiveSample = async (spec, index, synthetic, engines) => {
       const correctedCropSource = guided ? transferField(cropBaseSource, crop.width, crop.height, guided, crop.y, bitmap.height, crop.x, bitmap.width) : undefined;
       const correctedCrop = renderPixels(cropBaseSource, recipe, correctedCropSource, followUp);
       const cropRendererMs = now() - cropRenderStart;
-      labelCell(wholeSheet, row, 0, correctedPreview, previewWidth, previewHeight, `${engineTitle} · corrected`, TILE_W, WHOLE_TILE_H, WHOLE_IMAGE_H);
-      labelCell(cropSheet, row, 0, correctedCrop, crop.width, crop.height, `${engineTitle} · corrected`, cropTileWidth, cropTileHeight, crop.height);
+      labelCell(wholeSheet, row, 0, correctedPreview, previewWidth, previewHeight, `${engineTitle} · ${product?'Off (current edits)':'corrected'}`, TILE_W, WHOLE_TILE_H, WHOLE_IMAGE_H);
+      labelCell(cropSheet, row, 0, correctedCrop, crop.width, crop.height, `${engineTitle} · ${product?'Off (current edits)':'corrected'}`, cropTileWidth, cropTileHeight, crop.height);
       const baseMetrics = metrics(correctedPreview);
       records.push({ sample: sampleId, category, engine, treatment: 'corrected baseline', inferenceCount: engine === 'balanced' ? 0 : 1, modelInferenceMs: inferenceMs, guidedFieldPreparationMs: prepareMs, previewTransferMs, previewRendererMs, warmPreviewRendererMs, cropRendererMs, preview: baseMetrics, crop: metrics(correctedCrop) });
 

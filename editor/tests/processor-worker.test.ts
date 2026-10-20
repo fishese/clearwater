@@ -13,7 +13,7 @@ const photoFinishMocks=vi.hoisted(()=>{
   applyPhotoFinish:vi.fn((pixels:Uint8ClampedArray)=>pixels),
  };
 });
-vi.mock('../src/core/photo-finish',()=>photoFinishMocks);
+vi.mock('../src/core/photo-finish',async importOriginal=>({...await importOriginal<Record<string,unknown>>(),...photoFinishMocks}));
 
 vi.mock('../src/photo-decode',()=>({decodePhoto:vi.fn(async()=>({
  bitmap:{width:2,height:2,close:vi.fn()},
@@ -148,6 +148,23 @@ describe('photo processor request sequencing',()=>{
   expect(models.inferField).toHaveBeenCalledOnce();
   expect(messages.some(message=>message.type==='rendered'&&message.request===51)).toBe(true);
   expect(messages.some(message=>message.type==='exported'&&message.request===52)).toBe(true);
+ });
+
+ it('applies a saved warm-only finish to preview/export and suppresses automatic contrast',async()=>{
+  const scope={postMessage:vi.fn()};
+  vi.stubGlobal('self',scope);vi.stubGlobal('OffscreenCanvas',FakeCanvas);vi.stubGlobal('ImageData',FakeImageData);
+  await import('../src/processor.worker');
+  const handler=(scope as unknown as {onmessage:(event:{data:Record<string,unknown>})=>Promise<void>}).onmessage;
+  await handler({data:{type:'load',gen:1,blob:new Blob()}});
+  const recipe=makeRecipe(analyse(new Uint8ClampedArray([40,80,120,255]),1,1));
+  recipe.adaptiveFinish={look:'vivid',amount:100,fit:{variant:'vivid',algorithmVersion:2,active:true,reason:'fit',sampleCount:64,colourReason:'fit',colourGains:[1,1,1],toneScale:1,toneOffset:0,warmSeparation:.3}};
+  recipe.enhancement={...DEFAULT_ENHANCEMENT,contrast:80,autoApplied:true};
+  await handler({data:{type:'render',gen:1,request:54,recipe}});
+  await handler({data:{type:'export',gen:1,request:55,recipe,format:'png',keepMetadata:false}});
+  expect(photoFinishMocks.applyPhotoFinish).toHaveBeenCalledTimes(2);
+  for(const call of photoFinishMocks.applyPhotoFinish.mock.calls as unknown[][])expect(call[5]).toEqual({inPlace:true});
+  const {enhancePixels}=await import('../src/core/enhancement');
+  for(const call of vi.mocked(enhancePixels).mock.calls)expect(call[3]).toMatchObject({contrast:0});
  });
 
  it('preserves existing red correction when the recipe identifies a red filter',async()=>{

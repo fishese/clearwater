@@ -9,7 +9,7 @@ import {decodePhoto} from './photo-decode';
 import type {PhotoInfo,PhotoResolution,PhotoDevice} from './core/photo-size';
 import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancement';
 import {pickNeutralFromPixels} from './core/white-balance';
-import {applyPhotoFinish,fitPhotoFinish,isValidPhotoFinishSettings,preparePhotoFinish} from './core/photo-finish';
+import {applyPhotoFinish,fitPhotoFinish,hasPhotoFinishEffect,isValidPhotoFinishSettings,preparePhotoFinish} from './core/photo-finish';
 import {classifyMediaFailure,currentMediaPlatform,isMediaPlatform,PlatformLimitError,type MediaPlatform} from './core/platform-limits';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
@@ -62,18 +62,12 @@ function photoFinishKernel(settings:AdaptivePhotoFinish) {
   if(photoFinishKernels.size>=4)photoFinishKernels.delete(photoFinishKernels.keys().next().value!);
   photoFinishKernels.set(key,prepared);return prepared;
 }
-function hasPhotoFinishEffect(settings:AdaptivePhotoFinish) {
-  const fit=settings.fit;
-  return fit.active&&settings.amount>0&&(
-    fit.colourGains.some(gain=>gain!==1)||fit.toneScale!==1||fit.toneOffset!==0||(fit.chromaGain??1)!==1
-  );
-}
 function currentPhotoFinish(recipe:Recipe):AdaptivePhotoFinish|undefined {
   const settings=recipe.adaptiveFinish;
   return settings&&isValidPhotoFinishSettings(settings)&&hasPhotoFinishEffect(settings)?settings:undefined;
 }
 function finishPixels(input:Uint8ClampedArray,width:number,height:number,settings:AdaptivePhotoFinish|undefined) {
-  return settings?applyPhotoFinish(input,width,height,settings,photoFinishKernel(settings)):input;
+  return settings?applyPhotoFinish(input,width,height,settings,photoFinishKernel(settings),{inPlace:true}):input;
 }
 function withoutAutoContrast(settings:Recipe['enhancement'],finish:AdaptivePhotoFinish|undefined) {
   return finish&&settings?.autoApplied===true?{...settings,contrast:0}:settings;
@@ -190,7 +184,7 @@ ctx.onmessage=async({data})=>{
         const input=c.getImageData(0,0,bitmap.width,rows);
         const base=guided?transferField(input.data,bitmap.width,rows,guided,top,bitmap.height):undefined;
         const corrected=renderPixels(input.data,recipe,base,followUp);
-        const finishedBase=finish?applyPhotoFinish(corrected,bitmap.width,rows,finish,finishKernel):corrected;
+        const finishedBase=finish?applyPhotoFinish(corrected,bitmap.width,rows,finish,finishKernel,{inPlace:true}):corrected;
         const finished=enhancePixels(finishedBase,bitmap.width,rows,resolved,bitmap.width,bitmap.height);
         out.putImageData(new ImageData(finished,bitmap.width,rows),0,top,0,y-top,bitmap.width,height);
         send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});

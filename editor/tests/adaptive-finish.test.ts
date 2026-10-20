@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
-import { applyAdaptiveFinish, fitAdaptiveFinish } from '../src/core/adaptive-finish';
+import { applyAdaptiveFinish, fitAdaptiveFinish, fitAdaptiveFinishV2 } from '../src/core/adaptive-finish';
 
 function gradient(width = 32, height = 32, cast: 'red' | 'neutral' = 'red') {
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -10,6 +10,19 @@ function gradient(width = 32, height = 32, cast: 'red' | 'neutral' = 'red') {
     pixels[at] = cast === 'red' ? Math.min(242, value + 16) : value;
     pixels[at + 1] = value;
     pixels[at + 2] = cast === 'red' ? Math.max(12, value - 8) : value;
+    pixels[at + 3] = 255;
+  }
+  return pixels;
+}
+
+function greenCyanCast(width = 64, height = 64) {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const at = (y * width + x) * 4;
+    const value = 64 + ((x * 7 + y * 11) % 150);
+    pixels[at] = Math.round(value * .48);
+    pixels[at + 1] = value;
+    pixels[at + 2] = Math.round(value * .84);
     pixels[at + 3] = 255;
   }
   return pixels;
@@ -274,5 +287,118 @@ describe('adaptive finish candidate math', () => {
     const malformed = { ...valid, toneScale: Number.NaN };
     expect(applyAdaptiveFinish(pixels, 32, 32, malformed)).toBe(pixels);
     expect(() => applyAdaptiveFinish(pixels, 31, 32, valid)).toThrow('Adaptive finish dimensions do not match');
+  });
+
+  it('fits stronger V2 colour and tone parameters without changing legacy fit rendering', () => {
+    const reference = greenCyanCast();
+    const legacy = fitAdaptiveFinish(reference, 64, 64, 'vivid');
+    const naturalReference = gradient(64, 64, 'red');
+    const legacyNatural = fitAdaptiveFinish(naturalReference, 64, 64, 'tone');
+    const natural = fitAdaptiveFinishV2(naturalReference, 64, 64, 'tone');
+    const vivid = fitAdaptiveFinishV2(reference, 64, 64, 'vivid');
+    expect(natural.algorithmVersion).toBe(2);
+    expect(vivid.algorithmVersion).toBe(2);
+    expect(natural.variant).toBe('tone');
+    expect(vivid.variant).toBe('vivid');
+    expect(natural.toneScale).toBeGreaterThan(legacyNatural.toneScale);
+    expect(natural.toneScale).toBeLessThan(vivid.toneScale);
+    expect(natural.colourGains).not.toEqual([1, 1, 1]);
+    expect(vivid.colourReason).toBe('fit');
+    expect(vivid.warmSeparation).toBeGreaterThan(0);
+    expect(vivid.colourGains[0]).toBeGreaterThan(legacy.colourGains[0]);
+    expect(vivid.colourGains[1]).toBeLessThan(legacy.colourGains[1]);
+    expect(vivid.colourGains.every(gain => gain >= .65 && gain <= 2.2)).toBe(true);
+
+    const savedLegacy = JSON.parse(JSON.stringify(legacy)) as typeof legacy;
+    const source = new Uint8ClampedArray([82, 145, 112, 255, 24, 96, 184, 255]);
+    expect(applyAdaptiveFinish(source, 2, 1, savedLegacy)).toEqual(applyAdaptiveFinish(source, 2, 1, legacy));
+  });
+
+  it('limits V2 colour correction to supported highlights, preserves blue water, and protects filtered surface shots', () => {
+    const reference = greenCyanCast(), vivid = fitAdaptiveFinishV2(reference, 64, 64, 'vivid');
+    const target = new Uint8ClampedArray([82, 145, 112, 255]);
+    const blueWater = new Uint8ClampedArray([20, 92, 190, 255]);
+    const natural = fitAdaptiveFinishV2(reference, 64, 64, 'tone');
+    const vividTarget = applyAdaptiveFinish(target, 1, 1, vivid);
+    const naturalTarget = applyAdaptiveFinish(target, 1, 1, natural);
+    const vividWater = applyAdaptiveFinish(blueWater, 1, 1, vivid);
+    const naturalWater = applyAdaptiveFinish(blueWater, 1, 1, natural);
+    const distance = (a: Uint8ClampedArray, b: Uint8ClampedArray) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+    expect(distance(target, vividTarget)).toBeGreaterThan(distance(target, naturalTarget));
+    expect(distance(blueWater, vividWater)).toBeLessThan(distance(target, vividTarget));
+    expect(vividWater[2]).toBeGreaterThan(vividWater[1]);
+
+    const shadow = new Uint8ClampedArray([3, 5, 9, 255]);
+    expect(applyAdaptiveFinish(shadow, 1, 1, vivid)).toEqual(shadow);
+    const filtered = fitAdaptiveFinishV2(reference, 64, 64, 'vivid', { scene: 'surface', filter: 'yes' });
+    expect(filtered.algorithmVersion).toBe(2);
+    expect(filtered.colourReason).toBe('protected-surface');
+    expect(filtered.colourGains).toEqual([1, 1, 1]);
+    expect(filtered.warmSeparation).toBeUndefined();
+    expect(fitAdaptiveFinishV2(reference, 64, 64, 'tone').warmSeparation).toBeUndefined();
+  });
+
+  it('does not use V2 channel ratios when red support is only noisy shadow data', () => {
+    const weakRed = new Uint8ClampedArray(Array.from({ length: 64 * 64 }, (_, i) => {
+      const value = 72 + (i % 80);
+      return [2 + (i % 4), value, Math.min(250, value + 35), 255];
+    }).flat());
+    const fit = fitAdaptiveFinishV2(weakRed, 64, 64, 'vivid');
+    expect(fit.algorithmVersion).toBe(2);
+    expect(fit.colourReason).toBe('weak-channel');
+    expect(fit.colourGains).toEqual([1, 1, 1]);
+    expect(fit.warmSeparation).toBeUndefined();
+  });
+
+  it('keeps the V2 local warm term limited to valid Vivid fits', () => {
+    const pixels = new Uint8ClampedArray([124, 58, 116, 255]);
+    const valid = { ...fitAdaptiveFinishV2(greenCyanCast(), 64, 64, 'vivid'), warmSeparation: .4 };
+    const changed = applyAdaptiveFinish(pixels, 1, 1, valid);
+    const withoutWarm = applyAdaptiveFinish(pixels, 1, 1, { ...valid, warmSeparation: 0 });
+    expect(changed[0] - changed[2]).toBeGreaterThan(withoutWarm[0] - withoutWarm[2]);
+
+    for (const malformed of [
+      { ...valid, colourReason: 'weak-channel' as const },
+      { ...valid, variant: 'tone' as const },
+      { ...valid, warmSeparation: .46 },
+    ]) {
+      expect(applyAdaptiveFinish(pixels, 1, 1, malformed)).toBe(pixels);
+    }
+  });
+
+  it('keeps a strongly biased V2 tone curve monotone through shadows and midtones', () => {
+    const fit = {
+      variant: 'vivid' as const, algorithmVersion: 2 as const, active: true, reason: 'fit' as const,
+      sampleCount: 256, colourReason: 'fit' as const, colourGains: [1, 1, 1] as const, chromaGain: 1,
+      toneScale: 1.24, toneOffset: -.10,
+    };
+    const ramp = new Uint8ClampedArray(256 * 4);
+    for (let value = 0; value < 256; value++) ramp.set([value, value, value, 255], value * 4);
+    const out = applyAdaptiveFinish(ramp, 256, 1, fit);
+    for (let value = 1; value < 256; value++) {
+      expect(out[value * 4], `V2 ramp reverses at ${value}: ${out[(value - 1) * 4]} to ${out[value * 4]}`).toBeGreaterThanOrEqual(out[(value - 1) * 4]);
+      expect(out[value * 4]).toBe(out[value * 4 + 1]);
+      expect(out[value * 4]).toBe(out[value * 4 + 2]);
+    }
+    expect(out[243 * 4]).toBeLessThan(255);
+    expect(new Set(Array.from({ length: 13 }, (_, index) => out[(243 + index) * 4])).size).toBeGreaterThan(1);
+  });
+
+  it('warms supported violet and yellow subjects while leaving blue water neutral pixels alone', () => {
+    const fit = {
+      variant: 'vivid' as const, algorithmVersion: 2 as const, active: true, reason: 'fit' as const,
+      sampleCount: 256, colourReason: 'fit' as const, colourGains: [1, 1, 1] as const,
+      chromaGain: 1, warmSeparation: .45, toneScale: 1, toneOffset: 0,
+    };
+    const source = new Uint8ClampedArray([
+      104, 105, 140, 255, // blue-violet with red support
+      190, 160, 80, 255,  // balanced yellow foreground
+      20, 92, 190, 255,   // blue water
+      128, 128, 128, 255, // neutral
+    ]);
+    const warmed = applyAdaptiveFinish(source, 4, 1, fit);
+    expect(warmed[0] - warmed[2]).toBeGreaterThan(source[0] - source[2]);
+    expect(warmed[4] - warmed[6]).toBeGreaterThan(source[4] - source[6]);
+    expect(warmed.slice(8)).toEqual(source.slice(8));
   });
 });
