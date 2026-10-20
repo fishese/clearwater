@@ -1,5 +1,14 @@
 # Handoff
 
+## Authorized 1.0.10 release preparation (20 October 2026)
+
+User confirmed the updated Android test build works and authorized Safari/iOS verification, merge and release. This supersedes earlier no-merge/no-release instructions for this feature.
+
+- [x] Android device acceptance reported by the user. Prepare version 1.0.10, Android code 29 and unsigned physical-device iOS build 8 (iOS 26+), preserving signing identity and production defaults.
+- [ ] Verify the shared photo-switch fix with actual WebKit on macOS and the iOS shell integration path; run hosted iOS native regressions and physical-device packaging. A spoofed iPhone user agent or Chromium bridge mock alone is not Safari/WKWebView hardware evidence.
+- [ ] Merge the reviewed feature, deploy Pages, and build APK/IPA from the exact merged source. Verify versions, signatures, ZIP/model assets and source provenance; publish the coordinated release with canonical and versioned assets/checksums/licence notices.
+- [ ] Next action: finish the macOS WebKit release gate and source review before merge. Physical iPhone memory/performance and camera/lens acceptance remain manual limitations; desktop finish overhead remains above the initial 10% target. Keep the optional finish Off by default. Preserve ignored private samples, unrelated IDE files and all stashes.
+
 ## Photo finish mobile layout and JPG switching fix (20 October 2026)
 
 - [x] Add 12px above the optional photo-finish description, equally sized 40px look buttons matching Auto enhance, and right-aligned Update finish. Production mobile layout checks pass at 320/390px in EN/zh-HK/ja; screenshot inspected.
