@@ -227,7 +227,8 @@ export function classifyMediaFailure(error:unknown,platform:MediaPlatform,operat
  if(isMemoryFailure(error)||(operation==='export'&&isEncoderFailure(error)))return new PlatformLimitError('out-of-memory',platform,undefined,error);
  const message=error instanceof Error?error.message:'';
  if(/unsupported configuration/i.test(message))return new Error('This device cannot decode or encode this video configuration. HEVC support varies by device. Try an H.264 SDR copy.');
- if(isGenericDecodeMessage(message)||operation==='decode')return new PlatformLimitError('unreadable',platform,undefined,error);
+ const knownDiagnostic=/^(This browser cannot decode|This device cannot decode|This device cannot encode|H\.264 video encoding is unavailable|The video decoder stopped|The video file stopped|Video processing stopped|Video export produced no output|This audio format cannot|A video export is already|Open a video first|Load the matching|Balanced after AI|Video load cancelled|Export cancelled|Analysis cancelled|Could not develop this DNG)/;
+ if(isGenericDecodeMessage(message)||operation==='decode'||(operation==='load'&&!knownDiagnostic.test(message)))return new PlatformLimitError('unreadable',platform,undefined,error);
  return error instanceof Error?error:new Error(message||'This video could not be processed.');
 }
 

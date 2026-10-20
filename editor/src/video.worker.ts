@@ -54,14 +54,14 @@ ctx.onmessage=async({data})=>{
   if(type==='unload'){generation=gen;lastRequest++;nodes.clear();pendingNodes.clear();const previous=input,pending=conversion;input=undefined;track=undefined;sink=undefined;pixels=undefined;info=undefined;frameTime=-1;start=0;if(pending)await bounded(pending.cancel(),10000,'Video export cancellation timed out.').catch(()=>{});previous?.dispose();return;}
   if(type==='load'){
    generation=gen;lastRequest++;nodes.clear();pendingNodes.clear();const deadline=Date.now()+45000;const previous=input,pending=conversion;input=undefined;track=undefined;pixels=undefined;info=undefined;sink=undefined;frameTime=-1;start=0;if(pending)await bounded(pending.cancel(),10000,'Video export cancellation timed out.').catch(()=>{});previous?.dispose();if(gen!==generation)return;
-   if(typeof VideoDecoder==='undefined')throw new Error('This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.');
    assertVideoBytes(data.blob.size,platform);
    const opened=new Input({source:new BlobSource(data.blob),formats:[MP4,QTFF]});opening=opened;
-   const video=await readLoad(opened.getPrimaryVideoTrack(),deadline);checkLoad(gen);if(!video)throw new Error('No video track was found in this MP4/MOV file.');
+   const video=await readLoad(opened.getPrimaryVideoTrack(),deadline);checkLoad(gen);if(!video)throw new PlatformLimitError('unreadable',platform);
    const duration=await readLoad(opened.computeDuration(),deadline);checkLoad(gen);
    const width=await readLoad(video.getDisplayWidth(),deadline),height=await readLoad(video.getDisplayHeight(),deadline);checkLoad(gen);
    assertVideoDuration(duration,platform);
    assertVideoFrame(width,height,platform);
+   if(typeof VideoDecoder==='undefined')throw new Error('This browser cannot decode video for editing. Try a recent Chrome/Edge browser or the Android app.');
    const colorSpace=await readLoad(video.getColorSpace(),deadline);
    const codecString=await readLoad(video.getCodecParameterString(),deadline);
    if(hasHdrTransfer(colorSpace)||isDolbyVisionCodec(codecString)||await readLoad(hasDolbyVisionMetadata(data.blob),deadline)){
