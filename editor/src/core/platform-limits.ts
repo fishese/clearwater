@@ -9,34 +9,50 @@ export type LimitCode=(typeof LIMIT_CODES)[number];
 export interface PlatformLimits {
  videoBytes:number;
  videoSeconds:number;
+ /** Extra microseconds of measurement noise allowed above videoSeconds. Reject only when rounded microseconds exceed the limit plus this tolerance. */
+ videoDurationToleranceSeconds:number;
  videoFramePixels:number;
  photoBytes:number;
  photoPixels:number;
+ /** Auto photo export budget. Full remains available as an explicit choice. */
+ photoAutoPixels:number;
  photoDimension:number;
  exportBytes:number;
  compactExportBytes:number;
  sourceExportBytes:number;
 }
 
-function limits():PlatformLimits {
+function limits(overrides:Partial<PlatformLimits>={}):PlatformLimits {
  return {
   videoBytes:512*1024*1024,
   videoSeconds:600,
+  videoDurationToleranceSeconds:0.001,
   videoFramePixels:34_000_000,
   photoBytes:512*1024*1024,
   photoPixels:200_000_000,
+  photoAutoPixels:200_000_000,
   photoDimension:32_768,
   exportBytes:512*1024*1024,
   compactExportBytes:256*1024*1024,
   sourceExportBytes:512*1024*1024,
+  ...overrides,
  };
 }
 
-/** One row per runtime. Values match the ceilings enforced today; rows are independent so one platform cannot leak into another message. */
+/**
+ * iOS Safari, iOS Chrome (WebKit) and the iOS app share one WKWebView process with about a 1.5 GB jetsam limit.
+ * Source export keeps the finished MP4 in a BufferTarget and then copies it into a Blob, so a 512 MB file peaks near 1 GB before frames are counted.
+ * 256 MB input and source output leaves room for decoded frames. Auto photos stay near 24 MP (about 96 MB of RGBA) instead of decoding the original.
+ */
+function iosLimits():PlatformLimits {
+ return limits({videoBytes:256*1024*1024,sourceExportBytes:256*1024*1024,photoAutoPixels:24_000_000});
+}
+
+/** One row per runtime. Android and desktop keep the wider ceilings; iOS rows are lower because of WebKit memory. */
 export const PLATFORM_LIMITS:Record<MediaPlatform,PlatformLimits>={
  'android-apk':limits(),
- 'ios-app':limits(),
- 'ios-safari':limits(),
+ 'ios-app':iosLimits(),
+ 'ios-safari':iosLimits(),
  'android-chrome':limits(),
  desktop:limits(),
 };
@@ -148,11 +164,22 @@ export function assertVideoBytes(bytes:number,platform:MediaPlatform):void {
  const limit=limitsFor(platform).videoBytes;
  if(bytes>limit)throw new PlatformLimitError('too-large',platform,{unit:'bytes',actual:bytes,limit});
 }
-/** Allows the historical 10 ms float slack (`duration > limit + 0.01`). The displayed limit stays the table value. */
+/** Same boundary as Android HDR: rounded microseconds greater than videoSeconds plus videoDurationToleranceSeconds. */
+export function videoDurationExceeds(duration:number,platform:MediaPlatform):boolean {
+ const row=limitsFor(platform);
+ const actualUs=Math.round(duration*1_000_000);
+ const limitUs=Math.round(row.videoSeconds*1_000_000)+Math.round(row.videoDurationToleranceSeconds*1_000_000);
+ return actualUs>limitUs;
+}
 export function assertVideoDuration(duration:number,platform:MediaPlatform):void {
  const limit=limitsFor(platform).videoSeconds;
  if(!Number.isFinite(duration)||duration<=0)throw new PlatformLimitError('unreadable',platform);
- if(duration>limit+.01)throw new PlatformLimitError('too-long',platform,{unit:'seconds',actual:duration,limit});
+ if(videoDurationExceeds(duration,platform))throw new PlatformLimitError('too-long',platform,{unit:'seconds',actual:duration,limit});
+}
+/** Quarter-turns swap axes. Matches ClearWaterHdrPlugin after MediaFormat.KEY_ROTATION, and Mediabunny display size. */
+export function displayFrameSize(width:number,height:number,rotationDegrees:number):{width:number;height:number} {
+ const quarter=((Math.round(rotationDegrees/90)%4)+4)%4;
+ return quarter%2===1?{width:height,height:width}:{width,height};
 }
 export function assertVideoFrame(width:number,height:number,platform:MediaPlatform):void {
  const limit=limitsFor(platform).videoFramePixels;

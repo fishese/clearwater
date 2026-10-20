@@ -48,6 +48,8 @@ public class ClearWaterHdrPlugin extends Plugin {
     private static final long MAX_INPUT_BYTES = 512L * 1024 * 1024;
     private static final long MAX_OUTPUT_BYTES = 256L * 1024 * 1024;
     private static final long MAX_DURATION_US = 600_000_000L;
+    /** Matches videoDurationToleranceSeconds (0.001) in editor/src/core/platform-limits.ts. */
+    private static final long DURATION_TOLERANCE_US = 1_000L;
     private static final long MAX_FRAME_PIXELS = 34_000_000L;
     private static final int CHUNK_BYTES = 256 * 1024;
 
@@ -277,12 +279,17 @@ public class ClearWaterHdrPlugin extends Plugin {
                 }
             } finally { extractor.release(); }
             if (durationUs <= 0 || width <= 0 || height <= 0) throw new IOException("cw-limit/unreadable");
-            if (durationUs > MAX_DURATION_US) throw new IOException(limitToken("too-long", "seconds", (durationUs + 999_999L) / 1_000_000L, MAX_DURATION_US / 1_000_000L));
-            if ((long)width * height > MAX_FRAME_PIXELS) throw new IOException(frameToken(width, height));
+            if (durationUs > MAX_DURATION_US + DURATION_TOLERANCE_US) {
+                String token = String.format(Locale.US, "cw-limit/too-long/seconds/%.3f/%d", durationUs / 1_000_000d, MAX_DURATION_US / 1_000_000L);
+                Log.w(TAG, token);
+                throw new IOException(token);
+            }
             MediaItem mediaItem = MediaItem.fromUri(Uri.fromFile(job.input));
             if (rotation % 90 != 0) throw new IOException("This video's rotation metadata is not supported.");
+            // Display size, same as the editor's getDisplayWidth/Height. A quarter turn swaps axes; the pixel count does not change.
             int displayWidth = width, displayHeight = height;
             if (Math.floorMod(rotation, 180) != 0) { displayWidth = height; displayHeight = width; }
+            if ((long)displayWidth * displayHeight > MAX_FRAME_PIXELS) throw new IOException(frameToken(displayWidth, displayHeight));
             int longSide = Math.max(displayWidth, displayHeight), shortSide = Math.min(displayWidth, displayHeight);
             float scale = Math.min(1f, Math.min(1920f / longSide, 1080f / shortSide));
             int outputWidth = Math.max(2, ((int)Math.floor(displayWidth * scale / 2f)) * 2);

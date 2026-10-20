@@ -15,9 +15,10 @@ export function fitPhoto(width:number,height:number,maxPixels:number,maxLong=PHO
 }
 export function photoInfo(width:number,height:number,bytes:number,raw:boolean,mode:PhotoResolution,device:PhotoDevice,platform:MediaPlatform=currentMediaPlatform()):PhotoInfo {
  validatePhotoSize(width,height,bytes,platform);
+ const row=limitsFor(platform);
  const large=width*height>PHOTO_RECOMMENDED_PIXELS||bytes>PHOTO_RECOMMENDED_BYTES;
- const budget=mode==='full'?PHOTO_MAX_PIXELS:mode==='reduced'?12_000_000:!large?PHOTO_RECOMMENDED_PIXELS:
-  device.mobile||(device.memory!==undefined&&device.memory<=4)?24_000_000:(device.memory??0)>=8?80_000_000:45_000_000;
+ const budget=mode==='full'?row.photoPixels:mode==='reduced'?12_000_000:Math.min(row.photoAutoPixels,!large?PHOTO_RECOMMENDED_PIXELS:
+  device.mobile||(device.memory!==undefined&&device.memory<=4)?24_000_000:(device.memory??0)>=8?80_000_000:45_000_000);
  // LibRaw's memory-saving development halves each axis; never upscale it afterwards.
  const half=raw&&width*height>budget;
  const [exportWidth,exportHeight]=fitPhoto(half?Math.ceil(width/2):width,half?Math.ceil(height/2):height,budget);

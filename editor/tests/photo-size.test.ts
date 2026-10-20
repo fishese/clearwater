@@ -14,6 +14,15 @@ describe('photo resource policy',()=>{
   const full=photoInfo(8000,6000,70*1024*1024,false,'full',{mobile:true,memory:4});expect([full.exportWidth,full.exportHeight]).toEqual([8000,6000]);
   expect(photoInfo(8000,6000,1,false,'auto',{mobile:false,memory:8}).exportWidth).toBe(8000);
  });
+ it('keeps iOS Auto at 24 MP while Full and desktop Auto can stay larger',()=>{
+  const ios=photoInfo(6000,5000,1024,false,'auto',{mobile:true,memory:6},'ios-safari');
+  expect(ios.exportWidth*ios.exportHeight).toBeLessThanOrEqual(24_000_000);
+  expect(ios.exportWidth).toBeLessThan(6000);
+  expect(photoInfo(6000,5000,1024,false,'full',{mobile:true,memory:6},'ios-app')).toMatchObject({exportWidth:6000,exportHeight:5000});
+  expect(photoInfo(4000,3000,1024,false,'auto',{mobile:true},'ios-app')).toMatchObject({exportWidth:4000,exportHeight:3000});
+  expect(photoInfo(6000,5000,1024,false,'auto',{mobile:false,memory:8},'desktop')).toMatchObject({exportWidth:6000,exportHeight:5000});
+  expect(photoInfo(6000,5000,1024,false,'auto',{mobile:true,memory:4},'android-apk').exportWidth).toBe(6000);
+ });
  it('does not shrink a 12 MP image just because its file exceeds 60 MB; RAW half-size never upscales',()=>{
   expect(photoInfo(4000,3000,80*1024*1024,true,'auto',{mobile:true}).exportWidth).toBe(4000);
   const raw=photoInfo(8000,6000,80*1024*1024,true,'auto',{mobile:true});expect([raw.exportWidth,raw.exportHeight]).toEqual([4000,3000]);

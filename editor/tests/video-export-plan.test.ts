@@ -18,6 +18,15 @@ describe('video export plans',()=>{
  it('requests higher quality than the compatible profile at 1080p30',()=>{
   expect(videoExportPlan({...info,sourceWidth:1920,sourceHeight:1080,sourceFrameRate:30},'source').bitrate).toBe(12_000_000);
  });
+ it('uses the 256 MB iOS source cap and leaves the desktop cap at 512 MB',()=>{
+  const ios=videoExportPlan(info,'source','ios-app');
+  const desktop=videoExportPlan(info,'source','desktop');
+  expect(ios.maxOutputBytes).toBe(256*1024*1024);
+  expect(ios.supported).toBe(false);
+  expect(ios.reason).toContain('256 MB');
+  expect(desktop.maxOutputBytes).toBe(512*1024*1024);
+  expect(desktop.supported).toBe(true);
+ });
  it('refuses a source export estimate above its cap instead of lowering bitrate',()=>{
   const plan=videoExportPlan({...info,duration:600},'source');
   expect(plan.supported).toBe(false);

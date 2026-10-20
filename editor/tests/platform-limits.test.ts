@@ -3,7 +3,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {translateMessage} from '../src/i18n-core';
 import {
  MEDIA_PLATFORMS,PLATFORM_LIMITS,PlatformLimitError,assertPhotoLimits,assertVideoBytes,assertVideoDuration,assertVideoFrame,
- classifyMediaFailure,detectMediaPlatform,formatBytes,formatDuration,formatResolution,limitsFor,parseLimitToken,renderLimitMessage,
+ classifyMediaFailure,detectMediaPlatform,displayFrameSize,formatBytes,formatDuration,formatResolution,limitsFor,parseLimitToken,renderLimitMessage,videoDurationExceeds,
 } from '../src/core/platform-limits';
 
 const facts=(capacitorPlatform:string,userAgent:string,navigatorPlatform='',maxTouchPoints=0)=>({capacitorPlatform,userAgent,navigatorPlatform,maxTouchPoints});
@@ -26,7 +26,15 @@ describe('platform limit table',()=>{
  });
  it('matches the ceilings enforced by the JS and native checks',()=>{
   const row=limitsFor('desktop');
-  for(const platform of MEDIA_PLATFORMS)expect(limitsFor(platform)).toEqual(row);
+  expect(limitsFor('android-apk')).toEqual(row);
+  expect(limitsFor('android-chrome')).toEqual(row);
+  expect(limitsFor('ios-app')).toEqual(limitsFor('ios-safari'));
+  expect(limitsFor('ios-app').videoBytes).toBe(256*1024*1024);
+  expect(limitsFor('ios-safari').sourceExportBytes).toBe(256*1024*1024);
+  expect(limitsFor('ios-app').photoAutoPixels).toBe(24_000_000);
+  expect(row.videoBytes).toBe(512*1024*1024);
+  expect(row.sourceExportBytes).toBe(512*1024*1024);
+  expect(row.photoAutoPixels).toBe(200_000_000);
   const root=new URL('../',import.meta.url);
   const java=readFileSync(new URL('android/app/src/main/java/com/fishese/clearwater/ClearWaterHdrPlugin.java',root),'utf8');
   const share=readFileSync(new URL('android/app/src/main/java/com/fishese/clearwater/ClearWaterSharePlugin.java',root),'utf8');
@@ -35,6 +43,8 @@ describe('platform limit table',()=>{
   expect(java).toContain('MAX_INPUT_BYTES = 512L * 1024 * 1024');
   expect(java).toContain('MAX_OUTPUT_BYTES = 256L * 1024 * 1024');
   expect(java).toContain('MAX_DURATION_US = 600_000_000L');
+  expect(java).toContain('DURATION_TOLERANCE_US = 1_000L');
+  expect(java).toContain('displayWidth * displayHeight > MAX_FRAME_PIXELS');
   expect(java).toContain('MAX_FRAME_PIXELS = 34_000_000L');
   expect(share).toContain('MAX_BYTES = 512L * 1024L * 1024L');
   expect(files).toContain('512L*1024*1024');
@@ -100,6 +110,13 @@ describe('limit error messages',()=>{
   }
   try{assertVideoDuration(601,'ios-safari');}catch(error){expect(error).toMatchObject({code:'too-long',actual:'10:01',limit:'10:00',platform:'ios-safari'});}
   expect(()=>assertVideoDuration(600,'desktop')).not.toThrow();
+  expect(videoDurationExceeds(600.001,'android-apk')).toBe(false);
+  expect(videoDurationExceeds(600.001+0.0006,'ios-app')).toBe(true);
+  expect(()=>assertVideoBytes(300*1024*1024,'ios-safari')).toThrow(/256 MB/);
+  expect(()=>assertVideoBytes(300*1024*1024,'android-apk')).not.toThrow();
+  expect(displayFrameSize(2160,3840,90)).toEqual({width:3840,height:2160});
+  expect(displayFrameSize(3840,2160,180)).toEqual({width:3840,height:2160});
+  expect(displayFrameSize(1920,1080,270)).toEqual({width:1080,height:1920});
   try{assertVideoFrame(8000,4500,'ios-app');}catch(error){expect(error).toMatchObject({code:'resolution',actual:'8000×4500 (36 MP)',limit:'34 MP',platform:'ios-app'});}
   try{assertPhotoLimits(40000,10,1,'desktop');}catch(error){expect(error).toMatchObject({code:'photo-too-large',actual:'40000×10',limit:'32768 px'});}
   try{assertPhotoLimits(10000,20001,1,'desktop');}catch(error){expect(error).toMatchObject({code:'photo-too-large',limit:'200 MP'});}
