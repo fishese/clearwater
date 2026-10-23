@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   safari-photo-switch-regression:
-    name: Test photo switching in WebKit and mocked iOS shell
+    name: Test iPhone saving, comparison and switching in WebKit
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -55,6 +55,12 @@ jobs:
           CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
           CHECK_BROWSER=webkit CHECK_IOS_SHELL=1 CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
           CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-smoke.mjs
+          CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/comparison-band-check.mjs
+          for ios_browser in safari chrome; do
+            for can_share in missing false true; do
+              CHECK_BROWSER=webkit CHECK_IOS_BROWSER="$ios_browser" CHECK_CAN_SHARE="$can_share" CHECK_URL=http://127.0.0.1:4173/ node scripts/ios-web-export-check.mjs
+            done
+          done
   unsigned-device-ipa:
     name: Build unsigned iPhone IPA
     runs-on: macos-26

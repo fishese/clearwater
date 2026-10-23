@@ -48,9 +48,19 @@ final class ClearWaterCaptureStore {
 
     func newCaptureID() -> UUID { UUID() }
 
+    private func uniqueCaptureName(date: Date, extension ext: String) -> String {
+        let existing = Set(records.values.map(\.name))
+        var suffix = 0
+        while true {
+            let candidate = CaptureFilename.format(date: date, extension: ext, collisionSuffix: suffix)
+            if !existing.contains(candidate) { return candidate }
+            suffix += 1
+        }
+    }
+
     /// Commits photo original, enhanced retry copy, and thumbnail as one directory rename.
     func commitPhoto(id: UUID, originalData: Data, enhancedData: Data, thumbnailData: Data,
-                     width: Int, height: Int, recipe: [String: Any]) throws -> [String: Any] {
+                     width: Int, height: Int, recipe: [String: Any], capturedAt: Date = Date()) throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
         try ensureLoaded()
         let key = id.uuidString.lowercased()
@@ -64,7 +74,7 @@ final class ClearWaterCaptureStore {
             try originalData.write(to: stage.appendingPathComponent("original.jpg"), options: .atomic)
             try enhancedData.write(to: stage.appendingPathComponent("enhanced.jpg"), options: .atomic)
             try thumbnailData.write(to: stage.appendingPathComponent("thumbnail.jpg"), options: .atomic)
-            let record = Record(id: key, kind: "photo", name: "ClearWater_\(key).jpg", type: "image/jpeg",
+            let record = Record(id: key, kind: "photo", name: uniqueCaptureName(date: capturedAt, extension: "jpg"), type: "image/jpeg",
                                 width: width, height: height, bytes: originalData.count,
                                 addedAt: Date().timeIntervalSince1970 * 1000, recipeVersion: 1,
                                 recipeData: recipeData, visible: true, pending: true, photosSaved: false,
@@ -100,7 +110,7 @@ final class ClearWaterCaptureStore {
 
     /// Commits the already-enhanced MP4 only; no uncorrected video source is retained.
     func commitVideo(id: UUID, outputURL: URL, thumbnailData: Data, width: Int, height: Int,
-                     duration: Double, fps: Double, codec: String, recipe: [String: Any]) throws -> [String: Any] {
+                     duration: Double, fps: Double, codec: String, recipe: [String: Any], capturedAt: Date = Date()) throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
         try ensureLoaded()
         let key = id.uuidString.lowercased()
@@ -118,7 +128,7 @@ final class ClearWaterCaptureStore {
             let attributes = try FileManager.default.attributesOfItem(atPath: movieURL.path)
             let size = (attributes[.size] as? NSNumber)?.intValue ?? 0
             guard size > 0, size <= 512 * 1024 * 1024 else { throw StoreError.invalidCapture }
-            let record = Record(id: key, kind: "video", name: "ClearWater_\(key).mp4", type: "video/mp4",
+            let record = Record(id: key, kind: "video", name: uniqueCaptureName(date: capturedAt, extension: "mp4"), type: "video/mp4",
                                 width: width, height: height, bytes: size,
                                 addedAt: Date().timeIntervalSince1970 * 1000, recipeVersion: 1,
                                 recipeData: recipeData, visible: true, pending: true, photosSaved: false,

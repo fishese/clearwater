@@ -39,6 +39,7 @@ try{
       window.Worker=class extends NativeWorker{constructor(...args){super(...args);window.__cwWorkerCount++;const send=this.postMessage.bind(this);this.postMessage=(data,...rest)=>{window.__cwWorkerMessages.push(data?.type??'unknown');return send(data,...rest);};}};
     });
     await page.goto(baseUrl,{waitUntil:'domcontentloaded'});
+    const hint=page.locator('.web-update-hint-ok');if(await hint.isVisible())await hint.click();
     await changeLanguage(page,language);
     await page.locator('input[type=file][multiple]').setInputFiles({name:'synthetic-dive.png',mimeType:'image/png',buffer:png});
     await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);

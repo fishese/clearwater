@@ -41,7 +41,7 @@ try{
  const result=await page.evaluate(async()=>{
   const makeFile=(size,type,seed)=>{const bytes=new Uint8Array(size);for(let i=0;i<size;i++)bytes[i]=(i*31+seed)%256;return {file:new File([bytes],type==='video/mp4'?'source.mp4':'source.jpg',{type}),expected:Array.from(bytes,byte=>String.fromCharCode(byte)).join('')};};
   const encodedWrites=(calls,id)=>calls.filter(call=>call.id===id).map(call=>atob(call.data)).join('');
-  const jpeg=makeFile(600001,'image/jpeg',17);const jpegResult=await CameraSaveCheck.saveAndroidCameraCapture(jpeg.file);
+  const jpeg=makeFile(600001,'image/jpeg',17);const capturedAt=new Date(2026,9,23,14,5,6).getTime();const jpegResult=await CameraSaveCheck.saveAndroidCameraCapture(jpeg.file,undefined,capturedAt);
   const jpegCapture=window.__captureCalls.find(call=>call.method==='createCapture');
   const jpegWrites=encodedWrites(window.__writes,'write-1');
   const mp4=makeFile(900001,'video/mp4',83);await CameraSaveCheck.saveAndroidCameraCapture(mp4.file);
@@ -62,11 +62,11 @@ try{
    try{await CameraSaveCheck.saveAndroidCameraCapture(file);invalid.push({label,error:''});}catch(error){invalid.push({label,error:error.message});}
   }
   window.__platform='web';let nonAndroid='';try{await CameraSaveCheck.saveAndroidCameraCapture(new File([new Uint8Array([1])],'photo.jpg',{type:'image/jpeg'}));}catch(error){nonAndroid=error.message;}
-  return {jpegResult,jpegType:jpegCapture.options.type,jpegName:jpegCapture.options.name,jpegMatches:jpegWrites===jpeg.expected,jpegChunks:window.__writes.filter(c=>c.id==='write-1').length,mp4Type:mp4Capture.options.type,mp4Name:mp4Capture.options.name,mp4Matches:mp4Writes===mp4.expected,mp4Chunks:window.__writes.filter(c=>c.id==='write-2').length,finishes:window.__finishes,updates:window.__updates,replacementMatches:replacementWrites===Array.from(new Uint8Array(300007).fill(44),byte=>String.fromCharCode(byte)).join(''),replaceFailure,probed,probeCall,deleteCall,createCaptureCount:window.__captureCalls.filter(call=>call.method==='createCapture').length,beginWriteCount:window.__captureCalls.filter(call=>call.method==='beginWrite').length,captureCount,invalid,nonAndroid,writeFailure};
+  return {jpegResult,jpegType:jpegCapture.options.type,jpegName:jpegCapture.options.name,capturedAt,jpegMatches:jpegWrites===jpeg.expected,jpegChunks:window.__writes.filter(c=>c.id==='write-1').length,mp4Type:mp4Capture.options.type,mp4Name:mp4Capture.options.name,mp4Matches:mp4Writes===mp4.expected,mp4Chunks:window.__writes.filter(c=>c.id==='write-2').length,finishes:window.__finishes,updates:window.__updates,replacementMatches:replacementWrites===Array.from(new Uint8Array(300007).fill(44),byte=>String.fromCharCode(byte)).join(''),replaceFailure,probed,probeCall,deleteCall,createCaptureCount:window.__captureCalls.filter(call=>call.method==='createCapture').length,beginWriteCount:window.__captureCalls.filter(call=>call.method==='beginWrite').length,captureCount,invalid,nonAndroid,writeFailure};
  });
- assert.equal(result.jpegType,'image/jpeg');assert.match(result.jpegName,/\.jpg$/);assert.equal(result.jpegMatches,true);assert.equal(result.jpegChunks,3);
+ assert.equal(result.jpegType,'image/jpeg');assert.equal(result.jpegName,'CW_20261023_140506.jpg','native gallery filename must use the capture timestamp');assert.equal(result.jpegMatches,true);assert.equal(result.jpegChunks,3);
  assert.deepEqual(result.jpegResult,{uri:'content://capture/1',name:result.jpegName,destination:`Pictures/ClearWater/${result.jpegName}`},'save must return the native capture descriptor');
- assert.equal(result.mp4Type,'video/mp4');assert.match(result.mp4Name,/\.mp4$/);assert.equal(result.mp4Matches,true);assert.equal(result.mp4Chunks,4);
+ assert.equal(result.mp4Type,'video/mp4');assert.match(result.mp4Name,/^CW_\d{8}_\d{6}\.mp4$/);assert.equal(result.mp4Matches,true);assert.equal(result.mp4Chunks,4);
  assert.deepEqual(result.finishes.slice(0,2),[{id:'write-1',abort:false},{id:'write-2',abort:false}]);
  assert.deepEqual(result.finishes[2],{id:'write-3',abort:true});assert.equal(result.writeFailure,'Simulated native write failure.');
  assert.equal(result.captureCount,3,'invalid inputs must not create native captures');

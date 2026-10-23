@@ -1,5 +1,40 @@
 # Adaptive photo colour-and-tone finish plan
 
+## Authorized 1.0.11 release preparation (23 October 2026)
+
+User authorized best-effort iPhone Safari/Chrome Save/Share verification and release of the current fixes before any proposed redesign. This supersedes the earlier no-release/no-version-bump checkpoint for this release only.
+
+- [x] Preserve current recipes/defaults, optional photo finish and native camera/storage behavior. Release scope: web Browse files, comparison hit band/dragging, cancelled-folder-picker export ownership.
+- [x] Add newly requested camera filenames `CW_YYYYMMDD_HHMMSS` plus the existing media extension across web/Android/iOS; preserve existing captures/internal IDs, use local capture time and non-overwriting numeric collision suffixes. 264 shared tests, 11 Android tests, signed debug/release builds, camera-save bridge and iOS camera/editor recovery checks pass. Collision suffix regression fixed; existing names/internal IDs preserved.
+- [x] Prepare version 1.0.11, Android code 30 and unsigned iOS build 9 (iOS 26+), with unchanged signing configuration.
+- [x] macOS WebKit photo switching/comparison and all six Safari/CriOS Save/Share cases pass in run 39980749558 (share APIs mocked). Unsigned device packaging passes.
+- [ ] Native iOS regression in run 39980749558 remains in progress; require success before merge.
+- [ ] Merge reviewed source, verify Pages, build and verify APK/IPA assets from merged source, publish coordinated checksummed release.
+- [ ] Next: complete browser release gates and record exact CI/build evidence. Physical iPhone share destinations, memory and camera acceptance remain hardware limitations; do not clear user app data.
+
+## Fresh workflow review checkpoint (23 October 2026)
+
+Current branch: `codex/fresh-workflow-review`. Review and reproducible checks: `REVIEW_2026-10-23.md`. This checkpoint supersedes the pending next-version items below; release history remains historical.
+
+- [x] Recover and independently verify the previous review and unfinished edits. Preserve all three stashes and unrelated `editor/.idea/`.
+- [x] Fix cancelled export resuming after a pending folder picker; held success/error and retry regression passes.
+- [x] Restrict comparison to a 44px-wide band along the full divider; preserve relative dragging, keyboard input, pan and pinch. Desktop/320/390px normal/expanded checks pass.
+- [x] Add web-only localized Browse files using existing supported-media validation. Preserve native picker routes. Browser filter/reset/cancel/unsupported-file checks pass; OS picker contents still require device acceptance.
+- [x] 262 shared tests, production build/worker graph, JPG stale replies, enhancement and photo-finish parity/reuse, iPhone-style browser export readiness, mocked iOS shell, multilingual mobile layouts pass. Independent patch review found no further actionable regression.
+- [x] Complete synthetic large-file report and UX proposals in `LARGE_MEDIA_REVIEW_2026-10-23.md` and `REVIEW_2026-10-23.md`. Desktop 12/24/48 MP exports: 2.06/3.71/7.36 s; short 4K Source: 20.26 s, dimensions preserved. Synthetic, no peak-memory or phone acceptance claim. Existing limits/defaults remain unchanged.
+- [ ] Next action: physical Android/iPhone picker, memory, camera and share-destination acceptance; macOS Safari/WKWebView validation. Windows WebKit photo load timed out, so it is inconclusive, not a pass. Chromium platform mocks are not hardware evidence.
+
+No release, merge, version bump, native signing or app-data clearing. The computer-use skill was inspected; repository browser harnesses were the relevant verification tools, with no additional skill installation needed.
+
+## Next version: photo picker and preview interaction (20 October 2026)
+
+Recorded at the user's request for the next planned version; documentation only. Do not issue an immediate release or bump versions for these items.
+
+- [ ] Web photo import: investigate an explicit Browse/files option. Reported behavior: the web picker exposes media/Google Photos without Browse, whereas the APK picker has Browse in its three-dot menu. Check the file-input configuration and browser/OS picker capabilities; provide a separate file-browse route where supported. Keep web, Android and iOS behavior distinct, and preserve existing media selection and multi-photo import. Record any browser-imposed limitation rather than promising control over the system picker.
+- [ ] Preview at 150% zoom: reproduce and fix clicks anywhere on the preview moving the before/after divider. Match the intended drag interaction at other zoom levels, preserving image panning, zooming and touch gestures; clicking away from the divider should not reposition it.
+- [ ] Comparison divider hit area: make the full vertical divider draggable within a horizontal band as wide as the <> handle, along the entire line, rather than only on the handle itself. Keep the visible handle/line and constrain the expanded drag target so it does not capture unrelated preview interactions.
+- [ ] Next action when implementation resumes: inspect the web import route and comparison pointer handling; reproduce at 150% and neighboring zoom levels, then verify mouse/touch behavior on web (including Safari), Android and iOS as applicable. Keep these requests pending until implemented and checked; no runtime fix is claimed here.
+
 ## 1.0.10 released (20 October 2026)
 
 [PR #12](https://github.com/fishese/clearwater/pull/12) merged as `5df9d5ad6cb1fd53d2bcae3f2bd17da6e422e082`; [v1.0.10](https://github.com/fishese/clearwater/releases/tag/v1.0.10) is published as latest from that exact tag/source. Android code 29; unsigned arm64 physical-device iOS build 8, iOS 26+. User accepted the photo-finish visuals and Android JPG-switching test build, then authorized merge/release.

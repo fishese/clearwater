@@ -13,7 +13,7 @@ describe('Android file bridge',()=>{
   const file=new File(['archived source'],'clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4',{type:'video/mp4'});
   const saved=await saveAndroidCameraCapture(file,'file:///cache/camera-captures/clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4');
   expect(saved.uri).toBe('content://media/video/42');
-  expect(bridge.createCapture).toHaveBeenCalledWith({name:expect.stringMatching(/^ClearWater_.*\.mp4$/),type:'video/mp4'});
+  expect(bridge.createCapture).toHaveBeenCalledWith({name:expect.stringMatching(/^CW_\d{8}_\d{6}\.mp4$/),type:'video/mp4'});
   expect(bridge.copyCameraCapture).toHaveBeenCalledWith({sourceUri:'file:///cache/camera-captures/clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4',uri:'content://media/video/42'});
   expect(bridge.beginWrite).not.toHaveBeenCalled();expect(bridge.writeChunk).not.toHaveBeenCalled();
  });

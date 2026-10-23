@@ -9,7 +9,7 @@
 .editor-preview .video-timeline-controls>button:hover:not(:disabled){background:#263b3e}
 .editor-preview .video-timeline-controls>label{flex:1;min-width:0;gap:3px}
 .editor-preview .video-timeline-controls input{height:28px;touch-action:pan-x}
-.editor-preview .comparison-input{top:50%;bottom:auto;height:44px;transform:translateY(-50%);inset-inline:0;z-index:2}
+.editor-preview .comparison-input{top:0;bottom:0;right:auto;width:44px;height:100%;transform:translateX(-50%);z-index:2}
 .editor-preview .divider-line,.editor-preview .divider-line>span{pointer-events:none}
 .editor-preview .stage.pan-enabled{display:flex;align-items:flex-start;justify-content:flex-start}
 .editor-preview .stage.pan-enabled .image-frame{touch-action:none;cursor:grab}

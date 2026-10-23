@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from 'react';
 import { Circle, SwitchCamera, Square, X, Pipette, RotateCcw, Check, Mic, MicOff, ZoomIn, Camera as CameraIcon, SlidersHorizontal, Sparkles, LoaderCircle } from 'lucide-react';
 import { makeCameraRecipe, pickCameraNeutral, cameraFramePoint, chooseCameraVideoMimeType, cameraRecordingLimitReached, cameraRecordingUiProgress, cameraRecordingTracks, stopStreamTracks } from './core/camera-capture';
+import {captureFilename} from './core/capture-filename';
 import { createCameraPreview } from './core/camera-preview';
 import { cameraQualityProfile } from './core/camera-quality';
 import { cameraApplyNativeAutoZoom, cameraNativeAutoRange, cameraNextZoomPreset, cameraZoomPresets, cameraZoomValue, labeledRearCameras, type ZoomRange } from './core/camera-zoom';
@@ -18,7 +19,7 @@ export interface CameraHandle {
 }
 
 export interface CameraSaveResult {collection:boolean;device:boolean;deviceExpected:boolean}
-export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string; nativeCaptureUri?:string }
+export interface CameraCaptureDetails { enhancedVideo?: boolean; jpegQuality?: number; iosCaptureId?:string; nativeCaptureUri?:string; capturedAt?:number }
 
 interface CameraProps {
   onCapture: (file: File, recipe: Recipe, details?: CameraCaptureDetails) => Promise<CameraSaveResult>;
@@ -126,6 +127,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
   const discardRecordingRef = useRef(false);
   const recordingRef = useRef(false);
   const recordingStartedRef = useRef(0);
+  const recordingCapturedAtRef = useRef<number|null>(null);
   const recordingBytesRef = useRef(0);
   const facingRef = useRef<'environment' | 'user'>('environment');
   const startCameraRef = useRef<(nextFacing?: 'environment' | 'user', deviceId?: string | null) => Promise<void>>(async () => {});
@@ -591,6 +593,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       recordingRef.current = false;
       setRecording(false);
       setRecordPending(false);
+      const capturedAt=recordingCapturedAtRef.current??Date.now();recordingCapturedAtRef.current=null;
       if (discardRecordingRef.current) return;
       if (result.error) { setError('Could not save video capture.'); return; }
       if (result.discarded) return;
@@ -599,7 +602,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       const frozen = structuredClone(frozenRecipeRef.current ?? recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1)));
         const save = capture.iosCaptureId
           ? Promise.resolve(new File([],capture.name,{type:capture.type,lastModified:Date.now()})).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,iosCaptureId:capture.iosCaptureId}))
-          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,...(isAndroid()?{nativeCaptureUri:capture.uri}:{})}));
+          : readNativeCameraCapture(capture).then(file=>saveCaptureRef.current(file,frozen,{enhancedVideo:true,capturedAt,...(isAndroid()?{nativeCaptureUri:capture.uri}:{})}));
         void save.then(saved=>{
           if(capture.iosCaptureId||saved?.collection||saved?.device)return nativeCamera.releaseCapture({uri:capture.uri}).catch(()=>{});
         }).catch(() => setError('Could not save video capture.'));
@@ -930,6 +933,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       setPhotoPending(true);
       setError('');
       const frozenRecipe = structuredClone(recipeWithCameraColour(recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1), strength / 100, undefined, cameraHintsRef.current), cameraAi.enabled, cameraAi.matrix));
+      const capturedAt=Date.now();
       let capture: NativeCameraCapture | null = null;
       const generation = generationRef.current;
       const isCurrentView = () => aliveRef.current && generation === generationRef.current;
@@ -938,7 +942,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           const file = capture.iosCaptureId
             ? new File([],capture.name,{type:capture.type,lastModified:Date.now()})
             : await readNativeCameraCapture(capture);
-          await saveCapture(file, frozenRecipe, capture.iosCaptureId?{iosCaptureId:capture.iosCaptureId}:{jpegQuality: qualityProfile.jpegQuality});
+          await saveCapture(file, frozenRecipe, capture.iosCaptureId?{iosCaptureId:capture.iosCaptureId}:{jpegQuality: qualityProfile.jpegQuality,capturedAt});
       } catch {
         if (isCurrentView()) setError('Photo capture failed.');
       } finally {
@@ -953,6 +957,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     photoPendingRef.current = true;
     setPhotoPending(true);
     setError('');
+    const capturedAt=Date.now();
     const frozenRecipe = structuredClone(recipeWithCameraColour(recipeRef.current ?? recipeForFrame(video, strength / 100, cameraHintsRef.current), cameraAi.enabled, cameraAi.matrix));
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
@@ -967,7 +972,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
     try {
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(new Error('Photo capture failed.')), 'image/jpeg', qualityProfile.jpegQuality));
-      await saveCapture(new File([blob], `clearwater-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() }), frozenRecipe, { jpegQuality: qualityProfile.jpegQuality });
+      await saveCapture(new File([blob], captureFilename(new Date(capturedAt),'jpg'), { type: 'image/jpeg', lastModified: capturedAt }), frozenRecipe, { jpegQuality: qualityProfile.jpegQuality,capturedAt });
     } catch {
       setError('Photo capture failed.');
     } finally {
@@ -985,6 +990,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       startingRecordingRef.current = true;
       setRecordPending(true);
       const frozen = structuredClone(recipeWithCameraColour(recipeRef.current ?? makeCameraRecipe(analyse(new Uint8ClampedArray(4), 1, 1), strength / 100, undefined, cameraHintsRef.current), cameraAi.enabled, cameraAi.matrix));
+      const capturedAt=Date.now();
       try {
         await nativeCamera.startRecording({ maxMs: recordingBudget.maxMs, maxBytes: recordingBudget.maxBytes, microphone: microphoneEnabled, recipe: frozen });
         if (!aliveRef.current) {
@@ -999,6 +1005,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
         chunksRef.current = [];
         discardRecordingRef.current = false;
         recordingStartedRef.current = performance.now();
+        recordingCapturedAtRef.current=capturedAt;
         recordingBytesRef.current = 0;
         nativeRecordingRef.current = true;
         recordingRef.current = true;
@@ -1008,6 +1015,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       } catch {
         nativeRecordingRef.current = false;
         recordingRef.current = false;
+        recordingCapturedAtRef.current=null;
         setError('Could not start recording.');
       } finally {
         startingRecordingRef.current = false;
@@ -1070,6 +1078,7 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
       recorder.onstop = () => {
         const discard = discardRecordingRef.current;
         const chunks = chunksRef.current;
+        const capturedAt=recordingCapturedAtRef.current??Date.now();recordingCapturedAtRef.current=null;
         chunksRef.current = [];
         recorderRef.current = null;
         stopPreviewCapture();
@@ -1087,11 +1096,11 @@ export const Camera = forwardRef<CameraHandle, CameraProps>(function Camera({ on
           setError('MP4 recording is unavailable on this device. Photos still work.');
           return;
         }
-        const extension = 'mp4';
-        void saveCapture(new File([blob], `clearwater-camera-${Date.now()}.${extension}`, { type: 'video/mp4', lastModified: Date.now() }), frozen, { enhancedVideo: true });
+        void saveCapture(new File([blob], captureFilename(new Date(capturedAt),'mp4'), { type: 'video/mp4', lastModified: capturedAt }), frozen, { enhancedVideo: true,capturedAt });
       };
       recorder.start(250);
       recordingStartedRef.current = performance.now();
+      recordingCapturedAtRef.current=Date.now();
       recordingRef.current = true;
       setRecording(true);
     } catch {
