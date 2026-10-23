@@ -10,6 +10,8 @@ try {
  const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=960;c.height=640;const x=c.getContext('2d');x.fillStyle='#438998';x.fillRect(0,0,960,640);return c.toDataURL().split(',')[1];});
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
+ const storageWarning=page.getByRole('button',{name:'Dismiss storage warning',exact:true});
+ if(await storageWarning.isVisible()){console.log('Storage warning shown in this browser context; dismissing through the UI before gesture checks.');await storageWarning.click();}
  const hint=page.locator('.web-update-hint-ok');if(await hint.isVisible())await hint.click();
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:900});
