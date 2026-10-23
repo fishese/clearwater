@@ -1,5 +1,15 @@
 # Maintenance
 
+## Authorized 1.0.11 release preparation (23 October 2026)
+
+User authorized best-effort iPhone Safari/Chrome Save/Share verification and release of the current fixes before any proposed redesign. This supersedes the earlier no-release/no-version-bump checkpoint for this release only.
+
+- [x] Preserve current recipes/defaults, optional photo finish and native camera/storage behavior. Release scope: web Browse files, comparison hit band/dragging, cancelled-folder-picker export ownership.
+- [x] Prepare version 1.0.11, Android code 30 and unsigned iOS build 9 (iOS 26+), with unchanged signing configuration.
+- [ ] Run macOS WebKit photo switching/comparison plus Safari/CriOS saving, cancel/retry, fresh-tap sharing and canShare variants. Run native iOS regressions and unsigned device packaging.
+- [ ] Merge reviewed source, verify Pages, build and verify APK/IPA assets from merged source, publish coordinated checksummed release.
+- [ ] Next: complete browser release gates and record exact CI/build evidence. Physical iPhone share destinations, memory and camera acceptance remain hardware limitations; do not clear user app data.
+
 ## Fresh workflow review checkpoint (23 October 2026)
 
 Current branch: `codex/fresh-workflow-review`. Review and reproducible checks: `REVIEW_2026-10-23.md`. This checkpoint supersedes the pending next-version items below; release history remains historical.

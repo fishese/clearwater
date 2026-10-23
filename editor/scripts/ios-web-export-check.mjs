@@ -1,19 +1,28 @@
 import { chromium,webkit } from 'playwright';
 import assert from 'node:assert/strict';
 
-const browser=await (process.env.CHECK_BROWSER==='webkit'?webkit:chromium).launch({headless:true});
+const engineName=process.env.CHECK_BROWSER==='webkit'?'webkit':process.env.CHECK_BROWSER==='msedge'?'msedge':'chromium';
+const iosBrowser=(process.env.CHECK_IOS_BROWSER??'safari').toLowerCase();
+const canShareMode=(process.env.CHECK_CAN_SHARE??'missing').toLowerCase();
+assert.ok(['safari','chrome'].includes(iosBrowser),'CHECK_IOS_BROWSER must be safari or chrome');
+assert.ok(['missing','false','true'].includes(canShareMode),'CHECK_CAN_SHARE must be missing, false or true');
+const browser=await (engineName==='webkit'?webkit:chromium).launch({headless:true,...(engineName==='msedge'?{channel:'msedge'}:{})});
 try{
   const context=await browser.newContext({acceptDownloads:true});
   const page=await context.newPage();
-  const downloads=[];page.on('download',download=>downloads.push(download.suggestedFilename()));
-  page.on('pageerror',error=>console.error('PAGE ERROR',error.message));
+  const downloads=[],pageErrors=[];page.on('download',download=>downloads.push(download.suggestedFilename()));
+  page.on('pageerror',error=>{pageErrors.push(error.message);console.error('PAGE ERROR',error.message);});
   page.on('console',message=>{if(message.type()==='error')console.error('CONSOLE',message.text());});
-  await page.addInitScript(()=>{
+  await page.addInitScript(({browserKind,shareMode})=>{
     delete window.showDirectoryPicker;
-    Object.defineProperty(navigator,'userAgent',{configurable:true,value:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 Version/18.6 Mobile/15E148 Safari/605.1.15'});
+    const safari='Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1';
+    const chrome='Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.82 Mobile/15E148 Safari/604.1';
+    Object.defineProperty(navigator,'userAgent',{configurable:true,value:browserKind==='chrome'?chrome:safari});
     Object.defineProperty(navigator,'platform',{configurable:true,value:'iPhone'});
     Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,value:5});
-    Object.defineProperty(navigator,'canShare',{configurable:true,value:undefined});
+    window.iosCanShareCalls=0;
+    if(shareMode==='missing')Object.defineProperty(navigator,'canShare',{configurable:true,value:undefined});
+    else Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>{window.iosCanShareCalls++;return shareMode==='true';}});
     window.iosShareCalls=[];window.iosShareCancelNext=true;
     window.iosPreviewRenders=0;window.delayNextEnhance=false;window.enhanceDelayed=false;window.holdNextRender=false;window.heldRender=null;
     const post=Worker.prototype.postMessage;
@@ -32,18 +41,20 @@ try{
     };
     window.releaseHeldRender=()=>{const held=window.heldRender;window.heldRender=null;Reflect.apply(post,held.worker,[held.message,...held.args]);};
     Object.defineProperty(navigator,'share',{configurable:true,value:async({files})=>{
-      const file=files[0];window.iosShareCalls.push({name:file.name,type:file.type,text:file.type==='application/json'?await file.text():null});
+      const file=files[0],call={name:file.name,type:file.type,userActivationSupported:!!navigator.userActivation,userActivationActive:navigator.userActivation?.isActive??null};window.iosShareCalls.push(call);
+      if(file.type==='application/json')call.text=await file.text();
       if(window.iosShareCancelNext){window.iosShareCancelNext=false;throw new DOMException('cancelled','AbortError');}
     }});
-  });
-  await page.goto(process.env.CHECK_URL||'http://127.0.0.1:5173/');
+  },{browserKind:iosBrowser,shareMode:canShareMode});
+  await page.goto(process.env.CHECK_URL||'http://127.0.0.1:4197/');
   const png=await page.evaluate(()=>{
     const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;
     const context=canvas.getContext('2d');context.fillStyle='#527b70';context.fillRect(0,0,64,64);
     return canvas.toDataURL('image/png').split(',')[1];
   });
-  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'safari-export.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
-  await page.waitForFunction(()=>document.querySelector('.filename')?.textContent.includes('safari-export.png'));
+  const exportName=`ios-${iosBrowser}-export.png`;
+  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:exportName,mimeType:'image/png',buffer:Buffer.from(png,'base64')});
+  await page.waitForFunction(name=>document.querySelector('.filename')?.textContent.includes(name),exportName);
   await page.waitForFunction(()=>!document.querySelector('.top-actions .primary')?.disabled).catch(async error=>{console.error('BUTTONS',await page.locator('.top-actions button').evaluateAll(buttons=>buttons.map(button=>({text:button.textContent,disabled:button.disabled,aria:button.getAttribute('aria-label')}))));console.error('BODY',(await page.locator('body').innerText()).slice(0,2000));throw error;});
 
   const exportButton=page.locator('.top-actions .primary');
@@ -66,7 +77,7 @@ try{
   await dialog.getByRole('button',{name:'Share now'}).click();
   await page.waitForFunction(()=>window.iosShareCalls.length===1);
   await dialog.waitFor();
-  assert.equal((await page.evaluate(()=>window.iosShareCalls[0])).name,'safari-export-restore.jpg');
+  assert.equal((await page.evaluate(()=>window.iosShareCalls[0])).name,`ios-${iosBrowser}-export-restore.jpg`);
   await dialog.getByRole('button',{name:'Share now'}).click();
   await page.waitForFunction(()=>window.iosShareCalls.length===2);
   await dialog.waitFor({state:'detached'});
@@ -108,6 +119,11 @@ try{
   await page.waitForTimeout(650);
   assert.equal(await exportButton.isDisabled(),false,'a superseded enhancement cannot leave export busy after a recipe loads');
   assert.deepEqual(downloads,[],'Safari save paths do not fall through to scripted downloads');
+  const shareDiagnostics=await page.evaluate(()=>({calls:window.iosShareCalls,canShareCalls:window.iosCanShareCalls}));
+  if(canShareMode==='missing')assert.equal(shareDiagnostics.canShareCalls,0,'missing canShare remains a supported iOS path');
+  else assert.ok(shareDiagnostics.canShareCalls>0,'configured canShare mock is exercised');
+  if(shareDiagnostics.calls.some(call=>call.userActivationSupported))assert.ok(shareDiagnostics.calls.every(call=>call.userActivationSupported&&call.userActivationActive===true),'each native share call starts inside fresh user activation');
+  assert.deepEqual(pageErrors,[],'page has no uncaught errors');
   await context.close();
-  console.log('PASS iPhone Safari export readiness, cancel/retry, recipe sharing, and superseded enhancement');
+  console.log(`PASS ${engineName} engine with iPhone ${iosBrowser==='chrome'?'CriOS':'Safari'} UA; canShare=${canShareMode}; cancel/retry, recipe sharing, user activation, and superseded enhancement`);
 }finally{await browser.close();}
