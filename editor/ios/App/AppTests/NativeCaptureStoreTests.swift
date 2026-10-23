@@ -3,6 +3,31 @@ import XCTest
 @testable import App
 
 final class NativeCaptureStoreTests: XCTestCase {
+    func testCaptureFilenameUsesLocalGregorianTimestampAndCollisionSuffix() {
+        var components = DateComponents(); components.year = 2026; components.month = 10; components.day = 23
+        components.hour = 14; components.minute = 5; components.second = 6
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let date = calendar.date(from: components)!
+        XCTAssertEqual(CaptureFilename.format(date: date, extension: "jpg", timeZone: TimeZone(secondsFromGMT: 0)!), "CW_20261023_140506.jpg")
+        XCTAssertEqual(CaptureFilename.format(date: date, extension: "mp4", collisionSuffix: 2, timeZone: TimeZone(secondsFromGMT: 0)!), "CW_20261023_140506_2.mp4")
+    }
+
+    func testStoreAddsCollisionSuffixWithoutChangingCaptureIdentity() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = ClearWaterCaptureStore(rootURL: root)
+        let date = Date(timeIntervalSince1970: 1_792_752_306)
+        func save(_ id: UUID) throws -> [String: Any] {
+            try store.commitPhoto(id: id, originalData: Data([1]), enhancedData: Data([2]), thumbnailData: Data([3]),
+                                  width: 1, height: 1, recipe: [:], capturedAt: date)
+        }
+        let firstID = UUID(), secondID = UUID()
+        let first = try save(firstID), second = try save(secondID)
+        XCTAssertEqual(first["name"] as? String, CaptureFilename.format(date: date, extension: "jpg"))
+        XCTAssertEqual(second["name"] as? String, CaptureFilename.format(date: date, extension: "jpg", collisionSuffix: 1))
+        XCTAssertEqual(first["id"] as? String, firstID.uuidString.lowercased())
+        XCTAssertEqual(second["id"] as? String, secondID.uuidString.lowercased())
+    }
+
     private func temporaryRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClearWaterCaptureStoreTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

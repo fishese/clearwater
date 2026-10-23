@@ -202,6 +202,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var currentRecipe: NativeBalancedRecipe
     private var clipRecipe: NativeBalancedRecipe?
     private var photoRecipes: [Int64: NativeBalancedRecipe] = [:]
+    private var photoCaptureDates: [Int64: Date] = [:]
     private var photoCaptureAvailable = false
     private var pendingRecordingMessage: String?
     private var latestRendered: CIImage?
@@ -245,6 +246,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
     private var acceptedVideoFrames = 0
     private var videoURL: URL?
     private var captureID: UUID?
+    private var clipCapturedAt: Date?
     private var embeddedCaptureDuration: Double?
     private var embeddedCaptureBytes: Int64?
     private var lastAnalysisTime = 0.0
@@ -995,6 +997,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
             settings.maxPhotoDimensions = self.photoOutput.maxPhotoDimensions
             self.recipeLock.lock()
             self.photoRecipes[settings.uniqueID] = frozenRecipe
+            self.photoCaptureDates[settings.uniqueID] = Date()
             self.recipeLock.unlock()
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -1006,18 +1009,19 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         guard let error else { return }
         recipeLock.lock()
         let outstanding = photoRecipes.removeValue(forKey: resolvedSettings.uniqueID) != nil
+        photoCaptureDates.removeValue(forKey: resolvedSettings.uniqueID)
         recipeLock.unlock()
         if outstanding { photoFailed(error) }
     }
     private func processPhoto(_ photo: AVCapturePhoto, error: Error?) {
-        recipeLock.lock(); let recipe = photoRecipes.removeValue(forKey: photo.resolvedSettings.uniqueID) ?? currentRecipe; recipeLock.unlock()
+        recipeLock.lock(); let recipe = photoRecipes.removeValue(forKey: photo.resolvedSettings.uniqueID) ?? currentRecipe; let capturedAt = photoCaptureDates.removeValue(forKey: photo.resolvedSettings.uniqueID) ?? Date(); recipeLock.unlock()
         if let error { photoFailed(error); return }
         guard let sourceData = photo.fileDataRepresentation(), let image = CIImage(data: sourceData, options: [.applyOrientationProperty: true]),
               let dims = imageDimensions(image), let enhanced = renderedJPEG(image, sourceData: sourceData, recipe: recipe), let thumb = thumbnail(enhanced) else { photoFailed(CameraError.processing); return }
         let id = ClearWaterCaptureStore.shared.newCaptureID()
         storageQueue.async { [weak self] in
             do {
-                let descriptor = try ClearWaterCaptureStore.shared.commitPhoto(id: id, originalData: sourceData, enhancedData: enhanced, thumbnailData: thumb, width: dims.width, height: dims.height, recipe: try NativeBalancedMath.recipeDictionary(recipe))
+                let descriptor = try ClearWaterCaptureStore.shared.commitPhoto(id: id, originalData: sourceData, enhancedData: enhanced, thumbnailData: thumb, width: dims.width, height: dims.height, recipe: try NativeBalancedMath.recipeDictionary(recipe), capturedAt: capturedAt)
                 DispatchQueue.main.async {
                     guard let self else { return }; self.captureInFlight = false; self.setState("ready")
                     self.savedPhotoCount += 1; self.updateCounters()
@@ -1133,7 +1137,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                         }
                         return
                     }
-                    self.movieWriter = writer; self.writerIncludesAudio = withAudio; self.captureID = id; self.videoURL = url; self.writerAcceptingFrames = true
+                    self.movieWriter = writer; self.writerIncludesAudio = withAudio; self.captureID = id; self.videoURL = url; self.clipCapturedAt = Date(); self.writerAcceptingFrames = true
                     DispatchQueue.main.async {
                         self.setState("recording"); self.recordButton.setImage(UIImage(systemName: "stop.circle.fill"), for: .normal)
                         if self.sessionInterrupted {
@@ -1201,12 +1205,13 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
                         self.failStagedVideo(CameraError.processing, id: id, url: url); self.clearWriter(); return
                     }
                     let editorRecipe = NativeBalancedMath.editorRecipeAfterCapture()
+                    let capturedAt = self.clipCapturedAt ?? Date()
                     self.storageQueue.async {
                         do {
                             let descriptor = try ClearWaterCaptureStore.shared.commitVideo(id: id, outputURL: url,
                                 thumbnailData: thumbnail, width: metadata.width, height: metadata.height,
                                 duration: metadata.duration, fps: metadata.nominalFrameRate, codec: metadata.codec,
-                                recipe: try NativeBalancedMath.recipeDictionary(editorRecipe))
+                                recipe: try NativeBalancedMath.recipeDictionary(editorRecipe), capturedAt: capturedAt)
                             DispatchQueue.main.async {
                                 self.savedVideoCount += 1; self.updateCounters()
                                 self.delegate?.cameraViewController(self, didComplete: descriptor)
@@ -1232,7 +1237,7 @@ final class ClearWaterCameraViewController: UIViewController, MTKViewDelegate,
         DispatchQueue.main.async { self.delegate?.cameraViewController(self, didFail: self.text("Video could not be saved.", "Video could not be saved."), captureID: id); self.delegate?.cameraViewController(self, recordingState: "ready"); self.setState("ready"); self.endBackgroundTask(); if self.closeRequested { self.finishClose() } }
     }
     private func clearWriter() {
-        movieWriter = nil; writerAcceptingFrames = false; writerIncludesAudio = false; captureID = nil; videoURL = nil
+        movieWriter = nil; writerAcceptingFrames = false; writerIncludesAudio = false; captureID = nil; videoURL = nil; clipCapturedAt = nil
         recipeLock.lock(); clipRecipe = nil; recipeLock.unlock()
         DispatchQueue.main.async { self.recordingStartedAt = nil; self.elapsedTimer?.invalidate(); self.elapsedTimer = nil }
         unlockCaptureOrientation()

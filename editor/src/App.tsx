@@ -8,6 +8,7 @@ import { clearPhotos, deletePhoto, listPhotos, promoteSharedPhotos, savePhoto, l
 import {forgetCustomModel,loadRememberedCustomModel,rememberCustomModel} from './custom-model-storage';
 import {supportsFolder,chooseFolder,restoredName,createUniqueFile,writeFile,type LocalDirectoryHandle} from './file-save';
 import {isAndroid,saveAndroidCameraCapture,replaceAndroidCameraCapture,deleteAndroidCameraCapture,probeAndroidSources,receiveAndroidPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,type AndroidPhotoFolder} from './native';
+import {captureFilename} from './core/capture-filename';
 import {nextBackAction,type BackState} from './back-navigation';
 import {convertHdrImportRequest} from './hdr-import';
 import {activateWebUpdate} from './update';
@@ -373,7 +374,7 @@ export default function App() {
       return {collection:true,device,deviceExpected};
     }
     const id=crypto.randomUUID();
-    if(isAndroid()&&file.type==='image/jpeg')file=new File([file],`clearwater-camera-${id}.jpg`,{type:file.type,lastModified:file.lastModified});
+    if(isAndroid()&&(file.type==='image/jpeg'||file.type==='video/mp4'))file=new File([file],captureFilename(new Date(details?.capturedAt??file.lastModified),file.type==='video/mp4'?'mp4':'jpg'),{type:file.type,lastModified:file.lastModified});
     const stored:StoredPhoto={id,file,recipe:clone(recipe),addedAt:Date.now(),...(isAndroid()?{cameraCapture:{...(details?.enhancedVideo?{enhancedVideo:true}:{})}}:{})};
     let collection=false;
     try{await savePhoto(stored);collection=true;}catch{setStorageWarning(true);}
@@ -391,7 +392,7 @@ export default function App() {
     if(isAndroid()&&collection){
       let saved:{uri:string;name:string}|undefined;
       try{
-        saved=await saveAndroidCameraCapture(rendered,details?.nativeCaptureUri);
+        saved=await saveAndroidCameraCapture(rendered,details?.nativeCaptureUri,details?.capturedAt);
         stored.cameraCapture={...stored.cameraCapture,uri:saved.uri,name:saved.name,...(rendered.type.startsWith('image/')?{renderedSha256:await cameraFileHash(rendered)}:{})};
         stored.file=new File([file],saved.name,{type:file.type,lastModified:file.lastModified});
         await savePhoto(stored);device=true;

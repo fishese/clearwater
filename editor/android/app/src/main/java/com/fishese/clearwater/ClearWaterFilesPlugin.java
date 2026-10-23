@@ -174,7 +174,8 @@ public class ClearWaterFilesPlugin extends Plugin {
         if(document==null)throw new IOException("Could not create photo.");
         created.add(document.toString());JSObject value=new JSObject();value.put("uri",document.toString());value.put("name",displayName(document,name));call.resolve(value);
     }catch(Exception error){call.reject("Could not create a new photo.",error);}}); }
-    @PluginMethod public void createCapture(PluginCall call) { io.execute(()->{Uri uri=null;try {
+    private final Object captureCreateLock = new Object();
+    @PluginMethod public void createCapture(PluginCall call) { io.execute(()->{Uri uri=null;try { synchronized(captureCreateLock) {
         String name=call.getString("name"),type=call.getString("type");
         if(name==null||name.isEmpty()||name.length()>240||name.contains("/")||name.contains("\\")||name.equals(".")||name.equals(".."))throw new IOException("Invalid capture filename.");
         boolean video="video/mp4".equals(type);
@@ -184,8 +185,15 @@ public class ClearWaterFilesPlugin extends Plugin {
         String relative=video?Environment.DIRECTORY_MOVIES+"/ClearWater":Environment.DIRECTORY_PICTURES+"/ClearWater";
         if(Build.VERSION.SDK_INT>=29) {
             Uri collection=video?MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY):MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
-            try(Cursor cursor=getContext().getContentResolver().query(collection,new String[]{MediaStore.MediaColumns._ID},MediaStore.MediaColumns.DISPLAY_NAME+"=? AND "+MediaStore.MediaColumns.RELATIVE_PATH+"=?",new String[]{name,relative+"/"},null)) {
-                if(cursor!=null&&cursor.moveToFirst())throw new IOException("Filename already exists. Please save again.");
+            String requested=name; int suffix=0;
+            while(true) {
+                String candidate=suffix==0?requested:CaptureFilename.withCollisionSuffix(requested,suffix);
+                boolean exists=false;
+                try(Cursor cursor=getContext().getContentResolver().query(collection,new String[]{MediaStore.MediaColumns._ID},MediaStore.MediaColumns.DISPLAY_NAME+"=? AND "+MediaStore.MediaColumns.RELATIVE_PATH+"=?",new String[]{candidate,relative+"/"},null)) { exists=cursor!=null&&cursor.moveToFirst(); }
+                if(!exists){name=candidate;break;}
+                if(!requested.matches("(?i)CW_\\d{8}_\\d{6}(?:_\\d+)?\\.(?:jpg|mp4)"))throw new IOException("Filename already exists. Please save again.");
+                suffix++;
+                if(suffix>10000)throw new IOException("Could not choose an unused capture filename.");
             }
             ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,name);values.put(MediaStore.MediaColumns.MIME_TYPE,type);values.put(MediaStore.MediaColumns.RELATIVE_PATH,relative);values.put(MediaStore.MediaColumns.IS_PENDING,1);
             uri=getContext().getContentResolver().insert(collection,values);
@@ -196,10 +204,11 @@ public class ClearWaterFilesPlugin extends Plugin {
         File base=getContext().getExternalFilesDir(video?Environment.DIRECTORY_MOVIES:Environment.DIRECTORY_PICTURES);
         if(base==null)base=getContext().getFilesDir();
         File directory=new File(base,"ClearWater");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Could not prepare app-specific capture storage.");
-        File target=new File(directory,name);if(!target.createNewFile())throw new IOException("Filename already exists. Please save again.");
+        String requested=name; int suffix=0; File target;
+        while(true){String candidate=suffix==0?requested:CaptureFilename.withCollisionSuffix(requested,suffix);target=new File(directory,candidate);if(target.createNewFile()){name=candidate;break;}if(!requested.matches("(?i)CW_\\d{8}_\\d{6}(?:_\\d+)?\\.(?:jpg|mp4)"))throw new IOException("Filename already exists. Please save again.");suffix++;if(suffix>10000)throw new IOException("Could not choose an unused capture filename.");}
         uri=Uri.fromFile(target);captureCreated.add(uri.toString());
         JSObject result=new JSObject();result.put("uri",uri.toString());result.put("name",name);result.put("destination",target.getAbsolutePath());call.resolve(result);
-    }catch(Exception error){if(uri!=null)deleteCapture(uri);call.reject("Could not create a camera capture.",error);}}); }
+    }}catch(Exception error){if(uri!=null)deleteCapture(uri);call.reject("Could not create a camera capture.",error);}}); }
     @PluginMethod public void copyCameraCapture(PluginCall call) { io.execute(()->{Uri target=null;try {
         String targetValue=call.getString("uri"),sourceUri=call.getString("sourceUri");
         if(sourceUri==null||targetValue==null||!captureCreated.remove(targetValue))throw new IOException("Only a newly created gallery capture can receive a camera video.");
@@ -266,7 +275,7 @@ public class ClearWaterFilesPlugin extends Plugin {
     private boolean isLegacyCaptureFile(File file) {
         try {
             String path=file.getCanonicalPath(),name=file.getName();
-            if(!name.matches("(?i)(?:ClearWater_\\d{8}T\\d{6}Z_[0-9a-f-]{36}\\.(?:jpg|mp4)|clearwater-camera-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.jpg)"))return false;
+            if(!name.matches("(?i)(?:ClearWater_\\d{8}T\\d{6}Z_[0-9a-f-]{36}(?:_\\d+)?\\.(?:jpg|mp4)|CW_\\d{8}_\\d{6}(?:_\\d+)?\\.(?:jpg|mp4)|clearwater-camera-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.jpg)"))return false;
             for(boolean video:new boolean[]{false,true})if(file.getCanonicalFile().getParentFile().equals(legacyCaptureDirectory(video).getCanonicalFile()))return true;
         } catch(Exception ignored) {}
         return false;

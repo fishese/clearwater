@@ -5,6 +5,7 @@
 User authorized best-effort iPhone Safari/Chrome Save/Share verification and release of the current fixes before any proposed redesign. This supersedes the earlier no-release/no-version-bump checkpoint for this release only.
 
 - [x] Preserve current recipes/defaults, optional photo finish and native camera/storage behavior. Release scope: web Browse files, comparison hit band/dragging, cancelled-folder-picker export ownership.
+- [x] Add newly requested camera filenames `CW_YYYYMMDD_HHMMSS` plus the existing media extension across web/Android/iOS; preserve existing captures/internal IDs, use local capture time and non-overwriting numeric collision suffixes. 264 shared tests and focused camera-save bridge check pass; native release checks pending.
 - [x] Prepare version 1.0.11, Android code 30 and unsigned iOS build 9 (iOS 26+), with unchanged signing configuration.
 - [ ] Run macOS WebKit photo switching/comparison plus Safari/CriOS saving, cancel/retry, fresh-tap sharing and canShare variants. Run native iOS regressions and unsigned device packaging.
 - [ ] Merge reviewed source, verify Pages, build and verify APK/IPA assets from merged source, publish coordinated checksummed release.

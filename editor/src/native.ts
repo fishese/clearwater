@@ -1,6 +1,7 @@
 import {Capacitor,registerPlugin,type PluginListenerHandle} from '@capacitor/core';
 import type {LocalDirectoryHandle,LocalFileHandle} from './file-save';
 import {isVideo,mediaLimit,supportedMedia} from './core/media';
+import {captureFilename} from './core/capture-filename';
 import {assertVideoBytes,detectMediaPlatform,normalizeMediaError,PlatformLimitError,presentMediaError,type MediaPlatform} from './core/platform-limits';
 import type {CustomModel} from './core/types';
 
@@ -119,18 +120,19 @@ export function listenForAndroidBack(onBack:()=>void):()=>void{
  return ()=>{if(stopped)return;stopped=true;backListeners=Math.max(0,backListeners-1);if(backListeners===0)void back.setEnabled({enabled:false}).catch(()=>{});if(listener)void listener.remove().catch(()=>{});};
 }
 export const exitAndroidApp=()=>back.exitApp();
-export async function saveAndroidCameraCapture(file:File,sourceUri?:string):Promise<{uri:string;name:string;destination:string}>{
+export async function saveAndroidCameraCapture(file:File,sourceUri?:string,capturedAt?:number):Promise<{uri:string;name:string;destination:string}>{
  if(!isAndroid())throw new Error('Camera captures can only be saved from the Android app.');
  const type=file.type.toLowerCase();
  const video=type==='video/mp4';
  if(!video&&type!=='image/jpeg')throw new Error('Camera captures must be JPEG photos or MP4 videos.');
  if(file.size<=0)throw new Error('The camera capture is empty.');
   if(sourceUri&&!video)throw new Error('Only native camera videos can be copied directly.');
- const generatedName=()=>{const stamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');return `ClearWater_${stamp}_${crypto.randomUUID()}.${video?'mp4':'jpg'}`;};
+ const generatedName=()=>captureFilename(new Date(capturedAt??file.lastModified??Date.now()),video?'mp4':'jpg');
  const supplied=file.name;
  const safeCameraName=/^clearwater-camera-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jpg$/i.test(supplied);
  const legacyName=/^ClearWater_\d{8}T\d{6}Z_[0-9a-f-]{36}\.(?:jpg|mp4)$/i.test(supplied)&&supplied.toLowerCase().endsWith(video?'.mp4':'.jpg');
- const name=safeCameraName&&!video||legacyName?supplied:generatedName();
+ const timestampedName=/^CW_\d{8}_\d{6}(?:_\d+)?\.(?:jpg|mp4)$/i.test(supplied)&&supplied.toLowerCase().endsWith(video?'.mp4':'.jpg');
+ const name=(safeCameraName&&!video||legacyName||timestampedName)&&!capturedAt?supplied:generatedName();
  const created=await files.createCapture({name,type:video?'video/mp4':'image/jpeg'});
   if(sourceUri){await files.copyCameraCapture({sourceUri,uri:created.uri});return created;}
  const {id}=await files.beginWrite({uri:created.uri});let committed=false;

@@ -262,7 +262,7 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
             let originalURL = try variant == "enhanced" && kind == "photo" ? self.store.enhancedPhotoURL(id: id) : self.store.sourceURL(id: id)
             let shareKey = "\(id):\(variant)"; guard self.activeShare == nil else { throw PluginError.shareBusy }
             self.cleanupStaleShareOperations()
-            let url = try self.namedShareURL(source: originalURL, id: id, kind: kind ?? "photo", variant: variant)
+            let url = try self.namedShareURL(source: originalURL, name: capture["name"] as? String ?? originalURL.lastPathComponent, kind: kind ?? "photo", variant: variant)
             self.activeShare = shareKey
             self.activeShareURL = url
             self.activeShareDirectory = url.deletingLastPathComponent()
@@ -283,12 +283,13 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
     }
     /// Give share providers a stable, user-facing filename without loading media into RAM.
     /// A per-operation directory makes crash leftovers safe to clean on the next share.
-    private func namedShareURL(source: URL, id: String, kind: String, variant: String) throws -> URL {
+    private func namedShareURL(source: URL, name: String, kind: String, variant: String) throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ClearWaterShare", isDirectory: true)
         let directory = root.appendingPathComponent(UUID().uuidString.lowercased(), isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let suffix = kind == "photo" && variant == "source" ? "_original" : ""
-        let destination = directory.appendingPathComponent("ClearWater_\(id)\(suffix).\(source.pathExtension)")
+        let sourceName = URL(fileURLWithPath: name).deletingPathExtension().lastPathComponent
+        let destination = directory.appendingPathComponent("\(sourceName)\(suffix).\(source.pathExtension)")
         do { try FileManager.default.linkItem(at: source, to: destination) }
         catch {
             do { try FileManager.default.copyItem(at: source, to: destination) }
@@ -312,8 +313,11 @@ public final class ClearWaterCameraPlugin: CAPPlugin, CAPBridgedPlugin, ClearWat
                 let capture = try self.store.getCapture(id: id)
                 let url = try (capture["kind"] as? String) == "video" ? self.store.sourceURL(id: id) : self.store.enhancedPhotoURL(id: id)
                 PHPhotoLibrary.shared().performChanges({
-                    if capture["kind"] as? String == "video" { PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url) }
-                    else { PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url) }
+                    let request = PHAssetCreationRequest.forAsset()
+                    let options = PHAssetResourceCreationOptions()
+                    options.originalFilename = capture["name"] as? String ?? url.lastPathComponent
+                    let resourceType: PHAssetResourceType = capture["kind"] as? String == "video" ? .video : .photo
+                    request.addResource(with: resourceType, fileURL: url, options: options)
                 }) { success, error in
                     guard success else { completion(false, error?.localizedDescription ?? "Photos could not save the capture."); return }
                     do { try self.store.markPhotosSaved(id: id); completion(true, nil) }
