@@ -1,13 +1,16 @@
+import {fileURLToPath} from 'node:url';
+import {mkdir} from 'node:fs/promises';
 import {chromium,webkit} from 'playwright';
 import assert from 'node:assert/strict';
 const browser=await (process.env.CHECK_BROWSER==='webkit'?webkit.launch():chromium.launch({channel:'msedge'}));
+await mkdir(new URL('../../analysis/photo-check/',import.meta.url),{recursive:true});
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900},hasTouch:true});
  await page.goto(process.env.CHECK_URL||'http://127.0.0.1:4176/');
  const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=960;c.height=640;const x=c.getContext('2d');x.fillStyle='#438998';x.fillRect(0,0,960,640);return c.toDataURL().split(',')[1];});
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
  await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false,null,{timeout:120000});
- const hint=page.getByRole('button',{name:'Got it',exact:true});if(await hint.isVisible())await hint.click();
+ const hint=page.locator('.web-update-hint-ok');if(await hint.isVisible())await hint.click();
  for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:900});
   for(const expanded of [false,true]){
@@ -30,6 +33,7 @@ try {
    }
    await input.focus();const before=Number(await input.inputValue());await page.keyboard.press('ArrowLeft');assert.ok(Number(await input.inputValue())<before,'keyboard slider retained');
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');
+   await page.screenshot({path:fileURLToPath(new URL('../../analysis/photo-check/review-'+width+'-'+expanded+'.png',import.meta.url)),fullPage:true});
    if(expanded)await page.getByRole('button',{name:'Exit expanded view',exact:true}).click();
   }
  }

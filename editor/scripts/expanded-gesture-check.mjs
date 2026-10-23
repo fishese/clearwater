@@ -6,6 +6,7 @@ const browser=await chromium.launch({channel:'msedge',headless:true});
 try {
  const page=await browser.newPage({viewport:{width:1440,height:900},hasTouch:true});
  await page.goto(url);
+ const hint=page.locator('.web-update-hint-ok');if(await hint.isVisible())await hint.click();
  const makePng=(width,height,colour='#b8a99a')=>page.evaluate(({width,height,colour})=>{const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;const ctx=canvas.getContext('2d');ctx.fillStyle=colour;ctx.fillRect(0,0,width,height);return canvas.toDataURL('image/png').split(',')[1];},{width,height,colour});
  const landscape=await makePng(960,540);
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'landscape.png',mimeType:'image/png',buffer:Buffer.from(landscape,'base64')});
@@ -65,9 +66,9 @@ try {
  // A drag on the comparison slider changes only the divider and cannot arm WB history.
  const undo=page.getByRole('button',{name:'Undo',exact:true});assert.equal(await undo.isDisabled(),true);
  await comparison.evaluate(el=>{
-  const r=el.getBoundingClientRect(),y=r.top+r.height/2;
+  const r=el.getBoundingClientRect(),frame=el.closest('.image-frame').getBoundingClientRect(),y=r.top+r.height/2;
   const send=(type,x)=>el.dispatchEvent(new PointerEvent(type,{pointerId:3,pointerType:'mouse',isPrimary:true,bubbles:true,cancelable:true,clientX:x,clientY:y}));
-  send('pointerdown',r.left+r.width*.25);send('pointermove',r.left+r.width*.75);send('pointerup',r.left+r.width*.75);
+  send('pointerdown',r.left+r.width/2);send('pointermove',frame.left+frame.width*.8);send('pointerup',frame.left+frame.width*.8);
  });
  assert.ok(Number(await comparison.inputValue())>65,'comparison drag moves the divider');
  assert.equal(await undo.isDisabled(),true,'comparison drag does not create a white-balance edit');

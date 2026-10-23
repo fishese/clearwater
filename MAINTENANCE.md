@@ -1,5 +1,19 @@
 # Maintenance
 
+## Fresh workflow review checkpoint (23 October 2026)
+
+Current branch: `codex/fresh-workflow-review`. Review and reproducible checks: `REVIEW_2026-10-23.md`. This checkpoint supersedes the pending next-version items below; release history remains historical.
+
+- [x] Recover and independently verify the previous review and unfinished edits. Preserve all three stashes and unrelated `editor/.idea/`.
+- [x] Fix cancelled export resuming after a pending folder picker; held success/error and retry regression passes.
+- [x] Restrict comparison to a 44px-wide band along the full divider; preserve relative dragging, keyboard input, pan and pinch. Desktop/320/390px normal/expanded checks pass.
+- [x] Add web-only localized Browse files using existing supported-media validation. Preserve native picker routes. Browser filter/reset/cancel/unsupported-file checks pass; OS picker contents still require device acceptance.
+- [x] 262 shared tests, production build/worker graph, JPG stale replies, enhancement and photo-finish parity/reuse, iPhone-style browser export readiness, mocked iOS shell, multilingual mobile layouts pass. Independent patch review found no further actionable regression.
+- [ ] Complete final synthetic large-file report and UX proposals. Next: measure short 4K Source video; update review with final matrix and unresolved hardware gates. Existing limits/defaults remain unchanged.
+- [ ] Physical Android/iPhone picker, memory, camera and share-destination acceptance; macOS Safari/WKWebView validation. Windows WebKit photo load timed out, so it is inconclusive, not a pass. Chromium platform mocks are not hardware evidence.
+
+No release, merge, version bump, native signing or app-data clearing. The computer-use skill was inspected; repository browser harnesses were the relevant verification tools, with no additional skill installation needed.
+
 ## Next version: photo picker and preview interaction (20 October 2026)
 
 Recorded at the user's request for the next planned version; documentation only. Do not issue an immediate release or bump versions for these items.
