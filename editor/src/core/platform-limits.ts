@@ -40,7 +40,8 @@ function limits(overrides:Partial<PlatformLimits>={}):PlatformLimits {
 }
 
 /**
- * iOS Safari, iOS Chrome (WebKit) and the iOS app share one WKWebView process with about a 1.5 GB jetsam limit.
+ * Use conservative budgets for iOS browsers and the app WebView. Available process
+ * memory varies by device, OS and concurrent work; there is no universal jetsam limit.
  * Source export keeps the finished MP4 in a BufferTarget and then copies it into a Blob, so a 512 MB file peaks near 1 GB before frames are counted.
  * 256 MB input and source output leaves room for decoded frames. Auto photos stay near 24 MP (about 96 MB of RGBA) instead of decoding the original.
  */
