@@ -5,9 +5,10 @@
 User authorized best-effort iPhone Safari/Chrome Save/Share verification and release of the current fixes before any proposed redesign. This supersedes the earlier no-release/no-version-bump checkpoint for this release only.
 
 - [x] Preserve current recipes/defaults, optional photo finish and native camera/storage behavior. Release scope: web Browse files, comparison hit band/dragging, cancelled-folder-picker export ownership.
-- [x] Add newly requested camera filenames `CW_YYYYMMDD_HHMMSS` plus the existing media extension across web/Android/iOS; preserve existing captures/internal IDs, use local capture time and non-overwriting numeric collision suffixes. 264 shared tests and focused camera-save bridge check pass; native release checks pending.
+- [x] Add newly requested camera filenames `CW_YYYYMMDD_HHMMSS` plus the existing media extension across web/Android/iOS; preserve existing captures/internal IDs, use local capture time and non-overwriting numeric collision suffixes. 264 shared tests, 11 Android tests, signed debug/release builds, camera-save bridge and iOS camera/editor recovery checks pass. Collision suffix regression fixed; existing names/internal IDs preserved.
 - [x] Prepare version 1.0.11, Android code 30 and unsigned iOS build 9 (iOS 26+), with unchanged signing configuration.
-- [ ] Run macOS WebKit photo switching/comparison plus Safari/CriOS saving, cancel/retry, fresh-tap sharing and canShare variants. Run native iOS regressions and unsigned device packaging.
+- [x] macOS WebKit photo switching/comparison and all six Safari/CriOS Save/Share cases pass in run 39980749558 (share APIs mocked). Unsigned device packaging passes.
+- [ ] Native iOS regression in run 39980749558 remains in progress; require success before merge.
 - [ ] Merge reviewed source, verify Pages, build and verify APK/IPA assets from merged source, publish coordinated checksummed release.
 - [ ] Next: complete browser release gates and record exact CI/build evidence. Physical iPhone share destinations, memory and camera acceptance remain hardware limitations; do not clear user app data.
 
