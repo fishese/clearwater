@@ -1,16 +1,15 @@
 # Maintenance
 
-## Authorized 1.0.11 release preparation (23 October 2026)
+## 1.0.11 released (24 October 2026)
 
-User authorized best-effort iPhone Safari/Chrome Save/Share verification and release of the current fixes before any proposed redesign. This supersedes the earlier no-release/no-version-bump checkpoint for this release only.
+[PR #13](https://github.com/fishese/clearwater/pull/13) merged as `342c06de02b818453ffb1475c4d39c14d0689457`; [v1.0.11](https://github.com/fishese/clearwater/releases/tag/v1.0.11) is published as latest from that exact source. Android code 30; unsigned iOS build 9, iOS 26+. User authorized release of current fixes and added camera filename changes before release. Proposed workflow redesigns and larger-file limit changes remain deferred.
 
-- [x] Preserve current recipes/defaults, optional photo finish and native camera/storage behavior. Release scope: web Browse files, comparison hit band/dragging, cancelled-folder-picker export ownership.
-- [x] Add newly requested camera filenames `CW_YYYYMMDD_HHMMSS` plus the existing media extension across web/Android/iOS; preserve existing captures/internal IDs, use local capture time and non-overwriting numeric collision suffixes. 264 shared tests, 11 Android tests, signed debug/release builds, camera-save bridge and iOS camera/editor recovery checks pass. Collision suffix regression fixed; existing names/internal IDs preserved.
-- [x] Prepare version 1.0.11, Android code 30 and unsigned iOS build 9 (iOS 26+), with unchanged signing configuration.
-- [x] macOS WebKit photo switching/comparison and all six Safari/CriOS Save/Share cases pass in run 39980749558 (share APIs mocked). Unsigned device packaging passes.
-- [ ] Native iOS regression in run 39980749558 remains in progress; require success before merge.
-- [ ] Merge reviewed source, verify Pages, build and verify APK/IPA assets from merged source, publish coordinated checksummed release.
-- [ ] Next: complete browser release gates and record exact CI/build evidence. Physical iPhone share destinations, memory and camera acceptance remain hardware limitations; do not clear user app data.
+- [x] Shipped web Browse files, full-height 44px comparison drag band with stable 150% zoom/panning, and cancelled-folder-picker export ownership fix. Recipes, production defaults, optional Off/Natural/Vivid finish, inference reuse and existing Save/Share behavior preserved.
+- [x] New camera photos/videos use local capture time `CW_YYYYMMDD_HHMMSS` plus media extension. Same-second collisions receive numeric suffixes; existing captures, edits and internal IDs remain unchanged. Android collision suffix regression fixed and covered. iOS camera restart harness now correctly expects Auto and verifies stale lens replies cannot change it.
+- [x] 264 shared tests, 11 Android tests and signed APK builds pass. [Native iOS run 39980749558](https://github.com/fishese/clearwater/actions/runs/39980749558) passed 35 tests; its native iOS source is identical to the merge. [Merged-source run 40019866869](https://github.com/fishese/clearwater/actions/runs/40019866869) passed unsigned device packaging, macOS WebKit photo switching/comparison and all six Safari/CriOS saving/cancel/retry/fresh-tap cases. Browser identity/share mocks are automated evidence, not physical iPhone destination acceptance.
+- [x] [Pages run 40019844541](https://github.com/fishese/clearwater/actions/runs/40019844541) deployed the merge; live site passes photo editing/repeated JPG switching. APK versions and prior certificate continuity verified. ZIP integrity, all 50 bundled web files, three model hashes, IPA identity/version/unsigned status and exact CI source/checksum verify. Only static-text line endings and independently verified generated service-worker cache/order differ across hosts.
+- [x] All 14 uploaded release assets match local SHA-256 and sizes. Release APK: `d7803a710e072d2f7b0c716f8c17a0b24af39740ef891e6448ebfee5428ee86a`; debug APK: `06692513bacaa2d5019b1ede23bbc3d628149d723ba39fe3b808bbf3838c3694`; unsigned IPA: `4d9274d01d0150c4479f43da11ba72c41302d1e5819ec3ce44983a2a25c58f56`. Evidence is ignored under `editor/android/build/release-1.0.11/` and `editor/ios/App/output/release-1.0.11/`.
+- [ ] Next: physical iPhone Safari/Chrome save destinations, native camera/lens and Android picker acceptance when hardware is available. Discuss review proposals before further implementation; see `REVIEW_2026-10-23.md` and `LARGE_MEDIA_REVIEW_2026-10-23.md`. No app data cleared; all three stashes and unrelated `editor/.idea/` preserved. Earlier no-release and pending-validation statements below are historical.
 
 ## Fresh workflow review checkpoint (23 October 2026)
 
