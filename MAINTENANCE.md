@@ -1,5 +1,15 @@
 # Maintenance
 
+## 1.0.12 released (24 October 2026)
+
+[PR #14](https://github.com/fishese/clearwater/pull/14) merged as `0d4a62cec9b9cbad9c2810aadf606f76ebd035dd`; [v1.0.12](https://github.com/fishese/clearwater/releases/tag/v1.0.12) is published as latest from that exact source. User explicitly authorized merge and release after accepting the Android test build. Android code 31; unsigned iOS build 10 (iOS 26+); signing configuration unchanged.
+
+- [x] Fixed mobile comparison divider flickering by replacing the competing native range control with a focusable ARIA slider using the existing Pointer Events gesture owner. Full-height 44px band, relative dragging, keyboard controls, pan/pinch/cancel behavior preserved. Camera timestamp names and existing processing/Save/Share defaults remain intact.
+- [x] [Merged-source run 40049835166](https://github.com/fishese/clearwater/actions/runs/40049835166) passes 264 shared tests, trusted Chromium touch moves, macOS WebKit real taps/synthetic touch pointers, photo switching, six Safari/CriOS Save/Share cases and unsigned device IPA packaging. All 11 Android tests and both APK builds pass. Native iOS runtime/tests are unchanged from the successful 35-test run 39980749558; only version metadata changed. Physical Android browser automation and user acceptance of the matching test APK are recorded below. Physical iPhone testing remains deferred; mocked share APIs do not verify destination apps.
+- [x] [Pages run 40049821573](https://github.com/fishese/clearwater/actions/runs/40049821573) deployed the merge. Live-site trusted touch dragging at Fit/150%, normal/expanded, 320/390/1440px and photo editing/repeated switching pass. Browser users can reload/apply the web update to receive the fix.
+- [x] Package ZIP integrity, all 50 bundled web files, all three model hashes, APK versions/signing certificate continuity and IPA identity/version/unsigned status verify. CI IPA commit/checksum matches the merge. All 14 uploaded assets match local SHA-256 and sizes; latest release/tag point to the exact merge. Release APK SHA-256 `3881fa663ac8499319956118bb6dd7168a6c3e87a64002c8323cfed5a1a083ee`; debug `0810b5d578bc616b6c8eaa320ed1ca41e57c757c6fdef99d7fe33e106e16f586`; unsigned IPA `ec6b563c69df63ade35a687a5b4ee1ece231d3dd65199d6322da88229c85f376`. Ignored evidence/assets: `editor/android/build/release-1.0.12/` and `editor/ios/App/output/release-1.0.12/`.
+- [ ] Next: physical iPhone acceptance when available. Consider clearer website camera feedback: browser collection storage does not create Gallery/Files copies until export/share. Larger-file and workflow redesign proposals remain deferred. No app data or existing stashes cleared; unrelated IDE state preserved.
+
 ## Mobile comparison drag regression (24 October 2026)
 
 - [x] Reproduced v1.0.11 on the connected SM-S9280 running Android Chrome 155 using browser-native touch events over ADB/CDP. A +30px drag from 50% should end near 58%; competing native range input events instead alternate 0/100 and end at an extreme. A desktop Chromium trusted-touch regression independently fails on released source with the same sequence. The previous comparison gate used mouse dragging, so it missed native touch defaults.
@@ -10,7 +20,7 @@
 - [x] Camera storage explanation verified: website captures stay in browser IndexedDB collection until exported/shared (usually `CW_...-restore.jpg/mp4`); Android 10+ APK auto-saves enhanced copies to `Pictures/ClearWater` or `Movies/ClearWater`. Browser collection does not imply a Gallery/Files copy. User confirmed the missing Gallery files were website captures. Record clearer collection-only wording as a UX suggestion; do not silently start auto-downloading.
 - [x] User reports installed Android test app works fine (24 October 2026). This is user acceptance of the installed test build; no detailed individual camera/Gallery assertions were supplied.
 - [x] User authorized merge and release of PR #14 (24 October 2026). Prepare 1.0.12: Android code 31, iOS build 10, signing unchanged.
-- [ ] Next: merge verified patch, rerun merged-source web/touch/Save checks and device packaging, verify APK/IPA provenance and publish coordinated release. Physical iPhone test remains deferred at user request.
+- [x] Merge, merged-source validation, package verification and 1.0.12 publication complete; see release checkpoint above. Physical iPhone test remains deferred at user request.
 
 ## 1.0.11 released (24 October 2026)
 
