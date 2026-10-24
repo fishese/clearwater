@@ -1,5 +1,15 @@
 # Handoff
 
+## 1.0.13 released (24 October 2026)
+
+[PR #15](https://github.com/fishese/clearwater/pull/15) merged as `5bcb5344b0a3ff1046abe0e4ed84279727b53707`; [v1.0.13](https://github.com/fishese/clearwater/releases/tag/v1.0.13) is published as latest from that exact source. Android code 32; unsigned iOS build 11 (iOS 26+). User explicitly authorized merge/release. Public assets now follow `RELEASE_ASSET_POLICY.md`: signed release APK and unsigned IPA, no debug/unsigned Android APKs or their sidecars.
+
+- [x] Fixed desktop preview-size oscillation at comparison edges by containing overlays and aligning the full 44px hit band/handle inside the image. Exact split position, keyboard, touch, pan/pinch and processing defaults preserved. Original private video and synthetic still-image checks passed; no private recording/media uploaded.
+- [x] [Merged-source run 40101059184](https://github.com/fishese/clearwater/actions/runs/40101059184) passes 264 shared tests, Chromium/WebKit edge layout checks, touch/keyboard, photo switching, all six Safari/CriOS Save/Share cases and unsigned IPA packaging. All 11 Android tests and signed release APK build pass. Swift runtime/tests remain identical to successful 35-test native run 39980749558 (only project version metadata changed). Physical iPhone acceptance remains deferred; share APIs are mocked in browser automation.
+- [x] [Pages run 40101022796](https://github.com/fishese/clearwater/actions/runs/40101022796) deployed the merge. Live Chrome classic-scrollbar edge checks, Chromium trusted-touch moves and Chrome photo editing/repeated switching pass. Reload/apply the web update to receive the fix.
+- [x] Package integrity, all 50 bundled web files, all three ONNX model hashes, APK version/signing certificate continuity and IPA identity/version/unsigned status verify. Downloaded CI IPA source/run/checksum matches the merge. All 12 uploaded assets match local SHA-256 and sizes; latest release/tag and canonical checksum download links verify. Release APK SHA-256 `5c36b16f4ee89c9df7558ad70af292a206a1d9b3cc1b45d875d34d2cf6f121b2`; unsigned IPA `ccc81158944cc86f1982e257ae431da13685cf1ffa019f92c3a8bcdca63118b0`. Ignored packages/scripts/evidence: `editor/android/build/release-1.0.13/` and `editor/ios/App/output/release-1.0.13/`.
+- [ ] Next: physical iPhone acceptance when available; optional clearer web camera collection/export wording and deferred larger-file/workflow proposals. No app data cleared or installation changed; all three stashes and unrelated IDE state preserved. Earlier pending-release statements below are historical.
+
 ## Desktop comparison edge resize regression (24 October 2026)
 
 - [x] Inspected the user's screen recording and reproduced with local `VID-20260325-WA0004.mp4` (1280x720 H.264, about 18 seconds). Chrome at 1440x720 with classic scrollbars alternates preview 878.22x494 / 851.55x479 at divider 100%; stage client area alternates 899x483 / 914x498. Also reproduced with a generated 16:9 still image: this is layout feedback, not a MOV/video decoding defect.
@@ -8,7 +18,7 @@
 - [x] Exact private video and synthetic wide-image geometry checks pass locally; Chrome/Edge, normal/expanded Fit/150%, edge drags, keyboard, touch and pinch/cancel checks pass. Production build and 264 shared tests pass. Final handle/hitbox alignment checks pass at both endpoints, and visual inspection confirms the stable preview. Independent source review found no remaining gesture regression.
 - [x] [CI run 40100443214](https://github.com/fishese/clearwater/actions/runs/40100443214) passes Chromium/WebKit edge layout, trusted touch/keyboard, photo switching, all six Safari/CriOS Save/Share cases and unsigned IPA packaging. CI uses synthetic media only; no physical iPhone acceptance is claimed.
 - [x] User authorized merge/release of PR #15 (24 October 2026). Prepare 1.0.13: Android code 32, iOS build 11; signing unchanged. Public assets exclude debug/unsigned APKs and their sidecars; keep unsigned IPA.
-- [ ] Next: merge, validate merged-source browser checks and packaging, verify signed APK/unsigned IPA, publish release and record provenance. No app installation or data clearing requested. Private recording frames, sample and diagnostics remain ignored under `analysis/photo-check/` and `Sample photos/`; use synthetic media in CI.
+- [x] Merge, merged-source validation, package verification and coordinated 1.0.13 publication complete; see release checkpoint above. No app installation or data clearing requested. Private recording frames, sample and diagnostics remain ignored under `analysis/photo-check/` and `Sample photos/`; use synthetic media in CI.
 
 ## Future release assets (24 October 2026)
 
