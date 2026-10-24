@@ -7,7 +7,8 @@
 - [x] Contain comparison controls in an image-sized clipped overlay, clamp the full 44px hit band inside the image at endpoints, and align the visible handle with that hit band while the split line still reaches the true edge. Keep stage scrolling, Fit math, processing and neutral picker unchanged.
 - [x] Exact private video and synthetic wide-image geometry checks pass locally; Chrome/Edge, normal/expanded Fit/150%, edge drags, keyboard, touch and pinch/cancel checks pass. Production build and 264 shared tests pass. Final handle/hitbox alignment checks pass at both endpoints, and visual inspection confirms the stable preview. Independent source review found no remaining gesture regression.
 - [x] [CI run 40100443214](https://github.com/fishese/clearwater/actions/runs/40100443214) passes Chromium/WebKit edge layout, trusted touch/keyboard, photo switching, all six Safari/CriOS Save/Share cases and unsigned IPA packaging. CI uses synthetic media only; no physical iPhone acceptance is claimed.
-- [ ] Next: [PR #15](https://github.com/fishese/clearwater/pull/15) is ready for merge/release authorization. No version bump, release, app installation or data clearing authorized in this follow-up. Private recording frames, sample and diagnostics remain ignored under `analysis/photo-check/` and `Sample photos/`; use synthetic media in CI.
+- [x] User authorized merge/release of PR #15 (24 October 2026). Prepare 1.0.13: Android code 32, iOS build 11; signing unchanged. Public assets exclude debug/unsigned APKs and their sidecars; keep unsigned IPA.
+- [ ] Next: merge, validate merged-source browser checks and packaging, verify signed APK/unsigned IPA, publish release and record provenance. No app installation or data clearing requested. Private recording frames, sample and diagnostics remain ignored under `analysis/photo-check/` and `Sample photos/`; use synthetic media in CI.
 
 ## Future release assets (24 October 2026)
 
