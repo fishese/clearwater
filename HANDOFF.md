@@ -1,5 +1,13 @@
 # Handoff
 
+## Desktop comparison edge resize regression (24 October 2026)
+
+- [x] Inspected the user's screen recording and reproduced with local `VID-20260325-WA0004.mp4` (1280x720 H.264, about 18 seconds). Chrome at 1440x720 with classic scrollbars alternates preview 878.22x494 / 851.55x479 at divider 100%; stage client area alternates 899x483 / 914x498. Also reproduced with a generated 16:9 still image: this is layout feedback, not a MOV/video decoding defect.
+- [x] Cause: comparison hitbox/visible handle extend past image edge, altering stage scrollable overflow; appearing/disappearing scrollbars feed ResizeObserver dimensions back into Fit. Playwright normally hides scrollbars, which masked this condition in prior checks.
+- [x] Contain comparison controls in an image-sized clipped overlay, clamp the full 44px hit band inside the image at endpoints, and align the visible handle with that hit band while the split line still reaches the true edge. Keep stage scrolling, Fit math, processing and neutral picker unchanged.
+- [x] Exact private video and synthetic wide-image geometry checks pass locally; Chrome/Edge, normal/expanded Fit/150%, edge drags, keyboard, touch and pinch/cancel checks pass. Production build and 264 shared tests pass. Final handle-alignment checks and CI WebKit coverage pending.
+- [ ] Next: complete final regressions and CI, then present patch for merge/release authorization. No version bump, release, app installation or data clearing authorized in this follow-up. Private recording frames, sample and diagnostics remain ignored under `analysis/photo-check/` and `Sample photos/`; use synthetic media in CI.
+
 ## Future release assets (24 October 2026)
 
 User requested future public releases omit both unsigned Android APKs and debug APKs (including their checksum sidecars). Publish signed release APKs and retain the unsigned IPA. Keep canonical download links, licences/notices, provenance and checksums. Debug builds remain local or separately requested testing material; preserve existing signing identities and user data. Follow `RELEASE_ASSET_POLICY.md` when adapting packaging scripts; historical 14-asset/debug-upload checklists below no longer set future policy. Existing releases are unchanged.
