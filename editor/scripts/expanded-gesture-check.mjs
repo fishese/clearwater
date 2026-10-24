@@ -40,14 +40,14 @@ try {
  // A two-pointer gesture over the comparison range zooms the image without moving its divider.
  await page.getByRole('button',{name:'Toggle adjustments'}).click();
  const comparison=page.locator('.comparison-input');
- const beforeDivider=Number(await comparison.inputValue());
+ const beforeDivider=Number(await comparison.getAttribute('aria-valuenow'));
  const cdp=await page.context().newCDPSession(page),cmpBox=await comparison.boundingBox(),cmpX=cmpBox.x+cmpBox.width/2,cmpY=cmpBox.y+cmpBox.height/2;
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cmpX-50,y:cmpY,id:1,radiusX:2,radiusY:2,force:1}]});
  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:cmpX-50,y:cmpY,id:1,radiusX:2,radiusY:2,force:1},{x:cmpX+50,y:cmpY,id:2,radiusX:2,radiusY:2,force:1}]});
  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:cmpX-50,y:cmpY,id:1,radiusX:2,radiusY:2,force:1},{x:cmpX+70,y:cmpY,id:2,radiusX:2,radiusY:2,force:1}]});
  await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
  assert.notEqual(await overlay.innerText(),'Fit','pinch changes zoom with comparison enabled');
- const pinchDivider=Number(await comparison.inputValue());assert.ok(Math.abs(pinchDivider-beforeDivider)<2,`pinch leaves the comparison divider in place (${beforeDivider} -> ${pinchDivider})`);
+ const pinchDivider=Number(await comparison.getAttribute('aria-valuenow'));assert.ok(Math.abs(pinchDivider-beforeDivider)<2,`pinch leaves the comparison divider in place (${beforeDivider} -> ${pinchDivider})`);
  const afterPinchScroll=await page.evaluate(()=>({left:document.querySelector('.stage').scrollLeft,top:document.querySelector('.stage').scrollTop}));
  assert.ok(afterPinchScroll.left>=0&&afterPinchScroll.top>=0);
  await page.getByRole('button',{name:'Fit',exact:true}).click();
@@ -70,7 +70,7 @@ try {
   const send=(type,x)=>el.dispatchEvent(new PointerEvent(type,{pointerId:3,pointerType:'mouse',isPrimary:true,bubbles:true,cancelable:true,clientX:x,clientY:y}));
   send('pointerdown',r.left+r.width/2);send('pointermove',frame.left+frame.width*.8);send('pointerup',frame.left+frame.width*.8);
  });
- assert.ok(Number(await comparison.inputValue())>65,'comparison drag moves the divider');
+ assert.ok(Number(await comparison.getAttribute('aria-valuenow'))>65,'comparison drag moves the divider');
  assert.equal(await undo.isDisabled(),true,'comparison drag does not create a white-balance edit');
 
  // With the picker armed, a pinch (including pointercancel) is consumed until every finger lifts.

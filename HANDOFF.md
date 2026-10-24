@@ -1,5 +1,13 @@
 # Handoff
 
+## Mobile comparison drag regression (24 October 2026)
+
+- [x] Reproduced v1.0.11 on the connected SM-S9280 running Android Chrome 155 using browser-native touch events over ADB/CDP. A +30px drag from 50% should end near 58%; competing native range input events instead alternate 0/100 and end at an extreme. A desktop Chromium trusted-touch regression independently fails on released source with the same sequence. The previous comparison gate used mouse dragging, so it missed native touch defaults.
+- [x] Replace the native range overlay with a focusable ARIA slider controlled by the existing Pointer Events gesture owner. Preserve the full-height 44px band, relative drag offset, arrows/Page/Home/End, pan/pinch and cancellation. Engine processing and export/save paths unchanged.
+- [x] Local production build, 264 shared tests, mobile/desktop trusted-touch drags, mouse/keyboard comparison, expanded pinch/cancel, pan, neutral picker and video-preview checks pass. Fixed build passes automated touch dragging on the physical Android phone at Fit/150%, normal/expanded. Existing user media, site data and app installations preserved; only synthetic media used in a separate local-origin test tab.
+- [ ] Run macOS WebKit trusted taps/synthetic touch-pointer checks and Chromium trusted touch moves in CI. No physical iPhone evidence yet. New script: `editor/scripts/comparison-touch-check.mjs`; ignored physical baseline trace: `analysis/photo-check/device-touch-baseline.json`.
+- [ ] Next: finish independent review/CI and present patch for release authorization. No new version or publication has been requested for this follow-up yet.
+
 ## 1.0.11 released (24 October 2026)
 
 [PR #13](https://github.com/fishese/clearwater/pull/13) merged as `342c06de02b818453ffb1475c4d39c14d0689457`; [v1.0.11](https://github.com/fishese/clearwater/releases/tag/v1.0.11) is published as latest from that exact source. Android code 30; unsigned iOS build 9, iOS 26+. User authorized release of current fixes and added camera filename changes before release. Proposed workflow redesigns and larger-file limit changes remain deferred.

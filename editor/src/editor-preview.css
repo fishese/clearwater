@@ -9,7 +9,9 @@
 .editor-preview .video-timeline-controls>button:hover:not(:disabled){background:#263b3e}
 .editor-preview .video-timeline-controls>label{flex:1;min-width:0;gap:3px}
 .editor-preview .video-timeline-controls input{height:28px;touch-action:pan-x}
-.editor-preview .comparison-input{top:0;bottom:0;right:auto;width:44px;height:100%;transform:translateX(-50%);z-index:2}
+.editor-preview .comparison-input{top:0;bottom:0;right:auto;width:44px;height:100%;transform:translateX(-50%);z-index:2;border:0;padding:0;background:transparent;display:block;user-select:none;-webkit-user-select:none}
+.editor-preview .comparison-input:focus-visible{opacity:1;outline:2px solid var(--jade);outline-offset:-2px;background:#a8d8c51a}
+.editor-preview .comparison-input:focus-visible:after{content:'';position:absolute;left:50%;top:50%;width:30px;height:30px;border-radius:50%;background:#e0efe8;box-shadow:0 2px 12px #0005;transform:translate(-50%,-50%);pointer-events:none}
 .editor-preview .divider-line,.editor-preview .divider-line>span{pointer-events:none}
 .editor-preview .stage.pan-enabled{display:flex;align-items:flex-start;justify-content:flex-start}
 .editor-preview .stage.pan-enabled .image-frame{touch-action:none;cursor:grab}

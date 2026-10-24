@@ -38,7 +38,7 @@ jobs:
         run: npm run build
       - name: Install Playwright WebKit
         working-directory: editor
-        run: npx playwright install webkit
+        run: npx playwright install webkit chromium
       - name: Run WebKit photo-switch regression
         working-directory: editor
         shell: bash
@@ -56,6 +56,8 @@ jobs:
           CHECK_BROWSER=webkit CHECK_IOS_SHELL=1 CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-check.mjs
           CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/photo-switch-smoke.mjs
           CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/comparison-band-check.mjs
+          CHECK_BROWSER=chromium CHECK_URL=http://127.0.0.1:4173/ node scripts/comparison-touch-check.mjs
+          CHECK_BROWSER=webkit CHECK_URL=http://127.0.0.1:4173/ node scripts/comparison-touch-check.mjs
           for ios_browser in safari chrome; do
             for can_share in missing false true; do
               CHECK_BROWSER=webkit CHECK_IOS_BROWSER="$ios_browser" CHECK_CAN_SHARE="$can_share" CHECK_URL=http://127.0.0.1:4173/ node scripts/ios-web-export-check.mjs
