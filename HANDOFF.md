@@ -1,5 +1,17 @@
 # Handoff
 
+## Mobile comparison drag regression (24 October 2026)
+
+- [x] Reproduced v1.0.11 on the connected SM-S9280 running Android Chrome 155 using browser-native touch events over ADB/CDP. A +30px drag from 50% should end near 58%; competing native range input events instead alternate 0/100 and end at an extreme. A desktop Chromium trusted-touch regression independently fails on released source with the same sequence. The previous comparison gate used mouse dragging, so it missed native touch defaults.
+- [x] Replace the native range overlay with a focusable ARIA slider controlled by the existing Pointer Events gesture owner. Preserve the full-height 44px band, relative drag offset, arrows/Page/Home/End, pan/pinch and cancellation. Engine processing and export/save paths unchanged.
+- [x] Local production build, 264 shared tests, mobile/desktop trusted-touch drags, mouse/keyboard comparison, expanded pinch/cancel, pan, neutral picker and video-preview checks pass. Fixed build passes automated touch dragging on the physical Android phone at Fit/150%, normal/expanded. Existing user media, site data and app installations preserved; only synthetic media used in a separate local-origin test tab.
+- [x] [CI run 40049220284](https://github.com/fishese/clearwater/actions/runs/40049220284) passes macOS WebKit real taps/synthetic touch pointers, Chromium trusted touch moves, six Safari/CriOS Save/Share cases, photo switching and unsigned IPA packaging. No physical iPhone evidence yet. New script: `editor/scripts/comparison-touch-check.mjs`; ignored physical baseline trace: `analysis/photo-check/device-touch-baseline.json`.
+- [x] User requested APK installation: installed matching-debug-signed test APK over existing 1.0.9 using `adb install -r`, preserving app data. Reports 1.0.11/code 30, includes slider fix at runtime source `a350db6`; SHA-256 `eb84e833b9d65a7c147c9712add321af5f6a85ded60ae9eb858048e5832347eb`. Both APK builds and 11 Android tests pass. Ignored immutable test APK/logs: `editor/android/build/mobile-slider-test/`.
+- [x] Camera storage explanation verified: website captures stay in browser IndexedDB collection until exported/shared (usually `CW_...-restore.jpg/mp4`); Android 10+ APK auto-saves enhanced copies to `Pictures/ClearWater` or `Movies/ClearWater`. Browser collection does not imply a Gallery/Files copy. User confirmed the missing Gallery files were website captures. Record clearer collection-only wording as a UX suggestion; do not silently start auto-downloading.
+- [x] User reports installed Android test app works fine (24 October 2026). This is user acceptance of the installed test build; no detailed individual camera/Gallery assertions were supplied.
+- [x] User authorized merge and release of PR #14 (24 October 2026). Prepare 1.0.12: Android code 31, iOS build 10, signing unchanged.
+- [ ] Next: merge verified patch, rerun merged-source web/touch/Save checks and device packaging, verify APK/IPA provenance and publish coordinated release. Physical iPhone test remains deferred at user request.
+
 ## 1.0.11 released (24 October 2026)
 
 [PR #13](https://github.com/fishese/clearwater/pull/13) merged as `342c06de02b818453ffb1475c4d39c14d0689457`; [v1.0.11](https://github.com/fishese/clearwater/releases/tag/v1.0.11) is published as latest from that exact source. Android code 30; unsigned iOS build 9, iOS 26+. User authorized release of current fixes and added camera filename changes before release. Proposed workflow redesigns and larger-file limit changes remain deferred.

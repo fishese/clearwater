@@ -22,18 +22,18 @@ try {
    const input=page.locator('.comparison-input');
    const frame=await page.locator('.image-frame').boundingBox();
    const stage=await page.locator('.stage').boundingBox();
-   const value=Number(await input.inputValue());
+   const value=Number(await input.getAttribute('aria-valuenow'));
    const y=Math.max(stage.y+10,Math.min(frame.y+frame.height/2,stage.y+stage.height-10));
    const x=Math.max(stage.x+15,frame.x+frame.width*.2);
    await page.mouse.click(x,y);
-   assert.equal(Number(await input.inputValue()),value,`${width} expanded=${expanded}: click away must not move divider`);
+   assert.equal(Number(await input.getAttribute('aria-valuenow')),value,`${width} expanded=${expanded}: click away must not move divider`);
    const dx=frame.x+frame.width*value/100;
    const dy=Math.max(stage.y+15,frame.y+20);
    if(dx>stage.x&&dx<stage.x+stage.width){
     await page.mouse.move(dx,dy);await page.mouse.down();await page.mouse.move(dx+35,dy,{steps:5});await page.mouse.up();
-    assert.ok(Number(await input.inputValue())>value,`${width}: full divider line must drag`);
+    assert.ok(Number(await input.getAttribute('aria-valuenow'))>value,`${width}: full divider line must drag`);
    }
-   await input.focus();const before=Number(await input.inputValue());await page.keyboard.press('ArrowLeft');assert.ok(Number(await input.inputValue())<before,'keyboard slider retained');
+   await input.focus();const before=Number(await input.getAttribute('aria-valuenow'));await page.keyboard.press('ArrowLeft');assert.ok(Number(await input.getAttribute('aria-valuenow'))<before,'keyboard slider retained');
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');
    await page.screenshot({path:fileURLToPath(new URL('../../analysis/photo-check/review-'+width+'-'+expanded+'.png',import.meta.url)),fullPage:true});
    if(expanded)await page.getByRole('button',{name:'Exit expanded view',exact:true}).click();

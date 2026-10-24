@@ -1,5 +1,5 @@
 import {t,message,useLanguage} from './i18n';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Trash2, Settings as SettingsIcon, Camera as CameraIcon, Plus, Download, SlidersHorizontal, Sparkles, ArrowLeftRight, Undo2, Redo2, RotateCcw, Upload, ImagePlus, Check, ChevronDown, ChevronLeft, ChevronRight, FolderOpen, LockKeyhole, X, Pipette, LoaderCircle, FileJson, ZoomIn, ZoomOut, Maximize2, Minimize2, RefreshCw, Play, Pause } from 'lucide-react';
 import { isAIEngine } from './core/bundled-models';
 import { clamp, makePhotoRecipe, makeVideoRecipe, parseRecipe, suggest } from './core/engine';
@@ -767,6 +767,17 @@ export default function App() {
     else if(gesture.points.size===2){gesture.pinched=true;gesture.picker=false;gesture.startZoom=zoom;const [a,b]=[...gesture.points.values()];gesture.startDistance=Math.hypot(a.x-b.x,a.y-b.y);}
     else {gesture.pinched=true;gesture.picker=false;}
   }
+  function comparisonKeyDown(e:ReactKeyboardEvent<HTMLDivElement>){
+    let next:number|undefined;
+    if(e.key==='ArrowLeft'||e.key==='ArrowDown')next=divider-1;
+    else if(e.key==='ArrowRight'||e.key==='ArrowUp')next=divider+1;
+    else if(e.key==='PageDown')next=divider-10;
+    else if(e.key==='PageUp')next=divider+10;
+    else if(e.key==='Home')next=0;
+    else if(e.key==='End')next=100;
+    if(next===undefined)return;
+    e.preventDefault();setDivider(clamp(next,0,100));
+  }
   function expandedPointerMove(e:ReactPointerEvent<HTMLDivElement>){
     const gesture=expandedGesture.current;if(!gesture.points.has(e.pointerId))return;
     const next={x:e.clientX,y:e.clientY},previous=gesture.points.get(e.pointerId)!;gesture.points.set(e.pointerId,next);
@@ -983,7 +994,7 @@ export default function App() {
           {!photo&&<div className="empty-state"><h1>{t("Photo & video editor")}</h1><p>{t("Open a photo, MP4 or MOV to start.")}</p><div className="empty-state-actions"><button className="button primary" onClick={()=>openImport()}><Upload size={16}/> {t("Choose a photo or video")}</button>{capabilities.platform==='web'&&<button className="button secondary browse-files-button" onClick={()=>openImport(true)}>{t("Browse files")}</button>}</div><small>{t("Or drop photos anywhere in the studio")}</small></div>}
           {photo&&<div className="image-frame" onPointerDown={expandedPointerDown} onPointerMove={expandedPointerMove} onPointerUp={e=>expandedPointerUp(e)} onPointerCancel={e=>expandedPointerUp(e,true)} onLostPointerCapture={e=>expandedPointerUp(e,true)} style={{width:fitWidth*zoom,height:fitWidth/aspect*zoom,visibility:ready?'visible':'hidden'}}>
             <canvas ref={editedCanvas} aria-label={t("Edited photo")}/><canvas ref={originalCanvas} className="original-canvas" aria-label={t("Original photo")} style={{clipPath:showOriginal?'none':compare?`inset(0 ${100-divider}% 0 0)`:'inset(0 100% 0 0)'}}/>
-            {compare&&!showOriginal&&<><span className="image-label before">{t("ORIGINAL")}</span><span className="image-label after">{t("RESTORED")}</span><div className="divider-line" style={{left:`${divider}%`}}><span><ArrowLeftRight size={16}/></span></div><input className="comparison-input" style={{left:`${divider}%`}} aria-label={t("Before and after divider")} type="range" min="0" max="100" value={divider} onChange={e=>setDivider(Number(e.target.value))}/></>}
+            {compare&&!showOriginal&&<><span className="image-label before">{t("ORIGINAL")}</span><span className="image-label after">{t("RESTORED")}</span><div className="divider-line" style={{left:`${divider}%`}}><span><ArrowLeftRight size={16}/></span></div>{/* Custom slider handling avoids competing native range-touch updates. */}<div className="comparison-input" style={{left:`${divider}%`}} role="slider" tabIndex={0} aria-label={t("Before and after divider")} aria-orientation="horizontal" aria-valuemin={0} aria-valuemax={100} aria-valuenow={divider} aria-valuetext={`${Math.round(divider)}%`} onKeyDown={comparisonKeyDown}/></>}
             {eyedropper&&<span className="picker-hint">{t("Click a white or grey area")}</span>}
           </div>}
           {expanded&&photo&&<div className="expanded-zoom-controls" style={zoomControlPosition} aria-label={t("Zoom, Fit & expand")}><button type="button" aria-label={t("Zoom out")} title={t("Zoom out")} disabled={!ready||zoom<=1} onClick={()=>setZoom(z=>Math.max(1,z-.5))}><ZoomOut size={16}/></button><button type="button" className="zoom-fit" aria-label={t("Fit")} title={t("Fit")} disabled={!ready} onClick={()=>{setZoom(1);if(stage.current)stage.current.scrollTo({left:0,top:0});}}>{zoom===1?t("Fit"):`${Math.round(zoom*100)}%`}</button><button type="button" aria-label={t("Zoom in")} title={t("Zoom in")} disabled={!ready||zoom>=4} onClick={()=>setZoom(z=>Math.min(4,z+.5))}><ZoomIn size={16}/></button>{expandButton}</div>}

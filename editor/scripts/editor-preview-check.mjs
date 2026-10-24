@@ -49,22 +49,22 @@ try{
   await page.getByRole('button',{name:'Toggle comparison',exact:true}).evaluate(el=>{if(el.classList.contains('active'))el.click();});
   await page.getByRole('button',{name:'Toggle comparison',exact:true}).evaluate(el=>{if(!el.classList.contains('active'))el.click();});
   for(let i=0;i<3;i++)await page.getByRole('button',{name:'Zoom in',exact:true}).click();
-  const before=Number(await divider.inputValue()),state=await page.evaluate(()=>{const s=document.querySelector('.stage'),r=s.getBoundingClientRect();return {left:s.scrollLeft,top:s.scrollTop,x:r.left+r.width*.65,y:r.top+r.height*.25};});
+  const before=Number(await divider.getAttribute('aria-valuenow')),state=await page.evaluate(()=>{const s=document.querySelector('.stage'),r=s.getBoundingClientRect();return {left:s.scrollLeft,top:s.scrollTop,x:r.left+r.width*.65,y:r.top+r.height*.25};});
   await page.mouse.move(state.x,state.y);await page.mouse.down();await page.mouse.move(state.x-75,state.y-60,{steps:5});await page.mouse.up();
   const after=await page.evaluate(()=>({left:document.querySelector('.stage').scrollLeft,top:document.querySelector('.stage').scrollTop}));
   assert.ok(after.left>state.left||after.top>state.top,`drag outside comparison handle band pans (${after.left},${after.top})`);
-  assert.equal(Number(await divider.inputValue()),before,'pan leaves comparison divider unchanged');
+  assert.equal(Number(await divider.getAttribute('aria-valuenow')),before,'pan leaves comparison divider unchanged');
  };
  const panTouch=async()=>{
   for(let i=0;i<2;i++)await page.getByRole('button',{name:'Zoom in',exact:true}).click();
-  const before=Number(await divider.inputValue()),state=await page.evaluate(()=>{const s=document.querySelector('.stage'),r=s.getBoundingClientRect();return {left:s.scrollLeft,top:s.scrollTop,x:r.left+r.width*.65,y:r.top+r.height*.25};});
+  const before=Number(await divider.getAttribute('aria-valuenow')),state=await page.evaluate(()=>{const s=document.querySelector('.stage'),r=s.getBoundingClientRect();return {left:s.scrollLeft,top:s.scrollTop,x:r.left+r.width*.65,y:r.top+r.height*.25};});
   const cdp=await page.context().newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:state.x,y:state.y,id:71,radiusX:2,radiusY:2,force:1}]});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:state.x-70,y:state.y-50,id:71,radiusX:2,radiusY:2,force:1}]});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   const after=await page.evaluate(()=>({left:document.querySelector('.stage').scrollLeft,top:document.querySelector('.stage').scrollTop}));
   assert.ok(after.left>state.left||after.top>state.top,`touch drag outside comparison band pans (${after.left},${after.top})`);
-  assert.equal(Number(await divider.inputValue()),before,'touch pan leaves comparison divider unchanged');
+  assert.equal(Number(await divider.getAttribute('aria-valuenow')),before,'touch pan leaves comparison divider unchanged');
  };
  await panMouse();
  await panTouch();
