@@ -1,5 +1,9 @@
 # Handoff
 
+## Future release assets (24 October 2026)
+
+User requested future public releases omit both unsigned Android APKs and debug APKs (including their checksum sidecars). Publish signed release APKs and retain the unsigned IPA. Keep canonical download links, licences/notices, provenance and checksums. Debug builds remain local or separately requested testing material; preserve existing signing identities and user data. Follow `reference/release-asset-policy.md` when adapting packaging scripts; historical 14-asset/debug-upload checklists below no longer set future policy. Existing releases are unchanged.
+
 ## 1.0.12 released (24 October 2026)
 
 [PR #14](https://github.com/fishese/clearwater/pull/14) merged as `0d4a62cec9b9cbad9c2810aadf606f76ebd035dd`; [v1.0.12](https://github.com/fishese/clearwater/releases/tag/v1.0.12) is published as latest from that exact source. User explicitly authorized merge and release after accepting the Android test build. Android code 31; unsigned iOS build 10 (iOS 26+); signing configuration unchanged.
