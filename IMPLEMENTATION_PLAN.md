@@ -9,7 +9,8 @@
 - [x] User requested APK installation: installed matching-debug-signed test APK over existing 1.0.9 using `adb install -r`, preserving app data. Reports 1.0.11/code 30, includes slider fix at runtime source `a350db6`; SHA-256 `eb84e833b9d65a7c147c9712add321af5f6a85ded60ae9eb858048e5832347eb`. Both APK builds and 11 Android tests pass. Ignored immutable test APK/logs: `editor/android/build/mobile-slider-test/`.
 - [x] Camera storage explanation verified: website captures stay in browser IndexedDB collection until exported/shared (usually `CW_...-restore.jpg/mp4`); Android 10+ APK auto-saves enhanced copies to `Pictures/ClearWater` or `Movies/ClearWater`. Browser collection does not imply a Gallery/Files copy. User confirmed the missing Gallery files were website captures. Record clearer collection-only wording as a UX suggestion; do not silently start auto-downloading.
 - [x] User reports installed Android test app works fine (24 October 2026). This is user acceptance of the installed test build; no detailed individual camera/Gallery assertions were supplied.
-- [ ] Next: merge/release authorization for the verified patch; physical iPhone test deferred at user request. [PR #14](https://github.com/fishese/clearwater/pull/14) is ready. No new merge/publication/version bump authorized for this follow-up; public website remains 1.0.11 without this fix.
+- [x] User authorized merge and release of PR #14 (24 October 2026). Prepare 1.0.12: Android code 31, iOS build 10, signing unchanged.
+- [ ] Next: merge verified patch, rerun merged-source web/touch/Save checks and device packaging, verify APK/IPA provenance and publish coordinated release. Physical iPhone test remains deferred at user request.
 
 ## 1.0.11 released (24 October 2026)
 
