@@ -2,6 +2,8 @@
 
 # Mobile slider feature branch checkpoint (28 October 2026)
 
+The branch was pushed at `6e4808c`; the user requested cancellation of hosted iOS/WebKit run 40643272918 due to GitHub work hours, so it is not a WebKit pass. Signed Android test APK built from the feature branch; 11 Android tests pass and its signer matches the 1.0.13 release. Local ignored copy: `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`, SHA-256 `58c534ee29241025c541baa3e601b701cb5f2a3462cd859a46f072bd1ece878c`. Await exact authorized file-transfer address: `pushit.sh` does not resolve. No device installation, data removal, public site deployment or release occurred.
+
 The user selected a compact two-column horizontal mobile layout and retained vertical desktop sliders. The feature branch adds reversible live touch previews and preserves history and dependent recipe state on cancelled gestures; the video timeline is separate and unchanged. Production build, 264 shared tests and a 10-case final-build Chromium smoke pass. Separate synthetic Chromium runs pass 36 swipes, 8 diagonal takeovers, interactions, switching and recipe rollback; six 320px photo-count wrap assertions still fail in the layout matrix. Windows WebKit launched but the synthetic photo load timed out at 90 seconds, so the result is inconclusive. Local feature commit `43ed9d4`; automatic approval review rejected pushing it without explicit authorization for GitHub publication. Hosted WebKit, physical iPhone/Android and VoiceOver/TalkBack acceptance remain outstanding. No release or deployment is authorized.
 
 

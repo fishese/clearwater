@@ -2,6 +2,10 @@
 
 # Mobile slider feature branch checkpoint (28 October 2026)
 
+- [x] User authorized pushing the branch; `6e4808c` pushed. Hosted iOS/WebKit run 40643272918 cancelled at user request due to GitHub work hours.
+- [x] Signed Android test APK built with matching 1.0.13 certificate; 11 Android tests pass. Local ignored artifact `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`.
+- [ ] Deliver the APK after the user confirms the transfer site: `pushit.sh` does not resolve. Provide a separate test preview before expecting this branch to appear in Safari; do not deploy the public release site without authorization.
+
 - [x] User approved horizontal mobile sliders, vertical desktop sliders and a reduced label-to-track gap. Implemented shared responsive controls and reversible touch preview on `codex/mobile-scroll-safe-controls`.
 - [x] Production build, 264 unit tests, final-build Chromium smoke, 36 swipe/8 diagonal cases and separate interaction/recipe/switch runs pass. Six 320px photo-count wrap assertions in the separate layout matrix still fail; slider/layout checks pass.
 - [ ] Windows WebKit launched but photo load timed out; run hosted WebKit automation and physical iPhone/Android/VoiceOver/TalkBack acceptance. Do not equate browser emulation with device evidence.

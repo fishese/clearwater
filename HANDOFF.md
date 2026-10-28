@@ -1,5 +1,12 @@
 # Handoff
 
+## Signed mobile slider test APK (28 October 2026)
+
+- [x] User authorized pushing `codex/mobile-scroll-safe-controls`; GitHub branch was pushed at `6e4808c`. Hosted iOS/WebKit run 40643272918 was cancelled at user request to conserve GitHub work hours; no hosted WebKit result or iOS build is claimed.
+- [x] User requested an Android test APK. Built the signed release APK from the feature branch with existing project configuration, no version or signing changes; 11 Android tests pass, and the certificate matches preserved 1.0.13 release APKs. The local ignored copy is `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`, SHA-256 `58c534ee29241025c541baa3e601b701cb5f2a3462cd859a46f072bd1ece878c`.
+- [ ] Deliver the APK via the user's requested transfer site once its exact address is confirmed. `pushit.sh` does not resolve; `sendit.sh` is a plausible alternative but was not authorized. No installation or upload performed. If a phone has a different signing identity, do not uninstall or clear data.
+- [ ] The public website remains on the release; user testing of this branch in iPhone Safari requires a separate preview. Physical iPhone, Android and assistive-technology checks remain outstanding.
+
 ## Mobile slider feature branch (28 October 2026)
 
 - [x] User chose horizontal controls on narrow screens and asked to keep desktop vertical; user also asked to reduce the gap between labels and sliders. Implemented on `codex/mobile-scroll-safe-controls` with shared recipe logic, a 44px mobile touch track and a full-size native accessibility control; desktop retains its native vertical faders.
