@@ -1,5 +1,27 @@
 # Handoff
 
+## Signed mobile slider test APK (28 October 2026)
+
+- [x] User authorized pushing `codex/mobile-scroll-safe-controls`; GitHub branch was pushed at `6e4808c`. Hosted iOS/WebKit run 40643272918 was cancelled at user request to conserve GitHub work hours; no hosted WebKit result or iOS build is claimed.
+- [x] User requested an Android test APK. Built the signed release APK from the feature branch with existing project configuration, no version or signing changes; 11 Android tests pass, and the certificate matches preserved 1.0.13 release APKs. The local ignored copy is `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`, SHA-256 `58c534ee29241025c541baa3e601b701cb5f2a3462cd859a46f072bd1ece878c`.
+- [x] User confirmed sendit.sh; uploaded the signed APK and downloaded it once to verify its SHA-256 matches the local build. The temporary link was supplied to the user; the service states one-day or five-download retention. No installation performed. If a phone has a different signing identity, do not uninstall or clear data.
+- [ ] The public website remains on the release; user testing of this branch in iPhone Safari requires a separate preview. Physical iPhone, Android and assistive-technology checks remain outstanding.
+
+## Mobile slider feature branch (28 October 2026)
+
+- [x] User chose horizontal controls on narrow screens and asked to keep desktop vertical; user also asked to reduce the gap between labels and sliders. Implemented on `codex/mobile-scroll-safe-controls` with shared recipe logic, a 44px mobile touch track and a full-size native accessibility control; desktop retains its native vertical faders.
+- [x] Mobile touches distinguish horizontal editing from vertical scrolling. Transient preview edits are rolled back on cancellation or photo switch, with per-photo undo/redo and dependent recipe state preserved. Auto-save skips active previews. The separate video timeline has not been changed.
+- [x] Production build, 264 shared tests and 10-case final-build Chromium smoke pass. Separate Chromium runs passed 36 swipe and 8 diagonal cases at 320/390px in normal/expanded layouts, plus 12 interaction cases, photo switching and exact Natural/Auto-enhance recipe rollback; the combined matrix was not rerun after harness-only changes. Layout checks passed for EN/zh-HK/ja, but the legacy 320px photo-count wrap assertion still fails in six cases.
+- [x] Implemented and committed locally as `43ed9d4`. Windows WebKit launched but did not open the synthetic photo within 90 seconds; stopped the remaining cases, so this is inconclusive, not a pass.
+- [ ] Automatic approval review rejected the attempted push to `origin` because external publication of the branch was not explicitly authorized. Ask the user to authorize pushing `codex/mobile-scroll-safe-controls` to `https://github.com/fishese/clearwater`, then run hosted WebKit checks. Test physical iPhone Safari/Chrome, Android and VoiceOver/TalkBack when available. No merge, deployment or release authorized. Preserve user data, stashes and `editor/.idea/`.
+
+## Mobile scrolling and slider investigation (28 October 2026)
+
+- [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.
+- [x] Prepared and showed a two-column horizontal mobile prototype, tested 320px EN/zh-HK/ja and 844×390 coarse-pointer layouts. Native touch, keyboard and accessibility behavior need a safe gesture implementation: an initial horizontal drift followed by scrolling can still cancel after a preview edit, and current `update(..., false)` clears redo. CSS alone is not a fix.
+- [x] Saved the findings, interaction tradeoffs, local prototype and test checkpoints in `MOBILE_SCROLL_REVIEW_2026-10-28.md`; prototype screenshots/scripts remain gitignored. Restored app/test sources after the experiment; no runtime or app-data changes.
+- [ ] Next: user review of the horizontal design versus a deliberate activation step, then design a per-file reversible edit transaction that preserves concurrent edits, live preview, undo/redo and native accessibility. Test slow/diagonal cancellations, file switching, the separate video timeline and physical iPhone/Android when available. No merge/release authorized.
+
 ## 1.0.13 released (24 October 2026)
 
 [PR #15](https://github.com/fishese/clearwater/pull/15) merged as `5bcb5344b0a3ff1046abe0e4ed84279727b53707`; [v1.0.13](https://github.com/fishese/clearwater/releases/tag/v1.0.13) is published as latest from that exact source. Android code 32; unsigned iOS build 11 (iOS 26+). User explicitly authorized merge/release. Public assets now follow `RELEASE_ASSET_POLICY.md`: signed release APK and unsigned IPA, no debug/unsigned Android APKs or their sidecars.

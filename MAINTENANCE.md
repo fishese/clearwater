@@ -1,5 +1,19 @@
 # Maintenance
 
+# Mobile slider feature branch checkpoint (28 October 2026)
+
+The branch was pushed at `6e4808c`; the user requested cancellation of hosted iOS/WebKit run 40643272918 due to GitHub work hours, so it is not a WebKit pass. Signed Android test APK built from the feature branch; 11 Android tests pass and its signer matches the 1.0.13 release. Local ignored copy: `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`, SHA-256 `58c534ee29241025c541baa3e601b701cb5f2a3462cd859a46f072bd1ece878c`. User confirmed sendit.sh; upload and downloaded SHA-256 verification succeeded. No device installation, data removal, public site deployment or release occurred.
+
+The user selected a compact two-column horizontal mobile layout and retained vertical desktop sliders. The feature branch adds reversible live touch previews and preserves history and dependent recipe state on cancelled gestures; the video timeline is separate and unchanged. Production build, 264 shared tests and a 10-case final-build Chromium smoke pass. Separate synthetic Chromium runs pass 36 swipes, 8 diagonal takeovers, interactions, switching and recipe rollback; six 320px photo-count wrap assertions still fail in the layout matrix. Windows WebKit launched but the synthetic photo load timed out at 90 seconds, so the result is inconclusive. Local feature commit `43ed9d4`; automatic approval review rejected pushing it without explicit authorization for GitHub publication. Hosted WebKit, physical iPhone/Android and VoiceOver/TalkBack acceptance remain outstanding. No release or deployment is authorized.
+
+
+## Mobile scrolling and slider investigation (28 October 2026)
+
+- [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.
+- [x] Prepared and showed a two-column horizontal mobile prototype, tested 320px EN/zh-HK/ja and 844×390 coarse-pointer layouts. Native touch, keyboard and accessibility behavior need a safe gesture implementation: an initial horizontal drift followed by scrolling can still cancel after a preview edit, and current `update(..., false)` clears redo. CSS alone is not a fix.
+- [x] Saved the findings, interaction tradeoffs, local prototype and test checkpoints in `MOBILE_SCROLL_REVIEW_2026-10-28.md`; prototype screenshots/scripts remain gitignored. Restored app/test sources after the experiment; no runtime or app-data changes.
+- [ ] Next: user review of the horizontal design versus a deliberate activation step, then design a per-file reversible edit transaction that preserves concurrent edits, live preview, undo/redo and native accessibility. Test slow/diagonal cancellations, file switching, the separate video timeline and physical iPhone/Android when available. No merge/release authorized.
+
 ## 1.0.13 released (24 October 2026)
 
 [PR #15](https://github.com/fishese/clearwater/pull/15) merged as `5bcb5344b0a3ff1046abe0e4ed84279727b53707`; [v1.0.13](https://github.com/fishese/clearwater/releases/tag/v1.0.13) is published as latest from that exact source. Android code 32; unsigned iOS build 11 (iOS 26+). User explicitly authorized merge/release. Public assets now follow `RELEASE_ASSET_POLICY.md`: signed release APK and unsigned IPA, no debug/unsigned Android APKs or their sidecars.
