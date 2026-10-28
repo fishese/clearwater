@@ -41,7 +41,7 @@ type Sample = { name:string; label:string };
 const labelFor=(name:string)=>name.replace(/^IMG_\w+-/,'').replace(/\.[^.]+$/,'');
 const clone=<T,>(x:T):T=>structuredClone(x);
 function restoreRangeFinish(next:Recipe,base:Recipe|undefined){if(!next.adaptiveFinish&&base?.adaptiveFinish)next.adaptiveFinish=clone(base.adaptiveFinish);return next;}
-type RangeGesture={pointerId:number;identity:string;pointerType:string;phase:'pending'|'active'|'cancelled';startX:number;startY:number;base:number;last:number;previewed:boolean;baseIsDifferent:boolean;onChange:(v:number,transient?:boolean)=>void;onStart:()=>void;onPreviewState?:(active:boolean)=>void;onCancel?:()=>void};
+type RangeGesture={pointerId:number;identity:string;pointerType:string;phase:'pending'|'active'|'cancelled';transactional:boolean;startX:number;startY:number;base:number;last:number;previewed:boolean;baseIsDifferent:boolean;onChange:(v:number,transient?:boolean)=>void;onStart:()=>void;onPreviewState?:(active:boolean)=>void;onCancel?:()=>void};
 function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hint,vertical=false,displayValue,ariaValueText,disabled=false,identity='',onPreviewState,onCancel,baseIsDifferent=false}: {
   label:string;value:number;onChange:(v:number,transient?:boolean)=>void;onStart:()=>void;min?:number;max?:number;step?:number;unit?:string;hint?:string;vertical?:boolean;displayValue?:string;ariaValueText?:string;disabled?:boolean;identity?:string;onPreviewState?:(active:boolean)=>void;onCancel?:()=>void;baseIsDifferent?:boolean
 }) {
@@ -50,8 +50,9 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
   const [responsiveHorizontal,setResponsiveHorizontal]=useState(()=>typeof window!=='undefined'&&window.matchMedia('(max-width: 650px), (max-width: 1000px) and (pointer: coarse)').matches);
   const shown=draft??value,percent=clamp((shown-min)/(max-min)*100,0,100);
   const format=(n:number)=>displayValue!==undefined&&draft===null?displayValue:`${n>0&&min<0?'+':''}${Number(n.toFixed(2))}${unit}`;
-  const rollback=(active:RangeGesture)=>{if(active.pointerType==='touch'&&active.previewed){if(active.onCancel)active.onCancel();else active.onChange(active.base,true);active.previewed=false;active.onPreviewState?.(false);}};
+  const rollback=(active:RangeGesture)=>{if(active.transactional&&active.previewed){if(active.onCancel)active.onCancel();else active.onChange(active.base,true);active.previewed=false;active.onPreviewState?.(false);}};
   const clear=(active:RangeGesture,restore:boolean)=>{if(restore)rollback(active);if(gesture.current===active)gesture.current=null;setDraft(null);};
+  const effectivelyDisabled=()=>disabled||native.current?.matches(':disabled')===true;
   const quantize=(n:number)=>Number(clamp(min+Math.round((n-min)/step)*step,min,max).toFixed(4));
   const at=(clientX:number,clientY:number)=>{
     const rect=track.current?.getBoundingClientRect();if(!rect)return value;
@@ -71,19 +72,22 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
     if(identityRef.current!==identity){const active=gesture.current;if(active)clear(active,true);identityRef.current=identity;}
   },[identity]);
   useLayoutEffect(()=>{const active=gesture.current;if(active&&active.identity===identity&&value!==active.last){gesture.current=null;if(active.previewed){active.previewed=false;active.onPreviewState?.(false);}setDraft(null);}},[value,identity]);
+  useLayoutEffect(()=>{const active=gesture.current;if(active&&effectivelyDisabled())clear(active,true);});
   useEffect(()=>{const media=window.matchMedia('(max-width: 650px), (max-width: 1000px) and (pointer: coarse)'),change=()=>setResponsiveHorizontal(media.matches);media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[]);
   useEffect(()=>()=>{const active=gesture.current;if(active)rollback(active);},[]);
   useEffect(()=>{const cancelOutside=(event:PointerEvent)=>{const active=gesture.current;if(active&&track.current&&!track.current.contains(event.target as Node))clear(active,true);};window.addEventListener('pointerdown',cancelOutside,true);return()=>window.removeEventListener('pointerdown',cancelOutside,true);},[]);
   const pointerDown=(event:ReactPointerEvent<HTMLDivElement>)=>{
-    if(disabled||!event.isPrimary||(event.pointerType!=='touch'&&event.button!==0))return;
-    const active:RangeGesture={pointerId:event.pointerId,identity,pointerType:event.pointerType,phase:event.pointerType==='touch'?'pending':'active',startX:event.clientX,startY:event.clientY,base:value,last:value,previewed:false,baseIsDifferent,onChange,onStart,onPreviewState,onCancel};
+    if(effectivelyDisabled()||!event.isPrimary||(event.pointerType!=='touch'&&event.button!==0))return;
+    const transactional=event.pointerType==='touch'||responsiveHorizontal;
+    const active:RangeGesture={pointerId:event.pointerId,identity,pointerType:event.pointerType,phase:event.pointerType==='touch'?'pending':'active',transactional,startX:event.clientX,startY:event.clientY,base:value,last:value,previewed:false,baseIsDifferent,onChange,onStart,onPreviewState,onCancel};
     gesture.current=active;setDraft(value);native.current?.focus({preventScroll:true});
-    if(event.pointerType!=='touch')onStart();
+    if(!transactional)onStart();
     try{event.currentTarget.setPointerCapture(event.pointerId);}catch{/* Pointer may already have been cancelled. */}
     if(event.pointerType!=='touch')event.preventDefault();
   };
   const pointerMove=(event:ReactPointerEvent<HTMLDivElement>)=>{
     const active=gesture.current;if(!active||active.pointerId!==event.pointerId||active.identity!==identity)return;
+    if(effectivelyDisabled()){clear(active,true);try{if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}catch{/* Pointer capture may already be released. */}return;}
     const dx=event.clientX-active.startX,dy=event.clientY-active.startY;
     if(active.pointerType==='touch'){
       if(active.phase==='pending'){
@@ -93,16 +97,18 @@ function Range({label,value,onChange,onStart,min=-100,max=100,step=1,unit='',hin
       }else if(active.phase==='active'&&Math.abs(dy)>=8&&Math.abs(dy)>Math.abs(dx)*1.15){active.phase='cancelled';rollback(active);active.previewed=false;setDraft(null);return;}
       if(active.phase!=='active')return;
       preview(active,at(event.clientX,event.clientY));
+    }else if(active.transactional){
+      preview(active,at(event.clientX,event.clientY));
     }else{
       const next=at(event.clientX,event.clientY),previous=active.last;active.last=next;setDraft(next);if(next!==previous)active.onChange(next);
     }
   };
   const pointerUp=(event:ReactPointerEvent<HTMLDivElement>)=>{
     const active=gesture.current;if(!active||active.pointerId!==event.pointerId)return;
-    if(active.pointerType==='touch'){
-      if(active.phase==='pending')commitTouch(active,at(event.clientX,event.clientY));
-      else if(active.phase==='active')commitTouch(active,at(event.clientX,event.clientY));
-      else rollback(active);
+    if(effectivelyDisabled()){clear(active,true);try{if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}catch{/* Pointer capture may already be released. */}return;}
+    if(active.transactional){
+      if(active.pointerType==='touch'&&active.phase==='cancelled')rollback(active);
+      else commitTouch(active,at(event.clientX,event.clientY));
     }else{
       const next=at(event.clientX,event.clientY);if(next!==active.last)active.onChange(next);
     }

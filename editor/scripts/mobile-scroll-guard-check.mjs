@@ -399,7 +399,9 @@ async function switchDuringPreviewCase(){
       {name:'synthetic-switch-b.png',mimeType:'image/png',buffer:fixture2},
     ]);
     await page.waitForFunction(()=>document.querySelector('[aria-label="Photo position"]')?.textContent?.includes('/ 2'),null,{timeout:30000});
+    await page.waitForFunction(()=>!!document.querySelector('.preview-info')&&document.querySelector('.control-body')?.matches(':disabled')===false,null,{timeout:90000});
     const slider=await selectSlider(page,'warmth'),track=await trackFor(slider),selector=await sliderSelector(slider);
+    await slider.waitFor({state:'visible',timeout:10000});
     await track.evaluate(el=>el.scrollIntoView({block:'center',inline:'nearest'}));
     const original=(await sliderState(page,slider)).value,box=await track.boundingBox();assert.ok(box);
     if(browserName!=='chromium'){
