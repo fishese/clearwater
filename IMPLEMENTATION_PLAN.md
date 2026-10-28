@@ -4,8 +4,8 @@
 
 - [x] User approved horizontal mobile sliders, vertical desktop sliders and a reduced label-to-track gap. Implemented shared responsive controls and reversible touch preview on `codex/mobile-scroll-safe-controls`.
 - [x] Production build, 264 unit tests, final-build Chromium smoke, 36 swipe/8 diagonal cases and separate interaction/recipe/switch runs pass. Six 320px photo-count wrap assertions in the separate layout matrix still fail; slider/layout checks pass.
-- [ ] Run WebKit automation and physical iPhone/Android/VoiceOver/TalkBack acceptance; do not equate browser emulation with device evidence.
-- [ ] Push the feature branch for testing once verified. No merge, release, version bump or signing changes authorized.
+- [ ] Windows WebKit launched but photo load timed out; run hosted WebKit automation and physical iPhone/Android/VoiceOver/TalkBack acceptance. Do not equate browser emulation with device evidence.
+- [ ] Local feature commit `43ed9d4` exists. Automatic approval review rejected its push because publication needs explicit user authorization; request authorization to push the branch to the GitHub repository. No merge, release, version bump or signing changes authorized.
 
 
 ## Mobile scrolling and slider investigation (28 October 2026)

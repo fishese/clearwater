@@ -2,7 +2,7 @@
 
 # Mobile slider feature branch checkpoint (28 October 2026)
 
-The user selected a compact two-column horizontal mobile layout and retained vertical desktop sliders. The feature branch adds reversible live touch previews and preserves history and dependent recipe state on cancelled gestures; the video timeline is separate and unchanged. Production build, 264 shared tests and a 10-case final-build Chromium smoke pass. Separate synthetic Chromium runs pass 36 swipes, 8 diagonal takeovers, interactions, switching and recipe rollback; six 320px photo-count wrap assertions still fail in the layout matrix. WebKit, physical iPhone/Android and VoiceOver/TalkBack acceptance remain outstanding. No release or deployment is authorized.
+The user selected a compact two-column horizontal mobile layout and retained vertical desktop sliders. The feature branch adds reversible live touch previews and preserves history and dependent recipe state on cancelled gestures; the video timeline is separate and unchanged. Production build, 264 shared tests and a 10-case final-build Chromium smoke pass. Separate synthetic Chromium runs pass 36 swipes, 8 diagonal takeovers, interactions, switching and recipe rollback; six 320px photo-count wrap assertions still fail in the layout matrix. Windows WebKit launched but the synthetic photo load timed out at 90 seconds, so the result is inconclusive. Local feature commit `43ed9d4`; automatic approval review rejected pushing it without explicit authorization for GitHub publication. Hosted WebKit, physical iPhone/Android and VoiceOver/TalkBack acceptance remain outstanding. No release or deployment is authorized.
 
 
 ## Mobile scrolling and slider investigation (28 October 2026)
