@@ -1,5 +1,13 @@
 # Adaptive photo colour-and-tone finish plan
 
+# Mobile slider feature branch checkpoint (28 October 2026)
+
+- [x] User approved horizontal mobile sliders, vertical desktop sliders and a reduced label-to-track gap. Implemented shared responsive controls and reversible touch preview on `codex/mobile-scroll-safe-controls`.
+- [x] Production build, 264 unit tests, final-build Chromium smoke, 36 swipe/8 diagonal cases and separate interaction/recipe/switch runs pass. Six 320px photo-count wrap assertions in the separate layout matrix still fail; slider/layout checks pass.
+- [ ] Run WebKit automation and physical iPhone/Android/VoiceOver/TalkBack acceptance; do not equate browser emulation with device evidence.
+- [ ] Push the feature branch for testing once verified. No merge, release, version bump or signing changes authorized.
+
+
 ## Mobile scrolling and slider investigation (28 October 2026)
 
 - [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.

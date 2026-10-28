@@ -1,5 +1,12 @@
 # Handoff
 
+## Mobile slider feature branch (28 October 2026)
+
+- [x] User chose horizontal controls on narrow screens and asked to keep desktop vertical; user also asked to reduce the gap between labels and sliders. Implemented on `codex/mobile-scroll-safe-controls` with shared recipe logic, a 44px mobile touch track and a full-size native accessibility control; desktop retains its native vertical faders.
+- [x] Mobile touches distinguish horizontal editing from vertical scrolling. Transient preview edits are rolled back on cancellation or photo switch, with per-photo undo/redo and dependent recipe state preserved. Auto-save skips active previews. The separate video timeline has not been changed.
+- [x] Production build, 264 shared tests and 10-case final-build Chromium smoke pass. Separate Chromium runs passed 36 swipe and 8 diagonal cases at 320/390px in normal/expanded layouts, plus 12 interaction cases, photo switching and exact Natural/Auto-enhance recipe rollback; the combined matrix was not rerun after harness-only changes. Layout checks passed for EN/zh-HK/ja, but the legacy 320px photo-count wrap assertion still fails in six cases.
+- [ ] Push the branch and run hosted WebKit checks; test physical iPhone Safari/Chrome, Android and VoiceOver/TalkBack when available. No merge, deployment or release authorized. Preserve user data, stashes and `editor/.idea/`.
+
 ## Mobile scrolling and slider investigation (28 October 2026)
 
 - [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.

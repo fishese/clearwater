@@ -49,15 +49,36 @@ try {
           const nav = document.querySelector('.photo-navigation');
           const tools = document.querySelector('.canvas-tools');
           const panelIds = width <= 650 ? ['light'] : ['wide'];
+          const horizontalFaders = width <= 650;
           const faderPanels = panelIds.map(name => {
             const panel = name === 'wide' ? document.querySelector('.light-clarity-group') : document.querySelector(`#control-subpanel-${name}`);
             const grid = name === 'wide' ? panel?.querySelector(':scope > .group-content') : panel?.querySelector('.light-clarity-grid');
-            const sliders = [...(panel?.querySelectorAll('.light-clarity-grid .vertical-range input') ?? [])].map(rect);
+            const inputs = [...(panel?.querySelectorAll('.light-clarity-grid .vertical-range input') ?? [])];
+            const sliders = inputs.map(input => {
+              const track = input.closest('.vertical-range')?.querySelector('.range-track');
+              const target = horizontalFaders ? track : input;
+              const nativeStyle = getComputedStyle(input);
+              const targetRect = rect(target), nativeRect = rect(input);
+              input.focus({preventScroll:true});
+              return {...targetRect, ariaOrientation: input.getAttribute('aria-orientation'), writingMode: getComputedStyle(target).writingMode,
+                nativeFocusable: input.tabIndex >= 0 && !!input.getAttribute('aria-label'), nativeCanFocus: document.activeElement===input, nativePointerEvents: nativeStyle.pointerEvents, nativeOpacity: Number(nativeStyle.opacity), nativeWritingMode: nativeStyle.writingMode,
+                nativeFrameMatchesTrack: Math.abs(nativeRect.left-targetRect.left)<1 && Math.abs(nativeRect.top-targetRect.top)<1 && Math.abs(nativeRect.width-targetRect.width)<1 && Math.abs(nativeRect.height-targetRect.height)<1};
+            });
             const gridRect = grid ? rect(grid) : null;
+            const columnCount = new Set(sliders.map(x => Math.round(x.left))).size;
             return { name, count: sliders.length, minWidth: sliders.length ? Math.min(...sliders.map(x => x.width)) : 0,
+              minHeight: sliders.length ? Math.min(...sliders.map(x => x.height)) : 0,
               withinGrid: !!gridRect && sliders.every(x => x.left >= gridRect.left - 1 && x.right <= gridRect.right + 1),
-              singleRow: sliders.length > 0 && sliders.every(x => Math.abs(x.top - sliders[0].top) < 1),
-              overlap: sliders.some((x, i) => sliders.slice(i + 1).some(y => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 0.5)) };
+              columnCount, rowCount: columnCount ? Math.ceil(sliders.length / columnCount) : 0,
+              overlap: sliders.some((x, i) => sliders.slice(i + 1).some(y => x.left < y.right - 0.5 && y.left < x.right - 0.5 && x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5)),
+              orientations: [...new Set(sliders.map(x => x.ariaOrientation))],
+              nativeFocusable: sliders.length > 0 && sliders.every(x => x.nativeFocusable),
+              nativeCanFocus: sliders.length > 0 && sliders.every(x => x.nativeCanFocus),
+              nativeFrameMatchesTrack: sliders.length > 0 && sliders.every(x => x.nativeFrameMatchesTrack),
+              nativePointerEvents: sliders.length > 0 && sliders.every(x => x.nativePointerEvents === 'none'),
+              nativeOpacity: sliders.length ? Math.max(...sliders.map(x => x.nativeOpacity)) : 1,
+              nativeWritingModes: [...new Set(sliders.map(x => x.nativeWritingMode))],
+              writingModes: [...new Set(sliders.map(x => x.writingMode))] };
           });
           const touchTargets = [...document.querySelectorAll('.settings-group>summary,.control-tabs button')].map(rect).filter(x => x.width > 0 && x.height > 0);
           const enhancement = document.querySelector('.enhancement-group');
@@ -89,12 +110,29 @@ try {
           result.faderPanels.push(await page.evaluate(() => {
             const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; };
             const grid = document.querySelector('#control-subpanel-clarity .light-clarity-grid');
-            const sliders = [...(grid?.querySelectorAll('.vertical-range input') ?? [])].map(rect);
+            const inputs = [...(grid?.querySelectorAll('.vertical-range input') ?? [])];
+            const sliders = inputs.map(input => {
+              const track = input.closest('.vertical-range')?.querySelector('.range-track');
+              const target = track;
+              const nativeStyle = getComputedStyle(input);
+              const targetRect = rect(target), nativeRect = rect(input);
+              input.focus({preventScroll:true});
+              return {...targetRect, ariaOrientation: input.getAttribute('aria-orientation'), writingMode: getComputedStyle(target).writingMode,
+                nativeFocusable: input.tabIndex >= 0 && !!input.getAttribute('aria-label'), nativeCanFocus: document.activeElement===input, nativePointerEvents: nativeStyle.pointerEvents, nativeOpacity: Number(nativeStyle.opacity), nativeWritingMode: nativeStyle.writingMode,
+                nativeFrameMatchesTrack: Math.abs(nativeRect.left-targetRect.left)<1 && Math.abs(nativeRect.top-targetRect.top)<1 && Math.abs(nativeRect.width-targetRect.width)<1 && Math.abs(nativeRect.height-targetRect.height)<1};
+            });
             const bounds = grid ? rect(grid) : null;
+            const columnCount = new Set(sliders.map(x => Math.round(x.left))).size;
             return { name: 'clarity', count: sliders.length, minWidth: sliders.length ? Math.min(...sliders.map(x => x.width)) : 0,
+              minHeight: sliders.length ? Math.min(...sliders.map(x => x.height)) : 0,
               withinGrid: !!bounds && sliders.every(x => x.left >= bounds.left - 1 && x.right <= bounds.right + 1),
-              singleRow: sliders.length > 0 && sliders.every(x => Math.abs(x.top - sliders[0].top) < 1),
-              overlap: sliders.some((x, i) => sliders.slice(i + 1).some(y => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 0.5)) };
+              columnCount, rowCount: columnCount ? Math.ceil(sliders.length / columnCount) : 0,
+              overlap: sliders.some((x, i) => sliders.slice(i + 1).some(y => x.left < y.right - 0.5 && y.left < x.right - 0.5 && x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5)),
+              orientations: [...new Set(sliders.map(x => x.ariaOrientation))],
+              nativeFocusable: sliders.length > 0 && sliders.every(x => x.nativeFocusable), nativeCanFocus: sliders.length > 0 && sliders.every(x => x.nativeCanFocus), nativeFrameMatchesTrack: sliders.length > 0 && sliders.every(x => x.nativeFrameMatchesTrack),
+              nativePointerEvents: sliders.length > 0 && sliders.every(x => x.nativePointerEvents === 'none'), nativeOpacity: sliders.length ? Math.max(...sliders.map(x => x.nativeOpacity)) : 1,
+              nativeWritingModes: [...new Set(sliders.map(x => x.nativeWritingMode))],
+              writingModes: [...new Set(sliders.map(x => x.writingMode))] };
           }));
         }
         const expectedSmallToolbar = width <= 370 ? 36 : 40;
@@ -105,11 +143,22 @@ try {
         if (result.toolbarHeight < 44) errors.push('toolbar is shorter than 44px');
         if (stressLongCount && !result.longCountWrapped) errors.push('long photo count did not move toolbar controls to a second row');
         const expectedFaders = { wide: 5, light: 3, clarity: 2 };
+        const horizontalFaders = width <= 650;
         for (const panel of result.faderPanels) {
           if (panel.count !== expectedFaders[panel.name]) errors.push(`expected ${expectedFaders[panel.name]} ${panel.name} sliders, got ${panel.count}`);
-          if (panel.minWidth < 40) errors.push(`${panel.name} slider hit area narrower than 40px: ${panel.minWidth}`);
+          if (panel.minWidth < 44) errors.push(`${panel.name} slider hit area narrower than 44px: ${panel.minWidth}`);
+          if (panel.minHeight < 44) errors.push(`${panel.name} slider hit area shorter than 44px: ${panel.minHeight}`);
           if (!panel.withinGrid || panel.overlap) errors.push(`${panel.name} slider hit areas escape or overlap their grid`);
-          if (!panel.singleRow) errors.push(`${panel.name} sliders are not arranged in one row`);
+          const expectedRows = horizontalFaders ? Math.ceil(panel.count / 2) : 1;
+          if (panel.rowCount !== expectedRows) errors.push(`${panel.name} sliders occupy ${panel.rowCount} rows; expected ${expectedRows}`);
+          const expectedColumns = horizontalFaders ? Math.min(2, panel.count) : panel.count;
+          if (panel.columnCount !== expectedColumns) errors.push(`${panel.name} sliders occupy ${panel.columnCount} columns; expected ${expectedColumns}`);
+          const expectedOrientation = horizontalFaders ? 'horizontal' : 'vertical';
+          if (panel.orientations.length !== 1 || panel.orientations[0] !== expectedOrientation) errors.push(`${panel.name} aria-orientation mismatch: ${panel.orientations.join(',')}`);
+          const expectedWritingMode = horizontalFaders ? 'horizontal-tb' : 'vertical-lr';
+          if (panel.writingModes.length !== 1 || panel.writingModes[0] !== expectedWritingMode) errors.push(`${panel.name} writing mode mismatch: ${panel.writingModes.join(',')}`);
+          if (panel.nativeWritingModes.length !== 1 || panel.nativeWritingModes[0] !== expectedWritingMode) errors.push(`${panel.name} native input writing mode mismatch: ${panel.nativeWritingModes.join(',')}`);
+          if (horizontalFaders && (!panel.nativeFocusable || !panel.nativeCanFocus || !panel.nativeFrameMatchesTrack || !panel.nativePointerEvents || panel.nativeOpacity <= 0 || panel.nativeOpacity > 0.01)) errors.push(`${panel.name} native input is not focusable in the full-size transparent hit frame`);
         }
         if (result.settingsTargetMinHeight < 44) errors.push('visible settings/tab target shorter than 44px');
         if (result.toolbarButtonMinWidth < expectedSmallToolbar || result.toolbarButtonMinHeight < 40) errors.push('toolbar button target too small');

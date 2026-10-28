@@ -1,5 +1,10 @@
 # Maintenance
 
+# Mobile slider feature branch checkpoint (28 October 2026)
+
+The user selected a compact two-column horizontal mobile layout and retained vertical desktop sliders. The feature branch adds reversible live touch previews and preserves history and dependent recipe state on cancelled gestures; the video timeline is separate and unchanged. Production build, 264 shared tests and a 10-case final-build Chromium smoke pass. Separate synthetic Chromium runs pass 36 swipes, 8 diagonal takeovers, interactions, switching and recipe rollback; six 320px photo-count wrap assertions still fail in the layout matrix. WebKit, physical iPhone/Android and VoiceOver/TalkBack acceptance remain outstanding. No release or deployment is authorized.
+
+
 ## Mobile scrolling and slider investigation (28 October 2026)
 
 - [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.

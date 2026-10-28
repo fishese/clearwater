@@ -1,6 +1,7 @@
 /* Local to the editor workspace so camera and modal layouts keep their own spacing. */
 .editor-preview .workspace{padding-top:3px;padding-bottom:3px}
 .editor-preview .editor-note{padding-top:12px;padding-bottom:16px}
+.editor-preview .range-track{display:none}
 .editor-preview .compact-controls .range-field:not(.vertical-range)>span{margin-bottom:3px}
 .editor-preview .compact-controls .range-field:not(.vertical-range) input{height:44px}
 .editor-preview .video-timeline{padding:5px 9px}
@@ -29,4 +30,27 @@
 .editor-preview .save-destination{margin-top:12px}
 @media(max-width:650px){
   .editor-preview .video-timeline-controls>button{width:44px;height:44px}
+}
+
+/* Keep photo faders horizontal on touch layouts without changing desktop range behavior. */
+@media(max-width:650px),(max-width:1000px) and (pointer:coarse){
+  .editor-preview .compact-controls .group-content .fader-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;gap:0 12px}
+  .editor-preview .compact-controls .light-clarity-group>.group-content{display:block}
+  .editor-preview .compact-controls .group-content .vertical-range{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 44px;align-items:stretch;gap:0;margin:0}
+  .editor-preview .compact-controls .group-content .vertical-range>span{grid-column:1;grid-row:1}
+  .editor-preview .compact-controls .group-content .vertical-range>span{display:flex;justify-content:space-between;align-items:center;gap:5px;min-height:16px}
+  .editor-preview .compact-controls .group-content .vertical-range>span>span{flex:1;min-width:0;text-align:left;font-size:12px;line-height:14px;align-self:center;overflow-wrap:normal}
+  .editor-preview .compact-controls .group-content .vertical-range output{font-size:12px;flex:none}
+  .editor-preview .compact-controls .group-content .vertical-range .range-track{display:block;position:relative;grid-column:1;grid-row:2;width:100%;height:44px;margin:0;touch-action:pan-y;background:linear-gradient(to right,#34474a,#34474a) center / 100% 3px no-repeat;cursor:ew-resize}
+  .editor-preview .compact-controls .group-content .vertical-range .range-track-fill{position:absolute;display:block;left:0;top:50%;width:var(--fill);height:3px;transform:translateY(-50%);background:#98ccba;pointer-events:none}
+  .editor-preview .compact-controls .group-content .vertical-range .range-track-thumb{position:absolute;display:block;left:var(--fill);top:50%;width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;background:#b9e8d3;box-shadow:0 0 0 2px #203c35;pointer-events:none}
+  .editor-preview .compact-controls .group-content .vertical-range .range-native{position:relative;grid-column:1;grid-row:2;width:100%;height:44px;padding:0;margin:0;opacity:.001;pointer-events:none;appearance:none;background:transparent;border:0;overflow:visible;clip:auto;clip-path:none;white-space:normal;writing-mode:horizontal-tb;direction:ltr}
+  .editor-preview .compact-controls .group-content .vertical-range:focus-within .range-track{outline:2px solid var(--jade);outline-offset:2px;border-radius:5px}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range){display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 44px;gap:0}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range)>span{grid-column:1;grid-row:1;margin-bottom:0}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range) .range-track{display:block;position:relative;grid-column:1;grid-row:2;width:100%;height:44px;margin:0;touch-action:pan-y;background:linear-gradient(to right,#34474a,#34474a) center / 100% 3px no-repeat;cursor:ew-resize}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range) .range-track-fill{position:absolute;display:block;left:0;top:50%;width:var(--fill);height:3px;transform:translateY(-50%);background:#98ccba;pointer-events:none}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range) .range-track-thumb{position:absolute;display:block;left:var(--fill);top:50%;width:14px;height:14px;transform:translate(-50%,-50%);border-radius:50%;background:#b9e8d3;box-shadow:0 0 0 2px #203c35;pointer-events:none}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range) .range-native{position:relative;grid-column:1;grid-row:2;width:100%;height:44px;padding:0;margin:0;opacity:.001;pointer-events:none;appearance:none;background:transparent;border:0;overflow:visible;clip:auto;clip-path:none;white-space:normal}
+  .editor-preview .compact-controls .group-content .range-field:not(.vertical-range):focus-within .range-track{outline:2px solid var(--jade);outline-offset:2px;border-radius:5px}
 }
