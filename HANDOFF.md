@@ -1,5 +1,14 @@
 # Handoff
 
+## 1.0.14 released (28 October 2026)
+
+- [x] User accepted the Android test and authorized Android, iOS and web release. PR #16 and the disabled-slider/Safari-check follow-up PR #17 merged; final source is `a78f535648631a98ea0f9397200bf6a5476b35fb`, tag `v1.0.14`. [Release](https://github.com/fishese/clearwater/releases/tag/v1.0.14) is latest; [Pages run 40661598595](https://github.com/fishese/clearwater/actions/runs/40661598595) deployed the same source tree.
+- [x] Signed Android 1.0.14/code 33 and unsigned iOS 1.0.14/build 12 passed package checks, bundled web/model verification, checksum validation and Android certificate continuity. All 12 public assets match staged hashes; no unsigned/debug Android APKs were published. IPA requires user signing. Artifact candidate `d6af634d49f57adb2e932226b3e4196763c0b247` and merge have identical Git trees.
+- [x] 264 shared tests, 11 Android tests, [hosted WebKit/IPA run 40660779120](https://github.com/fishese/clearwater/actions/runs/40660779120), and ten live-site Chromium touch checks pass. The six hosted iPhone Safari/Chrome-style cases include slider drag, pending render completion, save/share and cancel/retry. Share APIs were mocked; WebKit gesture tests include synthetic events and skips. The user reported the earlier signed Android test works well.
+- [ ] Next: physical iPhone Safari/Chrome saving and actual share destinations, VoiceOver/TalkBack touch exploration, and user acceptance of final release. Six separate 320px long-photo-count wrap assertions remain a known limitation; the video timeline gesture behavior remains separate. No app data or stashes cleared.
+
+Release APK SHA-256 `f4b5607201fdce71b140296eddb01dc5ca4d81d45c60560c263ac2e82130668a`; unsigned IPA `6edbb5f20a23551736d5c07e20c2d5c69dcadea409275be72b3fcff053434fac`. Local release evidence is gitignored under `editor/android/build/release-1.0.14/` and `editor/ios/App/output/release-1.0.14-corrected/`. Older in-progress checkpoints below are historical.
+
 ## 1.0.14 release in progress (28 October 2026)
 
 - [x] User accepted Android test, authorized merge/release and web deployment, and asked to attempt the IPA. PR #16 merged at `ed78af2ebb1146878b1f3cf91c8ea24e841427a2`; Pages run 40658610995 deployed it. Candidate run 40657883083 built the unsigned IPA and passed hosted WebKit checks, but those packages precede the follow-up fix below.

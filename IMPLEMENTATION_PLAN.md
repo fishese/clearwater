@@ -2,6 +2,10 @@
 
 # Mobile slider feature branch checkpoint (28 October 2026)
 
+- [x] User accepted Android test and authorized release. Final follow-up merged as `a78f535`; `v1.0.14` published with signed APK and unsigned IPA; Pages run 40661598595 passed.
+- [x] 264 shared tests, 11 Android tests, hosted WebKit save-after-drag checks and live Chromium touch smoke passed. IPA and APK package contents and release checksums verified.
+- [ ] Physical iPhone Safari/Chrome, share destinations and VoiceOver/TalkBack acceptance remain. Continue tracking the separate video timeline and known 320px long-photo-count stress assertions.
+
 - [x] User authorized pushing the branch; `6e4808c` pushed. Hosted iOS/WebKit run 40643272918 cancelled at user request due to GitHub work hours.
 - [x] Signed Android test APK built with matching 1.0.13 certificate; 11 Android tests pass. Local ignored artifact `editor/android/build/mobile-scroll-test/ClearWater-mobile-slider-test.apk`.
 - [x] User confirmed sendit.sh; uploaded the test APK and verified its downloaded SHA-256 against the local build.
