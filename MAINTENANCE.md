@@ -1,5 +1,12 @@
 # Maintenance
 
+## Mobile scrolling and slider investigation (28 October 2026)
+
+- [x] Reproduced a vertical swipe over the Warmth fader changing 0→88 and blocking scroll in Chromium mobile emulation. A CSS-only horizontal prototype still changed 0→−65/+65 during vertical swipes at the track edges; the separate video timeline moved 0→6.52 seconds and blocked scroll. Evidence uses synthetic media; physical iPhone/Android gesture behavior has not been newly tested.
+- [x] Prepared and showed a two-column horizontal mobile prototype, tested 320px EN/zh-HK/ja and 844×390 coarse-pointer layouts. Native touch, keyboard and accessibility behavior need a safe gesture implementation: an initial horizontal drift followed by scrolling can still cancel after a preview edit, and current `update(..., false)` clears redo. CSS alone is not a fix.
+- [x] Saved the findings, interaction tradeoffs, local prototype and test checkpoints in `MOBILE_SCROLL_REVIEW_2026-10-28.md`; prototype screenshots/scripts remain gitignored. Restored app/test sources after the experiment; no runtime or app-data changes.
+- [ ] Next: user review of the horizontal design versus a deliberate activation step, then design a per-file reversible edit transaction that preserves concurrent edits, live preview, undo/redo and native accessibility. Test slow/diagonal cancellations, file switching, the separate video timeline and physical iPhone/Android when available. No merge/release authorized.
+
 ## 1.0.13 released (24 October 2026)
 
 [PR #15](https://github.com/fishese/clearwater/pull/15) merged as `5bcb5344b0a3ff1046abe0e4ed84279727b53707`; [v1.0.13](https://github.com/fishese/clearwater/releases/tag/v1.0.13) is published as latest from that exact source. Android code 32; unsigned iOS build 11 (iOS 26+). User explicitly authorized merge/release. Public assets now follow `RELEASE_ASSET_POLICY.md`: signed release APK and unsigned IPA, no debug/unsigned Android APKs or their sidecars.
