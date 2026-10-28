@@ -8,7 +8,7 @@ assert.ok(['safari','chrome'].includes(iosBrowser),'CHECK_IOS_BROWSER must be sa
 assert.ok(['missing','false','true'].includes(canShareMode),'CHECK_CAN_SHARE must be missing, false or true');
 const browser=await (engineName==='webkit'?webkit:chromium).launch({headless:true,...(engineName==='msedge'?{channel:'msedge'}:{})});
 try{
-  const context=await browser.newContext({acceptDownloads:true});
+  const context=await browser.newContext({acceptDownloads:true,viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   const page=await context.newPage();
   const downloads=[],pageErrors=[];page.on('download',download=>downloads.push(download.suggestedFilename()));
   page.on('pageerror',error=>{pageErrors.push(error.message);console.error('PAGE ERROR',error.message);});
@@ -59,6 +59,38 @@ try{
 
   const exportButton=page.locator('.top-actions .primary');
   const initialPreviewRenders=await page.evaluate(()=>window.iosPreviewRenders);
+  await page.locator('[data-control-tab="enhancement"]').click();
+  await page.locator('[data-control-subtab="colour"]').click();
+  const warmth=page.locator('#control-subpanel-colour input[aria-label="Warmth"]');
+  const rangeTrack=warmth.locator('xpath=..').locator('.range-track');
+  await rangeTrack.waitFor({state:'visible'});
+  const initialWarmth=await warmth.inputValue();
+  await page.evaluate(()=>{window.holdNextRender=true;});
+  const trackBox=await rangeTrack.boundingBox();assert.ok(trackBox,'mobile Warmth touch track is visible');
+  await rangeTrack.evaluate((track,rect)=>{
+    const x=rect.x+rect.width*.24,y=rect.y+rect.height/2;
+    const init={bubbles:true,cancelable:true,pointerId:71,pointerType:'touch',isPrimary:true,button:0,buttons:1};
+    track.dispatchEvent(new PointerEvent('pointerdown',{...init,clientX:x,clientY:y}));
+    track.dispatchEvent(new PointerEvent('pointermove',{...init,clientX:x+rect.width*.32,clientY:y}));
+    track.dispatchEvent(new PointerEvent('pointerup',{...init,buttons:0,clientX:x+rect.width*.32,clientY:y}));
+  },trackBox);
+  await page.waitForFunction(()=>window.heldRender!==null,null,{timeout:10000});
+  const pendingWarmth=await warmth.inputValue();
+  assert.notEqual(pendingWarmth,initialWarmth,'touch drag commits a changed Warmth value');
+  assert.equal(await exportButton.isDisabled(),true,'export remains disabled while the slider preview render is pending');
+  await page.locator('[data-control-tab="export"]').click();
+  assert.equal(await page.locator('.save-as').isDisabled(),true,'Save as remains disabled while the slider preview render is pending');
+  assert.equal(await page.getByRole('button',{name:'Save recipe'}).isDisabled(),true,'recipe save remains disabled while the slider preview render is pending');
+  assert.equal(await page.getByRole('button',{name:'Undo'}).isDisabled(),false,'committed touch drag creates an undo entry');
+  await page.evaluate(()=>window.releaseHeldRender());
+  await page.waitForFunction(()=>!document.querySelector('.top-actions .primary')?.disabled,null,{timeout:30000});
+  await page.waitForFunction(()=>!document.querySelector('.save-as')?.disabled,null,{timeout:30000});
+  await page.waitForTimeout(650);
+  assert.equal(await exportButton.isDisabled(),false,'export re-enables after the slider preview render completes');
+  assert.equal(await page.locator('.save-as').isDisabled(),false,'Save as re-enables after the slider preview render completes');
+  assert.equal(await page.getByRole('button',{name:'Save recipe'}).isDisabled(),false,'recipe save re-enables after the slider preview render completes');
+  const sliderPreviewRenders=await page.evaluate(()=>window.iosPreviewRenders);
+  assert.ok(sliderPreviewRenders>initialPreviewRenders,'slider edit rendered a new preview before export');
   assert.ok(initialPreviewRenders>0,'initial photo preview rendered before export');
   await exportButton.click();
   let dialog=page.getByRole('dialog',{name:'Share or save…'});
@@ -70,7 +102,7 @@ try{
   await dialog.getByRole('button',{name:'Cancel'}).click();
   await dialog.waitFor({state:'detached'});
   await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(()=>window.iosPreviewRenders),initialPreviewRenders,'export completion does not queue an unchanged preview render');
+  assert.equal(await page.evaluate(()=>window.iosPreviewRenders),sliderPreviewRenders,'export completion does not queue an unchanged preview render');
   assert.equal(await exportButton.isDisabled(),false,'export is ready immediately after the share prompt is cancelled');
 
   await page.locator('.save-as').click();dialog=page.getByRole('dialog',{name:'Share or save…'});await dialog.waitFor();
@@ -82,9 +114,10 @@ try{
   await page.waitForFunction(()=>window.iosShareCalls.length===2);
   await dialog.waitFor({state:'detached'});
   await page.waitForTimeout(150);
-  assert.equal(await page.evaluate(()=>window.iosPreviewRenders),initialPreviewRenders,'sharing does not repeat the unchanged preview render');
+  assert.equal(await page.evaluate(()=>window.iosPreviewRenders),sliderPreviewRenders,'sharing does not repeat the unchanged preview render');
   assert.equal(await exportButton.isDisabled(),false,'export remains ready after sharing');
 
+  await page.locator('[data-control-tab="export"]').click();
   await page.getByRole('button',{name:'Save recipe'}).click();
   dialog=page.getByRole('dialog',{name:'Share or save…'});await dialog.waitFor();
   assert.equal(await page.evaluate(()=>window.iosShareCalls.length),2,'toolbar recipe save waits for a fresh share tap');
@@ -92,7 +125,8 @@ try{
   await page.waitForFunction(()=>window.iosShareCalls.length===3);
   await dialog.waitFor({state:'detached'});
 
-  await page.locator('.preset-group>summary').click();
+  await page.locator('[data-control-tab="export"]').click();
+  await page.locator('.preset-group').evaluate(group=>{group.open=true;});
   await page.getByRole('button',{name:'Save preset',exact:true}).click();
   dialog=page.getByRole('dialog',{name:'Share or save…'});await dialog.waitFor();
   assert.equal(await page.evaluate(()=>window.iosShareCalls.length),3,'preset save also waits for a fresh share tap');
@@ -107,6 +141,8 @@ try{
     assert.equal(typeof JSON.parse(preset.text).engine,'string','shared preset contains serialized recipe JSON');
   }
   await page.evaluate(()=>{window.delayNextEnhance=true;window.holdNextRender=true;});
+  await page.locator('[data-control-tab="enhancement"]').click();
+  await page.locator('[data-control-subtab="effects"]').click();
   await page.getByRole('button',{name:'Auto enhance'}).click();
   await page.waitForFunction(()=>window.enhanceDelayed);
   assert.equal(await exportButton.isDisabled(),true,'enhancement keeps export locked while it is active');

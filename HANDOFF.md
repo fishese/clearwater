@@ -1,5 +1,12 @@
 # Handoff
 
+## 1.0.14 release in progress (28 October 2026)
+
+- [x] User accepted Android test, authorized merge/release and web deployment, and asked to attempt the IPA. PR #16 merged at `ed78af2ebb1146878b1f3cf91c8ea24e841427a2`; Pages run 40658610995 deployed it. Candidate run 40657883083 built the unsigned IPA and passed hosted WebKit checks, but those packages precede the follow-up fix below.
+- [x] Live smoke exposed a readiness race in the switch test and a real issue: the mobile visual slider could respond while its parent fieldset was disabled. Added effective native `:disabled` checks and reversible cancellation for touch and mouse. Synthetic Chromium tests cover blocked and mid-drag gestures, history and photo switching; the switch test now waits for readiness.
+- [x] User requested Safari export readiness after dragging. Extended iOS-browser automation to hold a slider preview render, verify saving is disabled while pending and re-enabled afterwards, then exercise share cancel/retry. Chromium passes; Windows WebKit lacks OffscreenCanvas. Hosted WebKit and an updated unsigned IPA must be attempted on the final source.
+- [ ] Commit/push and merge this follow-up, rebuild signed Android and unsigned iOS packages, rerun applicable checks, verify live Pages and release assets from the same final source tree, then publish 1.0.14. If the IPA build fails, user permits skipping it; do not publish an older IPA as 1.0.14. Preserve user data and signing configuration.
+
 ## Signed mobile slider test APK (28 October 2026)
 
 - [x] User authorized pushing `codex/mobile-scroll-safe-controls`; GitHub branch was pushed at `6e4808c`. Hosted iOS/WebKit run 40643272918 was cancelled at user request to conserve GitHub work hours; no hosted WebKit result or iOS build is claimed.
