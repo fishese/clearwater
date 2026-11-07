@@ -49,6 +49,15 @@ describe('iOS native file export',()=>{
   expect(state.exportBridge.beginExport).toHaveBeenCalledWith({name:'camera-original.mov',type:'video/quicktime',size:8});
  });
 
+ it('stages ZIP files in bounded chunks for the iOS share sheet and cleans up',async()=>{
+  const archive=new Blob([new Uint8Array(300_000)],{type:'application/zip'});
+  await expect(shareIOSFile(archive,'clearwater-batch.zip')).resolves.toEqual({completed:true,activityType:'saveToFiles'});
+  expect(state.exportBridge.beginExport).toHaveBeenCalledWith({name:'clearwater-batch.zip',type:'application/zip',size:300_000});
+  expect(state.exportBridge.writeExportChunk).toHaveBeenCalledTimes(2);
+  expect(state.exportBridge.discardExport).toHaveBeenCalledWith({id:'export-1'});
+  await expect(shareIOSFile(archive,'photo.jpg')).rejects.toThrow('name and type do not match');
+ });
+
  it('aborts partial files when a chunk write fails',async()=>{
   state.exportBridge.writeExportChunk.mockRejectedValueOnce(new Error('Disk full'));
   await expect(shareIOSFile(new Blob(['image'],{type:'image/png'}),'photo.png')).rejects.toThrow('Disk full');

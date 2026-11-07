@@ -15,8 +15,8 @@ function exportPlatform():MediaPlatform {
  return detectMediaPlatform({capacitorPlatform:Capacitor.getPlatform(),userAgent:nav?.userAgent??'',navigatorPlatform:nav?.platform??'',maxTouchPoints:nav?.maxTouchPoints??0});
 }
 const CHUNK_BYTES=256*1024;
-const ALLOWED_TYPES=new Set(['image/jpeg','image/png','image/heic','image/heif','image/dng','image/x-adobe-dng','video/mp4','video/quicktime','application/json']);
-const TYPE_BY_EXTENSION:Record<string,string>={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',heic:'image/heic',heif:'image/heif',dng:'image/x-adobe-dng',mp4:'video/mp4',mov:'video/quicktime',json:'application/json'};
+const ALLOWED_TYPES=new Set(['image/jpeg','image/png','image/heic','image/heif','image/dng','image/x-adobe-dng','video/mp4','video/quicktime','application/json','application/zip']);
+const TYPE_BY_EXTENSION:Record<string,string>={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',heic:'image/heic',heif:'image/heif',dng:'image/x-adobe-dng',mp4:'video/mp4',mov:'video/quicktime',json:'application/json',zip:'application/zip'};
 
 export function isIOSPhotoExportAvailable():boolean {
  return Capacitor.getPlatform()==='ios'&&Capacitor.isPluginAvailable('ClearWaterExport');
@@ -36,6 +36,7 @@ export async function shareIOSFile(blob:Blob,name='ClearWater-Export'):
  const declared=blob.type.toLowerCase().split(';',1)[0].trim();
  const type=!declared||declared==='application/octet-stream'?TYPE_BY_EXTENSION[extension]||declared:declared;
  if(!ALLOWED_TYPES.has(type))throw new Error('This file type cannot be shared from the iOS app.');
+ if(type==='application/zip'&&extension!=='zip')throw new Error('The file name and type do not match.');
  if(blob.size<=0)throw new Error('The exported file is empty.');
  const platform=exportPlatform();
  assertExportBytes(blob.size,type.startsWith('video/')?'video':'photo',platform);

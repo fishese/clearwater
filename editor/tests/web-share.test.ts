@@ -1,7 +1,7 @@
 import {describe,expect,it,vi} from 'vitest';
 const state=vi.hoisted(()=>({platform:'web'}));
 vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=>state.platform,isPluginAvailable:()=>false},registerPlugin:()=>({})}));
-import {isIOSWebBrowser,shareWebFile,supportsFileShare} from '../src/export-share';
+import {isIOSWebBrowser,shareWebBatchArchive,shareWebFile,supportsFileShare} from '../src/export-share';
 
 const jpeg=()=>new Blob([Uint8Array.from([0xff,0xd8,0xff,0xd9])],{type:'image/jpeg'});
 
@@ -73,5 +73,14 @@ describe('iPhone Safari save',()=>{
       share:async()=>{throw new DOMException('cancelled','AbortError');},
     };
     await expect(shareWebFile(jpeg(),'dive-restore.jpg',nav,true)).rejects.toMatchObject({name:'AbortError'});
+  });
+
+  it('shares a batch ZIP only when the browser accepts it, without widening ordinary media sharing',async()=>{
+    const share=vi.fn(async()=>{}),archive=new Blob(['zip'],{type:'application/zip'});
+    await shareWebBatchArchive(archive,'clearwater-batch.zip',{canShare:()=>true,share});
+    expect(share).toHaveBeenCalledWith({files:[expect.objectContaining({name:'clearwater-batch.zip',type:'application/zip'})]});
+    await expect(shareWebBatchArchive(archive,'clearwater-batch.zip',{canShare:()=>false,share})).rejects.toThrow('cannot share');
+    await expect(shareWebBatchArchive(archive,'../batch.zip',{canShare:()=>true,share})).rejects.toThrow('type cannot be shared');
+    await expect(shareWebFile(archive,'clearwater-batch.zip',{canShare:()=>true,share},true)).rejects.toThrow('type cannot be shared');
   });
 });

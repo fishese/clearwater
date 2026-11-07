@@ -247,6 +247,7 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         "image/x-adobe-dng": "dng",
         "video/mp4": "mp4",
         "video/quicktime": "mov",
-        "application/json": "json"
+        "application/json": "json",
+        "application/zip": "zip"
     ]
 }

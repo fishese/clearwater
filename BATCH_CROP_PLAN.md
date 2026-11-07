@@ -16,7 +16,8 @@ The user wants batch processing without reviewing every photo: select a correcti
 - [x] Read vault/project context and verify that Balanced restoration uses dive conditions; Auto enhance analyses the corrected preview.
 - [x] Added isolated sequential worker orchestration and unit tests for per-photo recipes, Auto enhance and cancellation. It is not yet connected to the UI; integration, per-item failure handling, real worker tests and resource cleanup still need validation.
 - [x] Added bounded stored-ZIP assembly with UTF-8 filenames, collision handling, CRC and cancellation; unit tests and Python zipfile interoperability pass. Batch output/UI and platform delivery are not implemented yet.
-- [ ] Add ZIP and selected-folder save flows with iOS-native/browser-specific handling; preserve existing single-photo export and Safari user activation.
+- [x] Added bounded iOS-native ZIP staging and browser ZIP share validation, with mocked bridge/share tests; these functions are not yet connected to a batch UI and physical iOS behavior is unverified.
+- [ ] Add selected-folder save flows and connect ZIP output to the batch UI, preserving existing single-photo export and Safari user activation. Native iOS folder access needs an explicit design and tests; browser ZIP needs a fallback when sharing is unavailable.
 - [ ] Implement non-destructive photo crop with correct orientation, preview/export geometry, metadata and undo/redo; no video changes.
 - [ ] Localize wording using the glossary; verify mobile/desktop and meaningful browser/native tests. Physical iPhone Safari/Chrome, Files/Photos and native app checks remain necessary.
 - [ ] Save checkpoint commits, including what is unfinished, before any interruption.
