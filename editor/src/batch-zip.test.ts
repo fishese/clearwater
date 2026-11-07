@@ -31,4 +31,11 @@ describe('batch ZIP',()=>{
   it('creates case-insensitively unique filenames',()=>{
     const used=new Set<string>();expect(uniqueBatchName('Fish.jpg',used)).toBe('Fish.jpg');expect(uniqueBatchName('fish.jpg',used)).toBe('fish (1).jpg');
   });
+  it('keeps long Unicode names within native file limits and preserves the extension',()=>{
+    const used=new Set<string>(),name='魚'.repeat(180)+'.jpg';
+    const first=uniqueBatchName(name,used),second=uniqueBatchName(name,used);
+    expect(new TextEncoder().encode(first).length).toBeLessThanOrEqual(200);
+    expect(new TextEncoder().encode(second).length).toBeLessThanOrEqual(220);
+    expect(first.endsWith('.jpg')).toBe(true);expect(second.endsWith(' (1).jpg')).toBe(true);
+  });
 });

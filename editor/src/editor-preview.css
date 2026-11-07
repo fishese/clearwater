@@ -1,5 +1,6 @@
 /* Local to the editor workspace so camera and modal layouts keep their own spacing. */
 .editor-preview .workspace{padding-top:3px;padding-bottom:3px}
+.editor-preview .image-frame{overflow:clip}.editor-preview .original-crop-overlay{position:absolute;inset:0;overflow:clip;pointer-events:none}
 .editor-preview .editor-note{padding-top:12px;padding-bottom:16px}
 .editor-preview .range-track{display:none}
 .editor-preview .compact-controls .range-field:not(.vertical-range)>span{margin-bottom:3px}
@@ -28,6 +29,17 @@
 .editor-preview .export-options>.export-actions{flex:1 0 100%}
 .editor-preview .preset-actions{display:flex;gap:9px;flex-wrap:wrap}
 .editor-preview .save-destination{margin-top:12px}
+.batch-dialog{width:min(540px,94vw);max-height:90dvh;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:18px;text-align:left}
+.batch-dialog h2{font-family:inherit;font-size:20px}.batch-dialog p,.batch-dialog small{font-size:12px;line-height:1.45;color:#abc0ba}
+.batch-dialog>fieldset,.batch-dialog details{display:grid;gap:10px;border:0;padding:0;margin:0;min-width:0}
+.batch-dialog>fieldset>label,.batch-dialog details>label{display:grid;gap:5px;font-size:12px}.batch-dialog select,.batch-dialog input[type=number]{width:100%;min-height:44px;background:#17262a;color:inherit;border:1px solid #34494d;border-radius:5px;padding:0 8px}
+.batch-dialog .batch-check,.batch-output label{display:flex;gap:8px;align-items:center;min-height:36px}.batch-dialog input[type=checkbox],.batch-dialog input[type=radio]{width:20px;height:20px;accent-color:var(--jade)}
+.batch-selection{display:grid;gap:8px}.batch-selection>div:first-child{display:flex;align-items:center;gap:14px}.batch-selection>div:first-child button{min-height:44px}.batch-selection .button{width:max-content;min-height:44px}.batch-selection .button input{position:absolute;width:1px;height:1px;opacity:0}
+.batch-photos{max-height:155px;overflow:auto;border:1px solid var(--border);border-radius:5px}.batch-photos label{display:flex;align-items:center;min-height:44px;gap:8px;padding:4px 8px}.batch-photos label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batch-dialog details>summary{cursor:pointer;min-height:44px;display:flex;align-items:center}.batch-output{display:flex;gap:18px;border:0;margin:0;padding:0;flex-wrap:wrap}.batch-dialog button,.batch-save a{min-height:44px}.batch-save{display:flex;gap:8px;flex-wrap:wrap}.batch-dialog progress{width:100%}.batch-dialog ul{max-height:110px;overflow:auto;padding-left:20px}
+.crop-dialog{width:min(680px,96vw);max-height:94dvh;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px;text-align:left}.crop-dialog h2{font-family:inherit;font-size:20px}.crop-dialog p{font-size:12px;color:#abc0ba}.crop-surface{position:relative;overflow:hidden;touch-action:none;user-select:none;background:#0a1518}.crop-surface canvas{display:block;width:100%;height:100%}.crop-selection{position:absolute;border:2px solid #fff;box-shadow:0 0 0 100vmax #0009;touch-action:none;cursor:move}.crop-handle{position:absolute;width:44px;height:44px;padding:0;touch-action:none}.crop-handle:after{content:'';position:absolute;width:16px;height:16px;border-color:#fff;border-style:solid}.crop-nw{top:-2px;left:-2px;cursor:nwse-resize}.crop-ne{top:-2px;right:-2px;cursor:nesw-resize}.crop-sw{bottom:-2px;left:-2px;cursor:nesw-resize}.crop-se{bottom:-2px;right:-2px;cursor:nwse-resize}.crop-nw:after{top:0;left:0;border-width:3px 0 0 3px}.crop-ne:after{top:0;right:0;border-width:3px 3px 0 0}.crop-sw:after{bottom:0;left:0;border-width:0 0 3px 3px}.crop-se:after{bottom:0;right:0;border-width:0 3px 3px 0}.crop-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.crop-actions button{min-height:44px}
+@media(max-width:650px){.batch-launch span{display:none}.batch-launch{min-width:40px;padding:0 8px}.batch-dialog{max-height:94dvh}}
+@media(max-width:430px){.editor-preview .topbar{padding-left:6px;padding-right:6px}.editor-preview .brand-cluster .brand>span:last-child{display:none}.editor-preview .web-update-hint{left:-32px}.editor-preview .web-update-hint::before{left:38px}}
 @media(max-width:650px){
   .editor-preview .video-timeline-controls>button{width:44px;height:44px}
 }

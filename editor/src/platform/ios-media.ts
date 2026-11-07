@@ -7,6 +7,9 @@ interface IOSPhotoExportPlugin {
  finishExport(options:{id:string;abort:boolean}):Promise<void>;
  shareExport(options:{id:string}):Promise<{completed:boolean;activityType?:string}>;
  discardExport(options:{id:string}):Promise<void>;
+ chooseBatchFolder():Promise<{id:string;name:string}>;
+ saveBatchExport(options:{folderId:string;id:string;name:string}):Promise<{name:string}>;
+ releaseBatchFolder(options:{id:string}):Promise<void>;
 }
 
 const exportPlugin=registerPlugin<IOSPhotoExportPlugin>('ClearWaterExport');
@@ -59,3 +62,30 @@ export async function shareIOSFile(blob:Blob,name='ClearWater-Export'):
 }
 
 export const shareIOSPhoto=shareIOSFile;
+
+export interface IOSBatchFolder {name:string;write(name:string,blob:Blob):Promise<string>;close():Promise<void>}
+
+/** Select once, then copy staged photos to the scoped folder without overwriting. */
+export async function chooseIOSBatchFolder():Promise<IOSBatchFolder>{
+ if(!isIOSPhotoExportAvailable())throw new Error('Native file export is available in the iOS app.');
+ let folder:{id:string;name:string};
+ try{folder=await exportPlugin.chooseBatchFolder();}
+ catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Folder selection cancelled.','AbortError');throw error;}
+ let closed=false;
+ return {name:folder.name,async write(name,blob){
+  if(closed)throw new Error('The output folder is no longer available.');
+  const type=blob.type.toLowerCase().split(';',1)[0].trim(),extension=name.split('.').at(-1)?.toLowerCase();
+  if(!((type==='image/jpeg'&&(extension==='jpg'||extension==='jpeg'))||(type==='image/png'&&extension==='png')))throw new Error('This file type cannot be saved.');
+  if(blob.size<=0)throw new Error('The exported file is empty.');
+  assertExportBytes(blob.size,'photo',exportPlatform());
+  const {id}=await exportPlugin.beginExport({name,type,size:blob.size});let staged=false;
+  try{
+   for(let offset=0;offset<blob.size;offset+=CHUNK_BYTES){const bytes=new Uint8Array(await blob.slice(offset,offset+CHUNK_BYTES).arrayBuffer());await exportPlugin.writeExportChunk({id,data:encodeBase64(bytes)});}
+   await exportPlugin.finishExport({id,abort:false});staged=true;
+   const saved=await exportPlugin.saveBatchExport({folderId:folder.id,id,name});return saved.name;
+  }finally{
+   if(!staged)await exportPlugin.finishExport({id,abort:true}).catch(()=>{});
+   await exportPlugin.discardExport({id}).catch(()=>{});
+  }
+ },async close(){if(closed)return;closed=true;await exportPlugin.releaseBatchFolder({id:folder.id});}};
+}

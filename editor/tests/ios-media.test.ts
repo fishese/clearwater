@@ -1,13 +1,13 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 
 const state=vi.hoisted(()=>({platform:'ios',pluginAvailable:true,exportBridge:{
- beginExport:vi.fn(),writeExportChunk:vi.fn(),finishExport:vi.fn(),shareExport:vi.fn(),discardExport:vi.fn()
+ beginExport:vi.fn(),writeExportChunk:vi.fn(),finishExport:vi.fn(),shareExport:vi.fn(),discardExport:vi.fn(),chooseBatchFolder:vi.fn(),saveBatchExport:vi.fn(),releaseBatchFolder:vi.fn()
 }}));
 vi.mock('@capacitor/core',()=>({
  Capacitor:{getPlatform:()=>state.platform,isPluginAvailable:()=>state.pluginAvailable},
  registerPlugin:()=>state.exportBridge
 }));
-import {isIOSPhotoExportAvailable,shareIOSFile} from '../src/platform/ios-media';
+import {chooseIOSBatchFolder,isIOSPhotoExportAvailable,shareIOSFile} from '../src/platform/ios-media';
 
 describe('iOS native file export',()=>{
  beforeEach(()=>{
@@ -17,6 +17,9 @@ describe('iOS native file export',()=>{
   state.exportBridge.finishExport.mockResolvedValue(undefined);
   state.exportBridge.shareExport.mockResolvedValue({completed:true,activityType:'saveToFiles'});
   state.exportBridge.discardExport.mockResolvedValue(undefined);
+  state.exportBridge.chooseBatchFolder.mockResolvedValue({id:'folder-1',name:'Pictures'});
+  state.exportBridge.saveBatchExport.mockResolvedValue({name:'photo (1).jpg'});
+  state.exportBridge.releaseBatchFolder.mockResolvedValue(undefined);
  });
 
  it('reports native export only when the iOS plugin is registered',()=>{
@@ -56,6 +59,25 @@ describe('iOS native file export',()=>{
   expect(state.exportBridge.writeExportChunk).toHaveBeenCalledTimes(2);
   expect(state.exportBridge.discardExport).toHaveBeenCalledWith({id:'export-1'});
   await expect(shareIOSFile(archive,'photo.jpg')).rejects.toThrow('name and type do not match');
+ });
+
+ it('copies batch photos to the chosen iOS folder, cleaning staging and releasing access',async()=>{
+  const folder=await chooseIOSBatchFolder();expect(folder.name).toBe('Pictures');
+  const result=await folder.write('photo.jpg',new Blob([new Uint8Array(300_000)],{type:'image/jpeg'}));
+  expect(result).toBe('photo (1).jpg');
+  expect(state.exportBridge.writeExportChunk).toHaveBeenCalledTimes(2);
+  expect(state.exportBridge.saveBatchExport).toHaveBeenCalledWith({folderId:'folder-1',id:'export-1',name:'photo.jpg'});
+  expect(state.exportBridge.discardExport).toHaveBeenCalledWith({id:'export-1'});
+  await folder.close();await folder.close();expect(state.exportBridge.releaseBatchFolder).toHaveBeenCalledTimes(1);
+  await expect(folder.write('photo.jpg',new Blob(['x'],{type:'image/jpeg'}))).rejects.toThrow('no longer available');
+ });
+ it('aborts a partially staged batch file and preserves folder picker cancellation',async()=>{
+  const folder=await chooseIOSBatchFolder();state.exportBridge.writeExportChunk.mockRejectedValueOnce(new Error('Disk full'));
+  await expect(folder.write('photo.png',new Blob(['x'],{type:'image/png'}))).rejects.toThrow('Disk full');
+  expect(state.exportBridge.finishExport).toHaveBeenCalledWith({id:'export-1',abort:true});
+  expect(state.exportBridge.saveBatchExport).not.toHaveBeenCalled();await folder.close();
+  state.exportBridge.chooseBatchFolder.mockRejectedValueOnce({code:'CANCELLED'});
+  await expect(chooseIOSBatchFolder()).rejects.toMatchObject({name:'AbortError'});
  });
 
  it('aborts partial files when a chunk write fails',async()=>{

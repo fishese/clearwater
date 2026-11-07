@@ -1,5 +1,12 @@
 # Handoff
 
+## Batch photos and crop test branch (8 November 2026)
+
+- [x] Feature branch `codex/batch-photos-crop` adds sequential batch processing, ZIP or selected-folder output, per-photo model/conditions/Auto enhance, and non-destructive crop. Originals and existing editor edits remain untouched; no website deployment is authorized before user phone testing.
+- [x] 278 shared tests and production build pass. Synthetic Chromium checks cover mobile/desktop layout (18 cases), crop preview/export parity, comparison edges, folder name collisions, cancel, editor history, and mocked iPhone ZIP share. These are not physical-device tests.
+- [ ] Build signed Android test APK and attempt hosted unsigned IPA, native iOS tests and WebKit checks from the feature branch. Native iOS folder picker and ZIP share are newly implemented and require actual device/Files-provider testing; browser ZIP sharing also requires real iPhone testing. See `BATCH_CROP_PLAN.md` for current progress and limits. Never merge or deploy the web before user authorization.
+
+
 ## 1.0.14 released (28 October 2026)
 
 - [x] User accepted the Android test and authorized Android, iOS and web release. PR #16 and the disabled-slider/Safari-check follow-up PR #17 merged; final source is `a78f535648631a98ea0f9397200bf6a5476b35fb`, tag `v1.0.14`. [Release](https://github.com/fishese/clearwater/releases/tag/v1.0.14) is latest; [Pages run 40661598595](https://github.com/fishese/clearwater/actions/runs/40661598595) deployed the same source tree.

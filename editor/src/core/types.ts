@@ -23,6 +23,8 @@ export interface Adjustments {
   highlights: number; shadows: number; contrast: number; haze: number; vibrance: number;
   neutral: [number, number, number];
 }
+/** Normalized crop rectangle in the orientation-corrected source image. */
+export interface PhotoCrop {x:number;y:number;width:number;height:number}
 export interface Recipe {
   version: 1; engine: 'balanced' | 'baseline' | AIEngine; strength: number;
   hints: Hints; auto: Suggestion; manual: Adjustments;
@@ -30,6 +32,7 @@ export interface Recipe {
   /** Frozen sampled Five A+ colour fit from camera capture, replayable without inference. */
   cameraColour?: {source:'fivea';matrix:number[]};
   enhancement?: PhotoEnhancement;
+  crop?: PhotoCrop;
   /** Optional adaptive photo finish; absent means legacy identity behavior. */
   adaptiveFinish?: AdaptivePhotoFinish;
   /** Optional follow-up Balanced pass for AI photo results. Omitted means disabled. */

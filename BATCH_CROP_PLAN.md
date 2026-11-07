@@ -2,6 +2,8 @@
 
 Updated 8 November 2026. Source: user request and the existing editor implementation.
 
+The user additionally requested a bug, race-condition and layout review, then a signed Android test APK and an attempted unsigned iOS test IPA if GitHub permits. Do not deploy or change the public website before the user has tested the apps.
+
 The user wants batch processing without reviewing every photo: select a correction model, optional Auto enhance and dive conditions, then save results as a ZIP or to a chosen folder. They also want a photo crop tool. The batch must preserve originals and existing edits and report failures/cancellation. Do not merge or publish without separate authorization.
 
 ## Platform findings
@@ -13,11 +15,12 @@ The user wants batch processing without reviewing every photo: select a correcti
 
 ## Work checklist
 
-- [x] Read vault/project context and verify that Balanced restoration uses dive conditions; Auto enhance analyses the corrected preview.
-- [x] Added isolated sequential worker orchestration and unit tests for per-photo recipes, Auto enhance and cancellation. It is not yet connected to the UI; integration, per-item failure handling, real worker tests and resource cleanup still need validation.
-- [x] Added bounded stored-ZIP assembly with UTF-8 filenames, collision handling, CRC and cancellation; unit tests and Python zipfile interoperability pass. Batch output/UI and platform delivery are not implemented yet.
-- [x] Added bounded iOS-native ZIP staging and browser ZIP share validation, with mocked bridge/share tests; these functions are not yet connected to a batch UI and physical iOS behavior is unverified.
-- [ ] Add selected-folder save flows and connect ZIP output to the batch UI, preserving existing single-photo export and Safari user activation. Native iOS folder access needs an explicit design and tests; browser ZIP needs a fallback when sharing is unavailable.
-- [ ] Implement non-destructive photo crop with correct orientation, preview/export geometry, metadata and undo/redo; no video changes.
-- [ ] Localize wording using the glossary; verify mobile/desktop and meaningful browser/native tests. Physical iPhone Safari/Chrome, Files/Photos and native app checks remain necessary.
-- [ ] Save checkpoint commits, including what is unfinished, before any interruption.
+- [x] Read project and vault context; verified that Balanced restoration uses dive conditions and Auto enhance analyses each corrected photo.
+- [x] Implemented isolated sequential processing and bounded stored-ZIP output, with per-photo failure reporting, cancellation and fresh-tap ZIP sharing on iOS browsers.
+- [x] Added iOS-native ZIP sharing and selected-folder support with scoped access, coordinated non-overwriting writes, bounded staging and mocked bridge tests. Native compilation, Files providers and physical-device behavior remain unverified until hosted build/device testing.
+- [x] Added non-destructive crop with undo/redo, preview, strip-based export and translated mobile/desktop controls. Synthetic Chromium tests cover off-centre crop, enhancement and pixel parity; EXIF orientation and real-device behavior remain to be checked.
+- [x] Local checks: 278 shared tests; production build; 18 touch-layout cases; synthetic Chromium batch folder/collision/cancellation, editor-history preservation, iPhone-style mocked ZIP share, crop parity and comparison edge checks. These are automated, not physical-device evidence.
+- [ ] Build a signed Android test APK using the existing project signing configuration; run Android tests and verify package/certificate. No version/signing changes or website deployment.
+- [ ] Push only this feature branch and attempt the unsigned iOS workflow, including native tests and WebKit, if GitHub permits. Never deploy Pages or merge without further authorization.
+- [ ] User phone testing: iPhone Safari/Chrome ZIP download/share and native iOS Files folder/share destinations; Android folder/ZIP, crop and cancellation. Browser folder output depends on actual API support; ZIP is limited to 128 MB, not a guarantee of memory availability.
+- [ ] Continue verification of metadata/orientation, actual providers, accessibility and large batches; collect user feedback before release. Preserve originals and existing app data.
