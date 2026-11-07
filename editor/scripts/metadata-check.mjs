@@ -19,6 +19,10 @@ try{
  let output=await exportFile(),data=await parse(output,{translateValues:false,reviveValues:false});
  assert.equal(data.Make,'Synthetic DiveCam');assert.equal(data.DateTimeOriginal,'2026:10:01 12:34:56');assert.equal(data.Orientation,1);assert.equal(data.ExifImageWidth,32);assert.equal(data.ExifImageHeight,64);assert.ok(data.latitude<0);
  const dimensions=await page.evaluate(async a=>{const b=await createImageBitmap(new Blob([new Uint8Array(a)],{type:'image/jpeg'}));return [b.width,b.height];},Array.from(output));assert.deepEqual(dimensions,[32,64]);
+ await page.getByRole('button',{name:'Crop photo'}).click();const crop=page.getByRole('dialog',{name:'Crop photo'}),corner=crop.getByRole('button',{name:'Top left crop handle'});await corner.focus();await corner.press('Shift+ArrowRight');await corner.press('Shift+ArrowDown');await crop.getByRole('button',{name:'Apply crop'}).click();
+ output=await exportFile();data=await parse(output,{translateValues:false,reviveValues:false});assert.equal(data.Orientation,1);assert.equal(data.ExifImageWidth,29);assert.equal(data.ExifImageHeight,58);assert.ok(data.latitude<0);
+ const cropDimensions=await page.evaluate(async a=>{const b=await createImageBitmap(new Blob([new Uint8Array(a)],{type:'image/jpeg'}));return [b.width,b.height];},Array.from(output));assert.deepEqual(cropDimensions,[29,58]);
+ await page.getByRole('button',{name:'Undo'}).click();
  await page.getByRole('combobox',{name:'File format'}).selectOption('png');output=await exportFile();data=await parse(output);assert.equal(data.Make,'Synthetic DiveCam');assert.ok(data.latitude<0);
  await page.getByLabel('Choose photos',{exact:true}).setInputFiles({name:'roundtrip.png',mimeType:'image/png',buffer:output});await page.waitForFunction(()=>document.querySelector('.top-actions .primary')?.disabled===false);
  await page.getByRole('combobox',{name:'File format'}).selectOption('jpg');output=await exportFile();assert.equal((await parse(output)).Make,'Synthetic DiveCam');
