@@ -26,7 +26,7 @@ import org.json.JSONObject;
 @CapacitorPlugin(name = "ClearWaterFiles")
 public class ClearWaterFilesPlugin extends Plugin {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Set<String> folders = new HashSet<>(), created = new HashSet<>(), captureCreated = new HashSet<>();
+    private final Set<String> folders = new HashSet<>(), created = new HashSet<>(), captureCreated = new HashSet<>(), downloadCreated = new HashSet<>();
     private final Map<String, WriteSession> writes = new HashMap<>();
     private final Map<String, ModelWriteSession> modelWrites = new HashMap<>();
     private final Map<String, File> sharedFiles = new HashMap<>();
@@ -170,10 +170,16 @@ public class ClearWaterFilesPlugin extends Plugin {
         Uri tree=folder(call);String name=filename(call);
         if(Boolean.TRUE.equals(find(tree,name).getBool("exists")))throw new IOException("Filename already exists. Please save again.");
         Uri parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":name.toLowerCase(Locale.ROOT).endsWith(".mp4")?"video/mp4":"image/jpeg",name);
+        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".zip")?"application/zip":name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":name.toLowerCase(Locale.ROOT).endsWith(".mp4")?"video/mp4":"image/jpeg",name);
         if(document==null)throw new IOException("Could not create photo.");
         created.add(document.toString());JSObject value=new JSObject();value.put("uri",document.toString());value.put("name",displayName(document,name));call.resolve(value);
     }catch(Exception error){call.reject("Could not create a new photo.",error);}}); }
+    @PluginMethod public void createBatchDownload(PluginCall call) { io.execute(()->{Uri uri=null;try {
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.Q){call.reject("Downloads requires a folder on this Android version.","UNAVAILABLE");return;}
+        ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,"clearwater-batch.zip");values.put(MediaStore.MediaColumns.MIME_TYPE,"application/zip");values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS);values.put(MediaStore.MediaColumns.IS_PENDING,1);
+        uri=getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);if(uri==null)throw new IOException("Could not create download.");
+        downloadCreated.add(uri.toString());JSObject result=new JSObject();result.put("uri",uri.toString());result.put("name",displayName(uri,"clearwater-batch.zip"));call.resolve(result);
+    }catch(Exception error){if(uri!=null)deleteCapture(uri);call.reject("Could not create the ZIP download.",error);}}); }
     private final Object captureCreateLock = new Object();
     @PluginMethod public void createCapture(PluginCall call) { io.execute(()->{Uri uri=null;try { synchronized(captureCreateLock) {
         String name=call.getString("name"),type=call.getString("type");
@@ -226,10 +232,10 @@ public class ClearWaterFilesPlugin extends Plugin {
         call.resolve();
     }catch(Exception error){if(target!=null)deleteCapture(target);call.reject("Could not copy the camera video to the gallery.",error);}}); }
     @PluginMethod public void beginWrite(PluginCall call) { io.execute(()->{try {
-        String value=call.getString("uri");boolean isCapture=captureCreated.remove(value);if(!isCapture&&!created.remove(value))throw new IOException("Only newly created photos can be written.");
-        Uri uri=Uri.parse(value);boolean mediaStore=isCapture&&"content".equals(uri.getScheme());OutputStream stream;
+        String value=call.getString("uri");boolean isCapture=captureCreated.remove(value),isDownload=downloadCreated.remove(value);if(!isCapture&&!isDownload&&!created.remove(value))throw new IOException("Only newly created photos can be written.");
+        Uri uri=Uri.parse(value);boolean mediaStore=(isCapture||isDownload)&&"content".equals(uri.getScheme());OutputStream stream;
         try {stream="file".equals(uri.getScheme())?new FileOutputStream(new File(uri.getPath()),false):getContext().getContentResolver().openOutputStream(uri,"wt");if(stream==null)throw new IOException("Could not open new photo.");}
-        catch(Exception error){if(isCapture)deleteCapture(uri);else deleteDocument(uri);throw error;}
+        catch(Exception error){if(isCapture||isDownload)deleteCapture(uri);else deleteDocument(uri);throw error;}
         String id=UUID.randomUUID().toString();writes.put(id,new WriteSession(uri,stream,mediaStore,isCapture));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
     }catch(Exception error){call.reject("Could not open new photo for writing.",error);}}); }
     @PluginMethod public void beginCameraUpdate(PluginCall call) { io.execute(()->{File stage=null,backup=null;try {
@@ -364,5 +370,5 @@ public class ClearWaterFilesPlugin extends Plugin {
     }
     @PluginMethod public void drainShares(PluginCall call) {io.execute(()->{JSObject result=new JSObject();result.put("photos",new JSArray(shares));shares.clear();if(shareError!=null){result.put("error",shareError);shareError=null;}call.resolve(result);});}
     @PluginMethod public void releaseShare(PluginCall call) {io.execute(()->{File file=sharedFiles.remove(call.getString("id"));if(file!=null)file.delete();call.resolve();});}
-    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values())cleanupWrite(session);writes.clear();for(String uri:captureCreated)deleteCapture(Uri.parse(uri));captureCreated.clear();for(ModelWriteSession session:modelWrites.values())try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}modelWrites.clear();});io.shutdown();}
+    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values())cleanupWrite(session);writes.clear();for(String uri:captureCreated)deleteCapture(Uri.parse(uri));captureCreated.clear();for(String uri:downloadCreated)deleteCapture(Uri.parse(uri));downloadCreated.clear();for(ModelWriteSession session:modelWrites.values())try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}modelWrites.clear();});io.shutdown();}
 }

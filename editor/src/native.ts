@@ -27,6 +27,7 @@ interface NativeFiles {
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string;size?:number}>;
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
+ createBatchDownload():Promise<{uri:string;name:string}>;
  createCapture(options:{name:string;type:string}):Promise<{uri:string;name:string;destination:string}>;
  copyCameraCapture(options:{sourceUri:string;uri:string}):Promise<void>;
  beginCameraUpdate(options:{uri:string}):Promise<{id:string}>;
@@ -169,6 +170,11 @@ function fileHandle(uri:string,name:string,created=false,size?:number):LocalFile
    const {id}=await files.beginWrite({uri});
    return {async write(blob){for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}},async close(){await files.finishWrite({id,abort:false});},async abort(){await files.finishWrite({id,abort:true});}};
  }};
+}
+export async function saveAndroidBatchDownload(blob:Blob):Promise<string>{
+ if(!isAndroid()||blob.type!=='application/zip'||!blob.size)throw new Error('Invalid ZIP download.');
+ const target=await files.createBatchDownload();const writable=await fileHandle(target.uri,target.name,true).createWritable();
+ try{await writable.write(blob);await writable.close();return target.name;}catch(error){await writable.abort().catch(()=>{});throw error;}
 }
 function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
  return {name:folder.name,async getFileHandle(name,options){

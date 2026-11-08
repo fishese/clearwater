@@ -5,6 +5,7 @@ import {chooseFolder,createUniqueFile,restoredName,supportsFolder,writeFile,type
 import {isIOSWebBrowser,shareWebBatchArchive} from './export-share';
 import {chooseIOSBatchFolder,isIOSPhotoExportAvailable,shareIOSFile,type IOSBatchFolder} from './platform/ios-media';
 import {currentMediaPlatform} from './platform/runtime';
+import {saveAndroidBatchDownload} from './native';
 import {isVideo,supportedMedia} from './core/media';
 import {isAIEngine} from './core/bundled-models';
 import {DEFAULT_HINTS,type CustomModel,type Hints,type Recipe} from './core/types';
@@ -93,7 +94,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
  }
  async function saveAndroidArchive(){
   if(!archive||saving||savingNow.current)return;savingNow.current=true;setSaving(true);setWarning('');
-  try{const folder=await chooseFolder(),target=await createUniqueFile(folder,'clearwater-batch.zip');await writeFile(target.handle,archive);setWarning(t('ZIP saved.'));}
+  try{try{const name=await saveAndroidBatchDownload(archive);setWarning(t('Saved {0} to Downloads.',[name]));}catch(error){if((error as {code?:string})?.code!=='UNAVAILABLE')throw error;const folder=await chooseFolder(),target=await createUniqueFile(folder,'clearwater-batch.zip');await writeFile(target.handle,archive);setWarning(t('ZIP saved.'));}}
   catch(error){if(!(error instanceof DOMException&&error.name==='AbortError'))setWarning(t('Could not save the ZIP. Choose another folder and try again.'));}
   finally{savingNow.current=false;if(mounted.current)setSaving(false);}
  }

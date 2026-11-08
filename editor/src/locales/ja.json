@@ -882,5 +882,6 @@
   "Reset crop": "切り抜きをリセット",
   "Apply crop": "切り抜きを適用",
   "Invalid crop settings.": "切り抜きの設定が無効です。",
-  "Could not share the ZIP. Try again.": "ZIPを共有できませんでした。もう一度お試しください。"
+  "Could not share the ZIP. Try again.": "ZIPを共有できませんでした。もう一度お試しください。",
+  "Saved {0} to Downloads.": "{0} をダウンロードに保存しました。"
 }

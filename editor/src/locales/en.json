@@ -882,5 +882,6 @@
   "Reset crop": "Reset crop",
   "Apply crop": "Apply crop",
   "Invalid crop settings.": "Invalid crop settings.",
-  "Could not share the ZIP. Try again.": "Could not share the ZIP. Try again."
+  "Could not share the ZIP. Try again.": "Could not share the ZIP. Try again.",
+  "Saved {0} to Downloads.": "Saved {0} to Downloads."
 }
