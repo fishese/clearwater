@@ -77,6 +77,7 @@ const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
   const platform:MediaPlatform=isMediaPlatform(data.platform)?data.platform:currentMediaPlatform();
+  let diagnosticStep='start';
   if(type==='render'||type==='enhance'||type==='finish')latestPreviewRequest=request;
   try {
     if(type==='custom-model') {
@@ -87,11 +88,11 @@ ctx.onmessage=async({data})=>{
       source?.close();source=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
       photoFinishKernels.clear();
       mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
-      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info}),onDiagnosticStep:step=>{diagnosticStep=step;}});
       const {bitmap}=decoded;
       if(gen!==generation){bitmap.close();return;}
       source=bitmap;sourceFile=data.blob;sourceInfo=decoded.info;
-      const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
+      diagnosticStep='analysis';const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
       const canvas=new OffscreenCanvas(Math.round(bitmap.width*scale),Math.round(bitmap.height*scale));
       const c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
       c.drawImage(bitmap,0,0,canvas.width,canvas.height);
@@ -215,6 +216,12 @@ ctx.onmessage=async({data})=>{
     if(type==='custom-model')console.error(error);
     const classified=type==='custom-model'?error instanceof Error?error:new Error(fallback):classifyMediaFailure(error instanceof Error?error:new Error(fallback),platform,type==='export'?'export':type==='load'?'photo-load':'photo-process');
     const limit=classified instanceof PlatformLimitError?classified:undefined;
-    send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
+    let diagnostic:string|undefined;
+    if(data.batchDiagnostic===true){
+      const allowed=new Set(['AbortError','EncodingError','InvalidStateError','NotReadableError','NotSupportedError','OperationError','QuotaExceededError','RangeError','SecurityError','TypeError']);
+      let current:unknown=error,kind='Error';for(let i=0;i<5&&current&&typeof current==='object';i++){const name=(current as {name?:unknown}).name;if(typeof name==='string'&&allowed.has(name))kind=name;current=(current as {cause?:unknown}).cause;}
+      diagnostic=`CW/${type}/${diagnosticStep}/${kind}`;
+    }
+    send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,diagnostic,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
   }
 };

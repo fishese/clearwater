@@ -5,12 +5,13 @@ import type {Analysis} from './core/types';
 const analysis:Analysis={mean:[30,80,100],neutral:[30,80,100],p05:.1,p50:.4,p95:.9,clipping:0,redRatio:.3,magenta:1,confidence:'medium'};
 const options:BatchPhotoOptions={engine:'balanced',hints:{scene:'underwater',filter:'yes',water:'blue',depth:12},balancedAfterAI:false,autoEnhance:true,format:'jpg',jpegQuality:.95,keepMetadata:true,resolution:'auto',device:{mobile:true},platform:'ios-safari'};
 class FakeWorker extends EventTarget {
-  messages:Record<string,unknown>[]=[];terminated=false;hold=false;closedImages=0;
+  messages:Record<string,unknown>[]=[];terminated=false;hold=false;closedImages=0;diagnostic:string|undefined;
   postMessage(message:Record<string,unknown>){
     this.messages.push(message);if(this.hold)return;
     queueMicrotask(()=>{
       const base={gen:message.gen,request:message.request};let data:Record<string,unknown>;
-      if(message.type==='load')data={...base,type:'loaded',analysis,original:{close:()=>this.closedImages++}};
+      if(message.type==='load'&&this.diagnostic)data={...base,type:'error',message:'Could not read photo.',diagnostic:this.diagnostic};
+      else if(message.type==='load')data={...base,type:'loaded',analysis,original:{close:()=>this.closedImages++}};
       else if(message.type==='enhance')data={...base,type:'enhancement-ready',enhancement:{black:.03,white:.95,contrast:80,clarity:35,sharpness:25}};
       else if(message.type==='export')data={...base,type:'exported',blob:new Blob(['result'],{type:'image/jpeg'})};
       else data={...base,type:'custom-ready'};
@@ -50,5 +51,14 @@ describe('batch photo processing',()=>{
     processor.cancel();
     await expect(pending).rejects.toMatchObject({name:'AbortError'});
     expect(worker.terminated).toBe(true);
+  });
+  it('shows only a recognized diagnostic code and requests diagnostics for batch work',async()=>{
+    const worker=new FakeWorker(),processor=new BatchPhotoProcessor(worker as unknown as Worker);
+    worker.diagnostic='CW/load/header/NotReadableError';
+    await expect(processor.process(new File(['a'],'a.jpg'),options)).rejects.toThrow('CW/load/header/NotReadableError');
+    expect(worker.messages[0].batchDiagnostic).toBe(true);
+    worker.diagnostic='CW/load/header/private-file-path';
+    await expect(processor.process(new File(['a'],'a.jpg'),options)).rejects.toThrow(/^Could not read photo\.$/);
+    processor.close();
   });
 });

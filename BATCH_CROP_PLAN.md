@@ -31,3 +31,5 @@ A synthetic desktop Chromium batch processed two 4000×3000 JPEGs using Balanced
 
 - [x] Batch selection now starts empty; editor collection is not automatically included. Production build, 278 shared tests, and synthetic batch/editor-history browser check pass.
 - [ ] Android user reproduced a generic photo-read error on a connected Samsung phone. Release WebView/Capacitor logcat did not expose an underlying exception; whether failures were newly selected or previously listed collection items, and ZIP versus folder output, needs user confirmation. Do not claim the empty-selection change fixes the read error until verified on the affected files. No app data cleared.
+
+- [x] Built and installed a signed diagnostic APK without clearing data; signature matches earlier test. It reports only a whitelisted failure phase/type for batch errors. Shared tests 279 pass; Android release build and unit task pass. SHA-256 `9cd27f1f92160f44c89061dd25505028b577ce6b41f9cbb72c6eb4d7de34da38`. Awaiting user reproduction and diagnostic code; do not claim the read issue fixed.

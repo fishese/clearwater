@@ -11,7 +11,7 @@ export interface BatchPhotoOptions {
   resolution:PhotoResolution; device:PhotoDevice; platform:MediaPlatform;
   custom?:{file:Blob;config:CustomModel};
 }
-type WorkerResponse={type:string;gen:number;request?:number;operation?:string;message?:string;analysis?:Analysis;enhancement?:PhotoEnhancement;blob?:Blob;metadataWarning?:string;original?:ImageBitmap;progress?:number};
+type WorkerResponse={type:string;gen:number;request?:number;operation?:string;message?:string;diagnostic?:string;analysis?:Analysis;enhancement?:PhotoEnhancement;blob?:Blob;metadataWarning?:string;original?:ImageBitmap;progress?:number};
 type WorkerLike=Pick<Worker,'postMessage'|'terminate'|'addEventListener'|'removeEventListener'>;
 
 export class BatchPhotoProcessor {
@@ -31,13 +31,13 @@ export class BatchPhotoProcessor {
         const data=(event as MessageEvent<WorkerResponse>).data;
         if(!data||data.gen!==message.gen)return;
         if(data.type==='progress'&&data.request===message.request){progress?.(data.progress??0);return;}
-        if(data.type==='error'&&(data.request===message.request||message.type==='load'||message.type==='custom-model')){cleanup();reject(new Error(data.message||'The photo could not be processed.'));return;}
+        if(data.type==='error'&&(data.request===message.request||message.type==='load'||message.type==='custom-model')){cleanup();const code=/^CW\/(load|enhance|export|custom-model)\/(start|header|decode|resize|analysis)\/(Error|AbortError|EncodingError|InvalidStateError|NotReadableError|NotSupportedError|OperationError|QuotaExceededError|RangeError|SecurityError|TypeError)$/.test(data.diagnostic??'')?` (${data.diagnostic})`:'';reject(new Error((data.message||'The photo could not be processed.')+code));return;}
         if(data.type!==expected||(message.request!==undefined&&data.request!==message.request))return;
         cleanup();resolve(data);
       };
       this.pendingCancel=cancel;
       this.worker.addEventListener('message',receive);this.worker.addEventListener('error',failed);this.worker.addEventListener('messageerror',failed);
-      try{this.worker.postMessage(message);}catch(error){cleanup();reject(error);}
+      try{this.worker.postMessage({...message,batchDiagnostic:true});}catch(error){cleanup();reject(error);}
     });
   }
   async prepareCustom(custom:NonNullable<BatchPhotoOptions['custom']>):Promise<void> {

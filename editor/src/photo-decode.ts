@@ -2,7 +2,7 @@ import {isRaw} from './core/media';
 import {fitPhoto,photoInfo,type PhotoInfo,type PhotoResolution,type PhotoDevice} from './core/photo-size';
 import {classifyMediaFailure,currentMediaPlatform,type MediaPlatform} from './core/platform-limits';
 import {photoHeader} from './photo-header';
-export interface PhotoDecodeOptions {mode:PhotoResolution;device:PhotoDevice;preview:boolean;onInfo:(info:PhotoInfo)=>void;signal?:AbortSignal;platform?:MediaPlatform}
+export interface PhotoDecodeOptions {mode:PhotoResolution;device:PhotoDevice;preview:boolean;onInfo:(info:PhotoInfo)=>void;signal?:AbortSignal;platform?:MediaPlatform;onDiagnosticStep?:(step:string)=>void}
 function throwIfAborted(signal?:AbortSignal):void{if(signal?.aborted)throw new DOMException('Photo decoding cancelled.','AbortError');}
 export async function decodePhoto(blob:File,options:PhotoDecodeOptions):Promise<{bitmap:ImageBitmap;info:PhotoInfo}>{
  throwIfAborted(options.signal);
@@ -17,7 +17,7 @@ export async function decodePhoto(blob:File,options:PhotoDecodeOptions):Promise<
   worker.postMessage({blob,mode:options.mode,device:options.device,preview:options.preview,platform:options.platform});
  });
  const platform=options.platform??currentMediaPlatform();
- let size=await photoHeader(blob);throwIfAborted(options.signal);
+ options.onDiagnosticStep?.('header');let size=await photoHeader(blob);throwIfAborted(options.signal);
  let info=size?photoInfo(...size,blob.size,false,options.mode,options.device,platform):undefined;
  if(info)options.onInfo(info);
  const target=info?(options.preview&&info.large?fitPhoto(...size!,2_560_000,1600):[info.exportWidth,info.exportHeight]):undefined;
@@ -25,7 +25,7 @@ export async function decodePhoto(blob:File,options:PhotoDecodeOptions):Promise<
  // One axis preserves aspect even when HEIF container rotation differs from EXIF.
  const bitmapOptions:ImageBitmapOptions={imageOrientation:'from-image',colorSpaceConversion:'default',...(resizing?{resizeWidth:target![0],resizeQuality:'high'}:{})};
  let bitmap:ImageBitmap;
- try{bitmap=await createImageBitmap(blob,bitmapOptions);}
+ options.onDiagnosticStep?.('decode');try{bitmap=await createImageBitmap(blob,bitmapOptions);}
  catch(error){
   if(options.signal?.aborted)throwIfAborted(options.signal);
   if(error instanceof DOMException&&error.name==='AbortError')throw error;
@@ -34,7 +34,7 @@ export async function decodePhoto(blob:File,options:PhotoDecodeOptions):Promise<
   try{const {heicTo}=await import('heic-to/next');bitmap=await heicTo({blob,type:'bitmap',options:bitmapOptions});}
   catch(heicError){if(options.signal?.aborted)throwIfAborted(options.signal);if(heicError instanceof DOMException&&heicError.name==='AbortError')throw heicError;throw classifyMediaFailure(heicError,platform,'photo-load');}
  }
- try{
+ options.onDiagnosticStep?.('resize');try{
   throwIfAborted(options.signal);
   if(!info||!resizing){size=[bitmap.width,bitmap.height];info=photoInfo(...size,blob.size,false,options.mode,options.device,platform);}
   else if(Math.abs(bitmap.width/bitmap.height-info.sourceHeight/info.sourceWidth)<.01&&Math.abs(bitmap.width/bitmap.height-info.sourceWidth/info.sourceHeight)>.01){
