@@ -16,6 +16,11 @@ class Reader {
 Object.assign(globalThis,{FileReader:Reader});
 function png(){const data=new Uint8Array(33);data.set([137,80,78,71,13,10,26,10]);const v=new DataView(data.buffer);v.setUint32(8,13);data.set(bytes('IHDR'),12);v.setUint32(16,32);v.setUint32(20,64);data.set([8,2,0,0,0],24);v.setUint32(29,crc32(data.subarray(12,29)));return data;}
 describe('photo EXIF preservation',()=>{
+ it('does not warn for empty EXIF text fields while preserving other metadata',async()=>{
+  const input=jpeg(piexif.dump({'0th':{270:'',271:'Test Camera',315:'',33432:''},Exif:{36867:'2026:10:01 12:34:56'}}));
+  const result=await readPhotoExif(input,32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
+  const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});expect(output.Make).toBe('Test Camera');expect(output.DateTimeOriginal).toBe('2026:10:01 12:34:56');
+ });
  it('preserves capture dates, camera, author, rational settings and southern/western GPS; fixes rotation/dimensions and drops MakerNote/thumbnail',async()=>{
   const result=await readPhotoExif(fixture(),32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
   const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});

@@ -87,6 +87,9 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
   for(const [block,target] of [['ifd0','0th'],['exif','Exif'],['gps','GPS']]){
    for(const [key,parsedValue] of Object.entries(parsed[block]??{})){
     const value=block==='exif'&&Number(key)===37510&&userComment!==undefined?userComment:parsedValue;
+    // exifr represents zero-length text tags as undefined; there is no
+    // metadata value to preserve or warn about in that case.
+    if(value===undefined||value===null)continue;
     const tag=Number(key),info=piexif.TAGS[target][tag];
     if(!info||(target==='0th'&&!ifd0Tags.has(tag))||(target==='Exif'&&excludedExif.has(tag)))continue;
     try{output[target][tag]=valueFor(value,info.type);copied++;}catch{skipped=true;}
