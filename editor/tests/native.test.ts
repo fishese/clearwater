@@ -45,8 +45,9 @@ describe('Android file bridge',()=>{
  });
  it('saves a batch ZIP in bounded chunks and aborts a failed write',async()=>{
   bridge.createBatchDownload.mockResolvedValue({uri:'content://download/1',name:'clearwater-batch.zip'});
+  bridge.finishWrite.mockResolvedValue(undefined).mockResolvedValueOnce({name:'clearwater-batch (2).zip'});
   const blob=new Blob([new Uint8Array(300000)],{type:'application/zip'});
-  await expect(saveAndroidBatchDownload(blob)).resolves.toBe('clearwater-batch.zip');
+  await expect(saveAndroidBatchDownload(blob)).resolves.toBe('clearwater-batch (2).zip');
   expect(bridge.writeChunk).toHaveBeenCalledTimes(2);expect(bridge.finishWrite).toHaveBeenCalledWith({id:'write-1',abort:false});
   bridge.writeChunk.mockRejectedValueOnce(new Error('Storage full'));
   await expect(saveAndroidBatchDownload(blob)).rejects.toThrow('Storage full');expect(bridge.finishWrite).toHaveBeenCalledWith({id:'write-1',abort:true});

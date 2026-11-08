@@ -35,7 +35,7 @@ interface NativeFiles {
  probeAndroidSources(options:{uris:string[]}):Promise<{states:Record<string,'present'|'missing'|'unavailable'|'trashed'>}>;
  beginWrite(options:{uri:string}):Promise<{id:string}>;
  writeChunk(options:{id:string;data:string}):Promise<void>;
- finishWrite(options:{id:string;abort:boolean}):Promise<void>;
+ finishWrite(options:{id:string;abort:boolean}):Promise<{name?:string}>;
  drainShares():Promise<{photos:SharedPhoto[];error?:string}>;
  releaseShare(options:{id:string}):Promise<void>;
  addListener(name:'sharesAvailable',listener:()=>void):Promise<PluginListenerHandle>;
@@ -173,8 +173,9 @@ function fileHandle(uri:string,name:string,created=false,size?:number):LocalFile
 }
 export async function saveAndroidBatchDownload(blob:Blob):Promise<string>{
  if(!isAndroid()||blob.type!=='application/zip'||!blob.size)throw new Error('Invalid ZIP download.');
- const target=await files.createBatchDownload();const writable=await fileHandle(target.uri,target.name,true).createWritable();
- try{await writable.write(blob);await writable.close();return target.name;}catch(error){await writable.abort().catch(()=>{});throw error;}
+ const target=await files.createBatchDownload(),{id}=await files.beginWrite({uri:target.uri});
+ try{for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}const result=await files.finishWrite({id,abort:false});return result?.name??target.name;}
+ catch(error){await files.finishWrite({id,abort:true}).catch(()=>{});throw error;}
 }
 function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
  return {name:folder.name,async getFileHandle(name,options){

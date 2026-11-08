@@ -3,6 +3,8 @@ import {isAIEngine} from './core/bundled-models';
 import type {Analysis,CustomModel,Hints,PhotoEnhancement,Recipe} from './core/types';
 import type {PhotoDevice,PhotoResolution} from './core/photo-size';
 import type {MediaPlatform} from './core/platform-limits';
+import {PlatformLimitError,presentMediaError} from './core/platform-limits';
+import {mediaLimit} from './core/media';
 
 /** A separate worker owns the batch so it cannot supersede the open editor. */
 export interface BatchPhotoOptions {
@@ -47,6 +49,7 @@ export class BatchPhotoProcessor {
     if(this.busy)throw new Error('Another batch photo is already being processed.');
     this.busy=true;
     try{
+    const limit=mediaLimit(file,options.platform);if(file.size>limit)throw new Error(presentMediaError(new PlatformLimitError('photo-too-large',options.platform,{unit:'bytes',actual:file.size,limit}),options.platform));
     // Android picker-backed files can become unreadable when accessed from a
     // worker. Materialize one photo at a time before crossing that boundary.
     if(options.platform==='android-apk'){
