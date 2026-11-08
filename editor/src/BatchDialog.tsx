@@ -36,9 +36,9 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   const addedItems=files.map(file=>({id:crypto.randomUUID(),name:file.name,getFile:async()=>file}));
   setAdded(previous=>[...previous,...addedItems]);setSelected(previous=>new Set([...previous,...addedItems.map(item=>item.id)]));
  };
- async function addAndroidPhotos(){
+ async function addAndroidPhotos(browse=false){
   if(choosing||running||saving||picking.current)return;picking.current=true;const token=++generation.current;setChoosing(true);
-  try{const photos=await chooseAndroidBatchPhotos();if(!mounted.current||token!==generation.current)return;
+  try{const photos=await chooseAndroidBatchPhotos(browse);if(!mounted.current||token!==generation.current)return;
    const entries=photos.map(photo=>({id:crypto.randomUUID(),name:photo.name,getFile:async(signal:AbortSignal)=>{if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');const file=await readAndroidFolderPhoto(photo,signal);if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');return file;}}));
    setAdded(previous=>[...previous,...entries]);setSelected(previous=>new Set([...previous,...entries.map(item=>item.id)]));
   }catch(error){if(mounted.current&&token===generation.current&&!(error instanceof DOMException&&error.name==='AbortError'))setWarning(message(error instanceof Error?error.message:'Could not access the selected photos.'));}
@@ -112,7 +112,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   <p>{t('Choose photos and settings. Originals and existing edits stay unchanged.')}</p>
   <fieldset disabled={running||saving||choosing}>
    <div className="batch-selection"><div><strong>{t('Photos')} ({chosen.length})</strong><button type="button" className="text-button" onClick={()=>setSelected(new Set(all.map(item=>item.id)))}>{t('Select all')}</button><button type="button" className="text-button" onClick={()=>setSelected(new Set())}>{t('Select none')}</button></div>
-    {platform==='android'?<button type="button" className="button secondary" onClick={()=>void addAndroidPhotos()}>{t('Add photos')}</button>:<label className="button secondary">{t('Add photos')}<input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,.heic,.heif,.dng" onChange={addFiles}/></label>}
+    {platform==='android'?<div className="batch-picker-actions"><button type="button" className="button secondary" onClick={()=>void addAndroidPhotos()}>{t('Add photos')}</button><button type="button" className="button secondary" onClick={()=>void addAndroidPhotos(true)}>{t('Browse files')}</button></div>:<label className="button secondary">{t('Add photos')}<input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,.heic,.heif,.dng" onChange={addFiles}/></label>}
     <div className="batch-photos">{all.map(item=><label key={item.id}><input type="checkbox" checked={selected.has(item.id)} onChange={event=>setSelected(previous=>{const next=new Set(previous);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next;})}/><span title={item.name}>{item.name}</span></label>)}</div>
    </div>
    <label>{t('Correction engine')}<select value={engine} onChange={event=>setEngine(event.target.value as Recipe['engine'])}><option value="balanced">{t('Balanced restoration')}</option><option value="baseline">{t('Original RGB heuristic')}</option><option value="wwe">WWE-UIE</option><option value="fivea">Five A+</option><option value="shallow">Shallow-UWnet</option>{custom&&<option value="wave">{custom.config.name}</option>}</select></label>

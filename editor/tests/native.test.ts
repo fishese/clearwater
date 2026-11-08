@@ -13,6 +13,8 @@ describe('Android file bridge',()=>{
   const photo={uri:'content://picked/1',name:'one.jpg',type:'image/jpeg',size:12};
   bridge.chooseBatchPhotos.mockResolvedValueOnce({photos:[photo,{uri:'content://picked/2',name:'video.mp4',type:'video/mp4',size:10}]});
   await expect(chooseAndroidBatchPhotos()).resolves.toEqual([photo]);
+  expect(bridge.chooseBatchPhotos).toHaveBeenCalledWith({browse:false});
+  bridge.chooseBatchPhotos.mockResolvedValueOnce({photos:[photo]});await expect(chooseAndroidBatchPhotos(true)).resolves.toEqual([photo]);expect(bridge.chooseBatchPhotos).toHaveBeenLastCalledWith({browse:true});
   bridge.chooseBatchPhotos.mockRejectedValueOnce({code:'CANCELLED'});await expect(chooseAndroidBatchPhotos()).rejects.toMatchObject({name:'AbortError'});
  });
  it('copies an owned native video directly without uploading its bytes through JavaScript',async()=>{

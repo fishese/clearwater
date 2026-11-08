@@ -114,8 +114,13 @@ public class ClearWaterFilesPlugin extends Plugin {
     @Override public void load() { enqueueShare(getActivity().getIntent()); }
     @Override protected void handleOnNewIntent(Intent intent) { enqueueShare(intent); }
     @PluginMethod public void chooseBatchPhotos(PluginCall call) {
-        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        boolean browse=call.getBoolean("browse",false);Intent intent=null;
+        if(!browse&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU){
+            intent=new Intent(MediaStore.ACTION_PICK_IMAGES);intent.setType("image/*");intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX,MediaStore.getPickImagesMaxLimit());
+            if(intent.resolveActivity(getContext().getPackageManager())==null)browse=true;
+        }else browse=true;
+        if(browse){intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);}
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivityForResult(call,intent,"batchPhotosSelected");
     }
     @ActivityCallback private void batchPhotosSelected(PluginCall call,ActivityResult result) {
