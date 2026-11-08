@@ -26,3 +26,8 @@ The user wants batch processing without reviewing every photo: select a correcti
 - [ ] Continue verification of real-image metadata/orientation, actual providers, accessibility and large batches; collect user feedback before release. Preserve originals and existing app data.
 
 A synthetic desktop Chromium batch processed two 4000×3000 JPEGs using Balanced plus Auto enhance in 1.31 s and 1.22 s respectively (simple gradient, encoded output about 240 KB each). This is not a representative mobile benchmark or peak-memory measurement; real photos, AI models, iOS and Android remain unmeasured.
+
+## Follow-up, 8 November 2026
+
+- [x] Batch selection now starts empty; editor collection is not automatically included. Production build, 278 shared tests, and synthetic batch/editor-history browser check pass.
+- [ ] Android user reproduced a generic photo-read error on a connected Samsung phone. Release WebView/Capacitor logcat did not expose an underlying exception; whether failures were newly selected or previously listed collection items, and ZIP versus folder output, needs user confirmation. Do not claim the empty-selection change fixes the read error until verified on the affected files. No app data cleared.

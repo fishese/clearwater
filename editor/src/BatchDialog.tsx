@@ -12,11 +12,11 @@ import type {PhotoDevice,PhotoResolution} from './core/photo-size';
 import {t,message} from './i18n';
 
 export interface BatchPhotoItem {id:string;name:string;getFile:(signal:AbortSignal)=>Promise<File>}
-type Props={items:BatchPhotoItem[];platform:'web'|'android'|'ios'|'unknown';initialEngine:Recipe['engine'];custom?:{file:Blob;config:CustomModel};resolution:PhotoResolution;device:PhotoDevice;onClose:()=>void};
+type Props={platform:'web'|'android'|'ios'|'unknown';initialEngine:Recipe['engine'];custom?:{file:Blob;config:CustomModel};resolution:PhotoResolution;device:PhotoDevice;onClose:()=>void};
 type Failure={name:string;message:string};
 
-export default function BatchDialog({items,platform,initialEngine,custom,resolution,device,onClose}:Props){
- const [added,setAdded]=useState<BatchPhotoItem[]>([]),[selected,setSelected]=useState<Set<string>>(()=>new Set(items.map(item=>item.id)));
+export default function BatchDialog({platform,initialEngine,custom,resolution,device,onClose}:Props){
+ const [added,setAdded]=useState<BatchPhotoItem[]>([]),[selected,setSelected]=useState<Set<string>>(()=>new Set());
  const [engine,setEngine]=useState<Recipe['engine']>(initialEngine==='wave'&&!custom?'wwe':initialEngine);
  const [hints,setHints]=useState<Hints>({...DEFAULT_HINTS}),[followup,setFollowup]=useState(true),[enhance,setEnhance]=useState(false);
  const [format,setFormat]=useState<'jpg'|'png'>('jpg'),[destination,setDestination]=useState<'zip'|'folder'>('zip');
@@ -26,7 +26,7 @@ export default function BatchDialog({items,platform,initialEngine,custom,resolut
  const starting=useRef(false),savingNow=useRef(false);
  const dialog=useRef<HTMLDivElement>(null);
  const iosWeb=platform==='web'&&isIOSWebBrowser(platform,navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
- const all=[...items,...added],chosen=all.filter(item=>selected.has(item.id));
+ const all=added,chosen=all.filter(item=>selected.has(item.id));
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;generation.current++;controller.current?.abort();processor.current?.cancel();};},[]);
  useEffect(()=>{const opener=document.activeElement as HTMLElement|null;dialog.current?.focus();return()=>{queueMicrotask(()=>opener?.focus());};},[]);
  useEffect(()=>{if(!archive){setArchiveUrl('');return;}const url=URL.createObjectURL(archive);setArchiveUrl(url);return()=>URL.revokeObjectURL(url);},[archive]);
