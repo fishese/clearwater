@@ -111,7 +111,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
  }
  const setHint=<K extends keyof Hints>(key:K,value:Hints[K])=>setHints(previous=>({...previous,[key]:value}));
  return <div className="modal-shade batch-shade"><div ref={dialog} tabIndex={-1} className="export-dialog batch-dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title" onKeyDown={event=>{if(event.key==='Escape'&&!saving){event.preventDefault();close();return;}if(event.key!=='Tab')return;const focusable=Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled),summary,[tabindex="0"]')).filter(element=>element.getClientRects().length>0);if(!focusable.length){event.preventDefault();return;}const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&(document.activeElement===first||document.activeElement===event.currentTarget)){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}}>
-  <h2 id="batch-title">{t('Batch process photos')}</h2>
+  <div className="batch-heading"><h2 id="batch-title">{t('Batch process photos')}</h2><button type="button" className="batch-close" disabled={saving} aria-label={t('Close')} title={t('Close')} onClick={close}>×</button></div>
   <p>{t('Choose photos and settings. Originals and existing edits stay unchanged.')}</p>
   <fieldset disabled={running||saving||choosing}>
    <div className="batch-selection"><div><strong>{t('Photos')} ({chosen.length})</strong><button type="button" className="text-button" onClick={()=>setSelected(new Set(all.map(item=>item.id)))}>{t('Select all')}</button><button type="button" className="text-button" onClick={()=>setSelected(new Set())}>{t('Select none')}</button></div>
@@ -120,8 +120,8 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
     <div className="batch-photos">{all.map(item=><label key={item.id}><input type="checkbox" checked={selected.has(item.id)} onChange={event=>setSelected(previous=>{const next=new Set(previous);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next;})}/><span title={item.name}>{item.name}</span></label>)}</div>
    </div>
    <label>{t('Correction engine')}<select value={engine} onChange={event=>setEngine(event.target.value as Recipe['engine'])}><option value="balanced">{t('Balanced restoration')}</option><option value="baseline">{t('Original RGB heuristic')}</option><option value="wwe">WWE-UIE</option><option value="fivea">Five A+</option><option value="shallow">Shallow-UWnet</option>{custom&&<option value="wave">{custom.config.name}</option>}</select></label>
-   {isAIEngine(engine)&&<label className="batch-check"><input type="checkbox" checked={followup} onChange={event=>setFollowup(event.target.checked)}/>{t('Balanced after AI')}</label>}
-   <label className="batch-check"><input type="checkbox" checked={enhance} onChange={event=>setEnhance(event.target.checked)}/>{t('Auto enhance')}</label>
+   <div className="batch-enhancement-options">{isAIEngine(engine)&&<label className="batch-check"><input type="checkbox" checked={followup} onChange={event=>setFollowup(event.target.checked)}/><span>{t('Balanced after AI')}</span></label>}
+   <label className="batch-check"><input type="checkbox" checked={enhance} onChange={event=>setEnhance(event.target.checked)}/><span>{t('Auto enhance')}</span></label></div>
    <details><summary>{t('Dive conditions')}</summary><p>{t('These settings affect Balanced restoration and Balanced after AI.')}</p>
     <label>{t('Environment')}<select value={hints.scene} onChange={event=>setHint('scene',event.target.value as Hints['scene'])}><option value="auto">{t('Auto')}</option><option value="underwater">{t('Diving')}</option><option value="surface">{t('Surface')}</option></select></label>
     <label>{t('Red filter')}<select value={hints.filter} onChange={event=>setHint('filter',event.target.value as Hints['filter'])}><option value="auto">{t('Auto')}</option><option value="yes">{t('Yes')}</option><option value="no">{t('No')}</option></select></label>
@@ -137,6 +137,5 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   {!running&&done>0&&<p role="status">{t('Processed {0} photos.',[done])}</p>}
   {warning&&<p role="status">{warning}</p>}{locationNotice&&<p role="status">{t('Location metadata may be unavailable for some selected photos.')}</p>}{failures.length>0&&<div role="alert"><strong>{t('Some photos need attention')}</strong><ul>{failures.map((failure,index)=><li key={index}>{failure.name}: {message(failure.message)}</li>)}</ul></div>}
   {archive&&archiveUrl&&<div className="batch-save">{platform==='android'?<button className="button primary" disabled={saving} onClick={()=>void saveAndroidArchive()}>{t('Save ZIP')}</button>:platform==='ios'?null:<a className="button primary" href={archiveUrl} download="clearwater-batch.zip">{t('Download ZIP')}</a>}{(platform==='ios'||iosWeb)&&<button className="button secondary" disabled={saving} onClick={()=>void shareArchive()}>{t('Share ZIP')}</button>}</div>}
-  <button type="button" className="button secondary" disabled={saving} onClick={close}>{t('Close')}</button>
  </div></div>;
 }

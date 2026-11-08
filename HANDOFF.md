@@ -2,6 +2,8 @@
 
 ## Batch photos and crop test branch (8 November 2026)
 
+- [ ] User reports Android batch/location test works and requested compact shared batch layout, a new unsigned iOS test build, and a local APK for later installation. Do not install to the phone or deploy the website. See `BATCH_CROP_PLAN.md` for the latest test/build status.
+
 - [x] Feature branch `codex/batch-photos-crop` adds sequential batch processing, ZIP or selected-folder output, per-photo model/conditions/Auto enhance, and non-destructive crop. Originals and existing editor edits remain untouched; no website deployment is authorized before user phone testing.
 - [x] 278 shared tests and production build pass. Synthetic Chromium checks cover mobile/desktop layout (18 cases), crop preview/export parity, comparison edges, folder name collisions, cancel, editor history, and mocked iPhone ZIP share. These are not physical-device tests.
 - [x] Signed Android test APK from `cc6816c` built with existing configuration, 11 native tests and certificate continuity pass; packaged web assets and ZIP integrity match. `editor/android/build/batch-crop-test/ClearWater-batch-crop-test.apk` SHA-256 `f728caf61acb5ce0df486cb266f530874a007d429c1d78a268a9863ecfdf8576`. User has not installed it.
