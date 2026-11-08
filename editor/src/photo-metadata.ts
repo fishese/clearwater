@@ -93,7 +93,11 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
     if(value===undefined||value===null)continue;
     const tag=Number(key),info=piexif.TAGS[target][tag];
     if(!info||(target==='0th'&&!ifd0Tags.has(tag))||(target==='Exif'&&excludedExif.has(tag)))continue;
-    try{output[target][tag]=valueFor(value,info.type);copied++;}catch{skipped=true;diagnostic??=`CW/meta/tag/${target}/${tag}`;}
+    try{output[target][tag]=valueFor(value,info.type);copied++;}catch{
+     skipped=true;const values=Array.isArray(value)||ArrayBuffer.isView(value)?Array.from(value as ArrayLike<unknown>):[value];
+     const reason=values.some(v=>typeof v==='number'&&!Number.isFinite(v))?'nonfinite':values.some(v=>typeof v==='number'&&v<0)?'negative':values.some(v=>typeof v!=='number')?'nonnumeric':'other';
+     diagnostic??=`CW/meta/tag/${target}/${tag}/${reason}`;
+    }
    }
   }
   if(!copied)return skipped?{warning,diagnostic}:{};
