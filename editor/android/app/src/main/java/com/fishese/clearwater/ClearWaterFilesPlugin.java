@@ -113,6 +113,23 @@ public class ClearWaterFilesPlugin extends Plugin {
     }catch(Exception error){call.reject("Could not remove the saved model.",error);}}); }
     @Override public void load() { enqueueShare(getActivity().getIntent()); }
     @Override protected void handleOnNewIntent(Intent intent) { enqueueShare(intent); }
+    @PluginMethod public void chooseBatchPhotos(PluginCall call) {
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(call,intent,"batchPhotosSelected");
+    }
+    @ActivityCallback private void batchPhotosSelected(PluginCall call,ActivityResult result) {
+        if(call==null)return;
+        if(result.getResultCode()!=Activity.RESULT_OK||result.getData()==null){call.reject("Photo selection cancelled.","CANCELLED");return;}
+        Intent data=result.getData();LinkedHashSet<Uri> uris=new LinkedHashSet<>();
+        if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++){Uri uri=data.getClipData().getItemAt(i).getUri();if(uri!=null)uris.add(uri);}
+        if(data.getData()!=null)uris.add(data.getData());
+        io.execute(()->{try{JSArray photos=new JSArray();for(Uri uri:uris){
+            String type=getContext().getContentResolver().getType(uri);String name=displayName(uri,"photo.jpg");long size=-1;
+            try(Cursor cursor=getContext().getContentResolver().query(uri,new String[]{OpenableColumns.SIZE},null,null,null)){if(cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0))size=cursor.getLong(0);}
+            JSObject photo=new JSObject();photo.put("uri",uri.toString());photo.put("name",name);photo.put("type",type==null?"":type);photo.put("size",size);photos.put(photo);
+        }JSObject output=new JSObject();output.put("photos",photos);call.resolve(output);}catch(Exception error){call.reject("Could not access the selected photos.",error);}});
+    }
     @PluginMethod public void chooseFolder(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);

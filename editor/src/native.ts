@@ -24,6 +24,7 @@ export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
 export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
  chooseFolder():Promise<{uri:string;name:string}>;
+ chooseBatchPhotos():Promise<{photos:AndroidFolderPhoto[]}>;
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string;size?:number}>;
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
@@ -188,6 +189,10 @@ function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
 }
 async function pickFolder(){try{return await files.chooseFolder();}catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Folder selection cancelled.','AbortError');throw error;}}
 export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{return directoryHandle(await pickFolder());}
+export async function chooseAndroidBatchPhotos():Promise<AndroidFolderPhoto[]>{
+ try{return (await files.chooseBatchPhotos()).photos.filter(photo=>supportedMedia(photo)&&!isVideo(photo));}
+ catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Photo selection cancelled.','AbortError');throw error;}
+}
 export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{
  const folder=await pickFolder(),result=await files.listPhotos({folder:folder.uri});
  const platform=androidPlatform();
@@ -200,9 +205,10 @@ function fileTooLarge(bytes:number,file:{name:string;type?:string},platform:Medi
  console.error(error);
  return error;
 }
-export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto):Promise<File>{
+export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto,signal?:AbortSignal):Promise<File>{
  const platform=androidPlatform(),limit=mediaLimit(photo,platform);
- const response=await fetch(Capacitor.convertFileSrc(photo.uri));if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
+ if(photo.size>limit)throw fileTooLarge(photo.size,photo,platform);
+ const response=await fetch(Capacitor.convertFileSrc(photo.uri),signal?{signal}:undefined);if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
  const reader=response.body?.getReader();let blob:Blob;
  if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>limit)throw fileTooLarge(bytes,photo,platform);chunks.push(new Uint8Array(part.value));}}catch(error){console.error(error);await reader.cancel().catch(cancelError=>{console.error(cancelError);});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
  else blob=await response.blob();

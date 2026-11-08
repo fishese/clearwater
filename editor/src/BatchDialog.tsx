@@ -5,7 +5,7 @@ import {chooseFolder,createUniqueFile,restoredName,supportsFolder,writeFile,type
 import {isIOSWebBrowser,shareWebBatchArchive} from './export-share';
 import {chooseIOSBatchFolder,isIOSPhotoExportAvailable,shareIOSFile,type IOSBatchFolder} from './platform/ios-media';
 import {currentMediaPlatform} from './platform/runtime';
-import {saveAndroidBatchDownload} from './native';
+import {saveAndroidBatchDownload,chooseAndroidBatchPhotos,readAndroidFolderPhoto} from './native';
 import {isVideo,supportedMedia} from './core/media';
 import {isAIEngine} from './core/bundled-models';
 import {DEFAULT_HINTS,type CustomModel,type Hints,type Recipe} from './core/types';
@@ -24,7 +24,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
  const [running,setRunning]=useState(false),[saving,setSaving]=useState(false),[choosing,setChoosing]=useState(false),[progress,setProgress]=useState({current:0,total:0,name:'',percent:0});
  const [archive,setArchive]=useState<Blob|null>(null),[archiveUrl,setArchiveUrl]=useState(''),[failures,setFailures]=useState<Failure[]>([]),[warning,setWarning]=useState(''),[done,setDone]=useState(0);
  const controller=useRef<AbortController|null>(null),processor=useRef<BatchPhotoProcessor|null>(null),mounted=useRef(true),generation=useRef(0);
- const starting=useRef(false),savingNow=useRef(false);
+ const starting=useRef(false),savingNow=useRef(false),picking=useRef(false);
  const dialog=useRef<HTMLDivElement>(null);
  const iosWeb=platform==='web'&&isIOSWebBrowser(platform,navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
  const all=added,chosen=all.filter(item=>selected.has(item.id));
@@ -36,6 +36,14 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   const addedItems=files.map(file=>({id:crypto.randomUUID(),name:file.name,getFile:async()=>file}));
   setAdded(previous=>[...previous,...addedItems]);setSelected(previous=>new Set([...previous,...addedItems.map(item=>item.id)]));
  };
+ async function addAndroidPhotos(){
+  if(choosing||running||saving||picking.current)return;picking.current=true;const token=++generation.current;setChoosing(true);
+  try{const photos=await chooseAndroidBatchPhotos();if(!mounted.current||token!==generation.current)return;
+   const entries=photos.map(photo=>({id:crypto.randomUUID(),name:photo.name,getFile:async(signal:AbortSignal)=>{if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');const file=await readAndroidFolderPhoto(photo,signal);if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');return file;}}));
+   setAdded(previous=>[...previous,...entries]);setSelected(previous=>new Set([...previous,...entries.map(item=>item.id)]));
+  }catch(error){if(mounted.current&&token===generation.current&&!(error instanceof DOMException&&error.name==='AbortError'))setWarning(message(error instanceof Error?error.message:'Could not access the selected photos.'));}
+  finally{picking.current=false;if(mounted.current&&token===generation.current)setChoosing(false);}
+ }
  const cancel=()=>{generation.current++;controller.current?.abort();processor.current?.cancel();};
  const close=()=>{cancel();onClose();};
  async function start(){
@@ -104,7 +112,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   <p>{t('Choose photos and settings. Originals and existing edits stay unchanged.')}</p>
   <fieldset disabled={running||saving||choosing}>
    <div className="batch-selection"><div><strong>{t('Photos')} ({chosen.length})</strong><button type="button" className="text-button" onClick={()=>setSelected(new Set(all.map(item=>item.id)))}>{t('Select all')}</button><button type="button" className="text-button" onClick={()=>setSelected(new Set())}>{t('Select none')}</button></div>
-    <label className="button secondary">{t('Add photos')}<input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,.heic,.heif,.dng" onChange={addFiles}/></label>
+    {platform==='android'?<button type="button" className="button secondary" onClick={()=>void addAndroidPhotos()}>{t('Add photos')}</button>:<label className="button secondary">{t('Add photos')}<input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,.heic,.heif,.dng" onChange={addFiles}/></label>}
     <div className="batch-photos">{all.map(item=><label key={item.id}><input type="checkbox" checked={selected.has(item.id)} onChange={event=>setSelected(previous=>{const next=new Set(previous);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next;})}/><span title={item.name}>{item.name}</span></label>)}</div>
    </div>
    <label>{t('Correction engine')}<select value={engine} onChange={event=>setEngine(event.target.value as Recipe['engine'])}><option value="balanced">{t('Balanced restoration')}</option><option value="baseline">{t('Original RGB heuristic')}</option><option value="wwe">WWE-UIE</option><option value="fivea">Five A+</option><option value="shallow">Shallow-UWnet</option>{custom&&<option value="wave">{custom.config.name}</option>}</select></label>

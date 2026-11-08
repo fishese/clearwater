@@ -883,5 +883,6 @@
   "Apply crop": "套用裁剪",
   "Invalid crop settings.": "裁剪設定無效。",
   "Could not share the ZIP. Try again.": "無法分享 ZIP，請再試一次。",
-  "Saved {0} to Downloads.": "已將 {0} 儲存至下載資料夾。"
+  "Saved {0} to Downloads.": "已將 {0} 儲存至下載資料夾。",
+  "Could not access the selected photos.": "未能存取所選相片。"
 }
