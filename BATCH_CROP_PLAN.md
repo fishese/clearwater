@@ -56,3 +56,6 @@ A synthetic desktop Chromium batch processed two 4000×3000 JPEGs using Balanced
 
 - [x] User reports Android batch/location test works. Compact shared batch UI: two-column filenames, side-by-side enhancement options and a labelled 44px top close button. Chromium synthetic layout checks pass at 320/390/1280 in EN/zh-HK/ja; batch workflow and 283 shared tests pass. No thumbnails decoded.
 - [ ] Build an unsigned iOS IPA from the feature branch with hosted WebKit regressions, including the new shared layout. Do not deploy Pages. User will install the local Android APK later; no ADB installation this time.
+
+- [x] Built signed Android test APK from source `1df352f`, verified signing certificate continuity, ZIP integrity and 50 packaged web asset hashes. Local ignored `editor/android/build/batch-layout-test/ClearWater-batch-layout-test.apk`, SHA-256 `3020a6939ee141c954e25c5a7ec6af90a4dd52a489fade7ccb66341592281c87`; not installed per user request.
+- [x] Hosted workflow 42493459824 built unsigned iOS IPA from `1df352f`; downloaded checksum matches `8a23b2f2dbbc9fbeee9b991ada32a5b2f47e5d34a17e77e5768824646cf5a8c6` at `editor/ios/App/output/batch-layout-test/ClearWater-unsigned.ipa`. Hosted WebKit regression, including the shared batch layout, passed; iOS simulator tests were still running when recorded. No Pages deployment.

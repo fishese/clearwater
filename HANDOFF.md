@@ -2,6 +2,8 @@
 
 ## Batch photos and crop test branch (8 November 2026)
 
+- [x] Built Android test APK and unsigned IPA from `1df352f`; checksums and paths are recorded in `BATCH_CROP_PLAN.md`. WebKit passed in run 42493459824; iOS simulator tests were still running when recorded. Neither app installed nor website deployed.
+
 - [ ] User reports Android batch/location test works and requested compact shared batch layout, a new unsigned iOS test build, and a local APK for later installation. Do not install to the phone or deploy the website. See `BATCH_CROP_PLAN.md` for the latest test/build status.
 
 - [x] Feature branch `codex/batch-photos-crop` adds sequential batch processing, ZIP or selected-folder output, per-photo model/conditions/Auto enhance, and non-destructive crop. Originals and existing editor edits remain untouched; no website deployment is authorized before user phone testing.
