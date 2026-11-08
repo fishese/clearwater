@@ -24,7 +24,7 @@ export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
 export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
  chooseFolder():Promise<{uri:string;name:string}>;
- chooseBatchPhotos(options:{browse:boolean}):Promise<{photos:AndroidFolderPhoto[]}>;
+ chooseBatchPhotos(options:{browse:boolean;keepLocation:boolean}):Promise<{photos:AndroidFolderPhoto[];locationUnavailable?:boolean}>;
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string;size?:number}>;
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
@@ -189,8 +189,8 @@ function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
 }
 async function pickFolder(){try{return await files.chooseFolder();}catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Folder selection cancelled.','AbortError');throw error;}}
 export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{return directoryHandle(await pickFolder());}
-export async function chooseAndroidBatchPhotos(browse=false):Promise<AndroidFolderPhoto[]>{
- try{return (await files.chooseBatchPhotos({browse})).photos.filter(photo=>supportedMedia(photo)&&!isVideo(photo));}
+export async function chooseAndroidBatchPhotos(browse=false,keepLocation=false):Promise<{photos:AndroidFolderPhoto[];locationUnavailable:boolean}>{
+ try{const result=await files.chooseBatchPhotos({browse,keepLocation});return {photos:result.photos.filter(photo=>supportedMedia(photo)&&!isVideo(photo)),locationUnavailable:result.locationUnavailable===true};}
  catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Photo selection cancelled.','AbortError');throw error;}
 }
 export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{

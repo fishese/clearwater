@@ -1,6 +1,7 @@
 package com.fishese.clearwater;
 
 import android.app.Activity;
+import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
@@ -23,7 +24,7 @@ import java.util.concurrent.*;
 import org.json.JSONObject;
 
 /** User-selected SAF folders plus the app-private custom model slots. Existing SAF documents are never overwritten. */
-@CapacitorPlugin(name = "ClearWaterFiles")
+@CapacitorPlugin(name = "ClearWaterFiles", permissions = {@Permission(alias="mediaLocation", strings={Manifest.permission.ACCESS_MEDIA_LOCATION})})
 public class ClearWaterFilesPlugin extends Plugin {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final Set<String> folders = new HashSet<>(), created = new HashSet<>(), captureCreated = new HashSet<>(), downloadCreated = new HashSet<>();
@@ -114,7 +115,12 @@ public class ClearWaterFilesPlugin extends Plugin {
     @Override public void load() { enqueueShare(getActivity().getIntent()); }
     @Override protected void handleOnNewIntent(Intent intent) { enqueueShare(intent); }
     @PluginMethod public void chooseBatchPhotos(PluginCall call) {
-        boolean browse=call.getBoolean("browse",false);Intent intent=null;
+        if(call.getBoolean("keepLocation",false)&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q&&getPermissionState("mediaLocation")!=PermissionState.GRANTED){requestPermissionForAlias("mediaLocation",call,"batchLocationPermissionResult");return;}
+        launchBatchPhotos(call);
+    }
+    @PermissionCallback private void batchLocationPermissionResult(PluginCall call) {if(call!=null)launchBatchPhotos(call);}
+    private void launchBatchPhotos(PluginCall call) {
+        boolean browse=call.getBoolean("browse",false)||call.getBoolean("keepLocation",false);Intent intent=null;
         if(!browse&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU){
             intent=new Intent(MediaStore.ACTION_PICK_IMAGES);intent.setType("image/*");intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX,MediaStore.getPickImagesMaxLimit());
             if(intent.resolveActivity(getContext().getPackageManager())==null)browse=true;
@@ -129,11 +135,15 @@ public class ClearWaterFilesPlugin extends Plugin {
         Intent data=result.getData();LinkedHashSet<Uri> uris=new LinkedHashSet<>();
         if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++){Uri uri=data.getClipData().getItemAt(i).getUri();if(uri!=null)uris.add(uri);}
         if(data.getData()!=null)uris.add(data.getData());
-        io.execute(()->{try{JSArray photos=new JSArray();for(Uri uri:uris){
+        io.execute(()->{try{JSArray photos=new JSArray();boolean keepLocation=call.getBoolean("keepLocation",false),canAccess=Build.VERSION.SDK_INT<Build.VERSION_CODES.Q||getPermissionState("mediaLocation")==PermissionState.GRANTED,locationUnavailable=false;for(Uri uri:uris){
             String type=getContext().getContentResolver().getType(uri);String name=displayName(uri,"photo.jpg");long size=-1;
             try(Cursor cursor=getContext().getContentResolver().query(uri,new String[]{OpenableColumns.SIZE},null,null,null)){if(cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0))size=cursor.getLong(0);}
-            JSObject photo=new JSObject();photo.put("uri",uri.toString());photo.put("name",name);photo.put("type",type==null?"":type);photo.put("size",size);photos.put(photo);
-        }JSObject output=new JSObject();output.put("photos",photos);call.resolve(output);}catch(Exception error){call.reject("Could not access the selected photos.",error);}});
+            Uri source=uri;if(keepLocation&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){
+                if(canAccess){try{Uri media=MediaStore.getMediaUri(getContext(),uri);if(media==null)throw new IOException("Original not available");Uri original=MediaStore.setRequireOriginal(media);try(android.os.ParcelFileDescriptor probe=getContext().getContentResolver().openFileDescriptor(original,"r")){if(probe==null)throw new IOException("Original not available");}source=original;}catch(Exception unavailable){locationUnavailable=true;}}
+                else locationUnavailable=true;
+            }
+            JSObject photo=new JSObject();photo.put("uri",source.toString());photo.put("name",name);photo.put("type",type==null?"":type);photo.put("size",size);photos.put(photo);
+        }JSObject output=new JSObject();output.put("photos",photos);output.put("locationUnavailable",locationUnavailable);call.resolve(output);}catch(Exception error){call.reject("Could not access the selected photos.",error);}});
     }
     @PluginMethod public void chooseFolder(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);

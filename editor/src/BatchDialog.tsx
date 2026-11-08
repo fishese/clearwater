@@ -21,8 +21,10 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
  const [engine,setEngine]=useState<Recipe['engine']>(initialEngine==='wave'&&!custom?'wwe':initialEngine);
  const [hints,setHints]=useState<Hints>({...DEFAULT_HINTS}),[followup,setFollowup]=useState(true),[enhance,setEnhance]=useState(false);
  const [format,setFormat]=useState<'jpg'|'png'>('jpg'),[destination,setDestination]=useState<'zip'|'folder'>('zip');
+ const [keepLocation,setKeepLocation]=useState(false);
  const [running,setRunning]=useState(false),[saving,setSaving]=useState(false),[choosing,setChoosing]=useState(false),[progress,setProgress]=useState({current:0,total:0,name:'',percent:0});
  const [archive,setArchive]=useState<Blob|null>(null),[archiveUrl,setArchiveUrl]=useState(''),[failures,setFailures]=useState<Failure[]>([]),[warning,setWarning]=useState(''),[done,setDone]=useState(0);
+ const [locationNotice,setLocationNotice]=useState(false);
  const controller=useRef<AbortController|null>(null),processor=useRef<BatchPhotoProcessor|null>(null),mounted=useRef(true),generation=useRef(0);
  const starting=useRef(false),savingNow=useRef(false),picking=useRef(false);
  const dialog=useRef<HTMLDivElement>(null);
@@ -38,8 +40,9 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
  };
  async function addAndroidPhotos(browse=false){
   if(choosing||running||saving||picking.current)return;picking.current=true;const token=++generation.current;setChoosing(true);
-  try{const photos=await chooseAndroidBatchPhotos(browse);if(!mounted.current||token!==generation.current)return;
-   const entries=photos.map(photo=>({id:crypto.randomUUID(),name:photo.name,getFile:async(signal:AbortSignal)=>{if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');const file=await readAndroidFolderPhoto(photo,signal);if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');return file;}}));
+  try{const result=await chooseAndroidBatchPhotos(browse,keepLocation);if(!mounted.current||token!==generation.current)return;
+   if(result.locationUnavailable)setLocationNotice(true);
+   const entries=result.photos.map(photo=>({id:crypto.randomUUID(),name:photo.name,getFile:async(signal:AbortSignal)=>{if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');const file=await readAndroidFolderPhoto(photo,signal);if(signal.aborted)throw new DOMException('Batch cancelled.','AbortError');return file;}}));
    setAdded(previous=>[...previous,...entries]);setSelected(previous=>new Set([...previous,...entries.map(item=>item.id)]));
   }catch(error){if(mounted.current&&token===generation.current&&!(error instanceof DOMException&&error.name==='AbortError'))setWarning(message(error instanceof Error?error.message:'Could not access the selected photos.'));}
   finally{picking.current=false;if(mounted.current&&token===generation.current)setChoosing(false);}
@@ -112,6 +115,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   <p>{t('Choose photos and settings. Originals and existing edits stay unchanged.')}</p>
   <fieldset disabled={running||saving||choosing}>
    <div className="batch-selection"><div><strong>{t('Photos')} ({chosen.length})</strong><button type="button" className="text-button" onClick={()=>setSelected(new Set(all.map(item=>item.id)))}>{t('Select all')}</button><button type="button" className="text-button" onClick={()=>setSelected(new Set())}>{t('Select none')}</button></div>
+    {platform==='android'&&<><label className="batch-check"><input type="checkbox" checked={keepLocation} onChange={event=>setKeepLocation(event.target.checked)}/>{t('Keep photo location (GPS)')}</label><small>{t('Choose this before adding photos. Android may request access and open Browse files; some providers cannot supply location.')}</small></>}
     {platform==='android'?<div className="batch-picker-actions"><button type="button" className="button secondary" onClick={()=>void addAndroidPhotos()}>{t('Add photos')}</button><button type="button" className="button secondary" onClick={()=>void addAndroidPhotos(true)}>{t('Browse files')}</button></div>:<label className="button secondary">{t('Add photos')}<input type="file" multiple accept="image/jpeg,image/png,image/heic,image/heif,image/dng,image/x-adobe-dng,.heic,.heif,.dng" onChange={addFiles}/></label>}
     <div className="batch-photos">{all.map(item=><label key={item.id}><input type="checkbox" checked={selected.has(item.id)} onChange={event=>setSelected(previous=>{const next=new Set(previous);if(event.target.checked)next.add(item.id);else next.delete(item.id);return next;})}/><span title={item.name}>{item.name}</span></label>)}</div>
    </div>
@@ -131,7 +135,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
   </fieldset>
   {running&&<div role="status"><p>{t('Processing {0} of {1}',[progress.current,progress.total])}: {progress.name}</p><progress max={100} value={progress.percent}/><button type="button" className="button secondary" onClick={cancel}>{t('Cancel')}</button></div>}
   {!running&&done>0&&<p role="status">{t('Processed {0} photos.',[done])}</p>}
-  {warning&&<p role="status">{warning}</p>}{failures.length>0&&<div role="alert"><strong>{t('Some photos need attention')}</strong><ul>{failures.map((failure,index)=><li key={index}>{failure.name}: {message(failure.message)}</li>)}</ul></div>}
+  {warning&&<p role="status">{warning}</p>}{locationNotice&&<p role="status">{t('Location metadata may be unavailable for some selected photos.')}</p>}{failures.length>0&&<div role="alert"><strong>{t('Some photos need attention')}</strong><ul>{failures.map((failure,index)=><li key={index}>{failure.name}: {message(failure.message)}</li>)}</ul></div>}
   {archive&&archiveUrl&&<div className="batch-save">{platform==='android'?<button className="button primary" disabled={saving} onClick={()=>void saveAndroidArchive()}>{t('Save ZIP')}</button>:platform==='ios'?null:<a className="button primary" href={archiveUrl} download="clearwater-batch.zip">{t('Download ZIP')}</a>}{(platform==='ios'||iosWeb)&&<button className="button secondary" disabled={saving} onClick={()=>void shareArchive()}>{t('Share ZIP')}</button>}</div>}
   <button type="button" className="button secondary" disabled={saving} onClick={close}>{t('Close')}</button>
  </div></div>;

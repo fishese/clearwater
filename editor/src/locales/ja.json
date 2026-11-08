@@ -884,5 +884,8 @@
   "Invalid crop settings.": "切り抜きの設定が無効です。",
   "Could not share the ZIP. Try again.": "ZIPを共有できませんでした。もう一度お試しください。",
   "Saved {0} to Downloads.": "{0} をダウンロードに保存しました。",
-  "Could not access the selected photos.": "選択した写真にアクセスできませんでした。"
+  "Could not access the selected photos.": "選択した写真にアクセスできませんでした。",
+  "Keep photo location (GPS)": "写真の位置情報（GPS）を保持",
+  "Choose this before adding photos. Android may request access and open Browse files; some providers cannot supply location.": "写真を追加する前に選択してください。Androidがアクセスを求め、「ファイルを参照」を開く場合があります。提供元によっては位置情報を取得できません。",
+  "Location metadata may be unavailable for some selected photos.": "選択した一部の写真では位置情報を取得できない場合があります。"
 }

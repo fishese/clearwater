@@ -85,6 +85,10 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
   const userComment=await rawJpegUserComment(source);
   const output:Record<string,Directory>={'0th':{},Exif:{},GPS:{}};
   let copied=0,skipped=false,diagnostic:string|undefined;phase='tags';
+  // A redacted or malformed coordinate must not leave a misleading partial
+  // latitude/longitude pair. Non-location EXIF and other valid tags survive.
+  const invalidCoordinate=[2,4].find(tag=>{const value=parsed.gps?.[tag];if(value===undefined||value===null)return false;try{valueFor(value,'Rational');return false;}catch{return true;}});
+  if(invalidCoordinate!==undefined){skipped=true;diagnostic=`CW/meta/tag/GPS/${invalidCoordinate}`;}
   for(const [block,target] of [['ifd0','0th'],['exif','Exif'],['gps','GPS']]){
    for(const [key,parsedValue] of Object.entries(parsed[block]??{})){
     const value=block==='exif'&&Number(key)===37510&&userComment!==undefined?userComment:parsedValue;
@@ -93,6 +97,7 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
     if(value===undefined||value===null)continue;
     const tag=Number(key),info=piexif.TAGS[target][tag];
     if(!info||(target==='0th'&&!ifd0Tags.has(tag))||(target==='Exif'&&excludedExif.has(tag)))continue;
+    if(target==='GPS'&&invalidCoordinate!==undefined&&[1,2,3,4].includes(tag))continue;
     try{output[target][tag]=valueFor(value,info.type);copied++;}catch{
      skipped=true;const values=Array.isArray(value)||ArrayBuffer.isView(value)?Array.from(value as ArrayLike<unknown>):[value];
      const reason=values.some(v=>typeof v==='number'&&!Number.isFinite(v))?'nonfinite':values.some(v=>typeof v==='number'&&v<0)?'negative':values.some(v=>typeof v!=='number')?'nonnumeric':'other';

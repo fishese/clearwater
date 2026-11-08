@@ -884,5 +884,8 @@
   "Invalid crop settings.": "裁剪設定無效。",
   "Could not share the ZIP. Try again.": "無法分享 ZIP，請再試一次。",
   "Saved {0} to Downloads.": "已將 {0} 儲存至下載資料夾。",
-  "Could not access the selected photos.": "未能存取所選相片。"
+  "Could not access the selected photos.": "未能存取所選相片。",
+  "Keep photo location (GPS)": "保留相片位置（GPS）",
+  "Choose this before adding photos. Android may request access and open Browse files; some providers cannot supply location.": "請在加入相片前選擇。Android 可能會要求存取權限並開啟「瀏覽檔案」；部分來源未能提供位置資料。",
+  "Location metadata may be unavailable for some selected photos.": "部分所選相片的位置中繼資料可能無法使用。"
 }

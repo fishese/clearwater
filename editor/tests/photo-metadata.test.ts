@@ -21,6 +21,13 @@ describe('photo EXIF preservation',()=>{
   const result=await readPhotoExif(input,32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
   const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});expect(output.Make).toBe('Test Camera');expect(output.DateTimeOriginal).toBe('2026:10:01 12:34:56');
  });
+ it('omits an invalid GPS coordinate pair while preserving other EXIF',async()=>{
+  const input=fixture(),pattern=Uint8Array.from([0,0,0,33,0,0,0,1,0,0,0,12,0,0,0,1]);
+  const offset=Buffer.from(input).indexOf(pattern);expect(offset).toBeGreaterThan(0);input.fill(0,offset+4,offset+8);
+  const result=await readPhotoExif(input,32,64);expect(result.warning).toContain('could not be preserved');expect(result.diagnostic).toBe('CW/meta/tag/GPS/2');
+  const output=piexif.load(binary(result.exif!));expect(output['0th'][271]).toBe('Test Camera');expect(output.Exif[36867]).toBe('2026:10:01 12:34:56');
+  for(const tag of [1,2,3,4])expect(output.GPS[tag]).toBeUndefined();
+ });
  it('preserves capture dates, camera, author, rational settings and southern/western GPS; fixes rotation/dimensions and drops MakerNote/thumbnail',async()=>{
   const result=await readPhotoExif(fixture(),32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
   const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});
