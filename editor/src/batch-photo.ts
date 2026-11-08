@@ -47,6 +47,12 @@ export class BatchPhotoProcessor {
     if(this.busy)throw new Error('Another batch photo is already being processed.');
     this.busy=true;
     try{
+    // Android picker-backed files can become unreadable when accessed from a
+    // worker. Materialize one photo at a time before crossing that boundary.
+    if(options.platform==='android-apk'){
+      let bytes:ArrayBuffer;try{bytes=await file.arrayBuffer();}catch(error){if(this.closed)throw new DOMException('Batch cancelled.','AbortError');const kind=error instanceof DOMException&&error.name==='NotReadableError'?'NotReadableError':'Error';throw new Error(`Could not read the selected photo. (CW/materialize/${kind})`);}
+      if(this.closed)throw new DOMException('Batch cancelled.','AbortError');file=new File([bytes],file.name,{type:file.type,lastModified:file.lastModified});
+    }
     const gen=++this.generation;
     const loaded=await this.waitFor({type:'load',gen,blob:file,photoResolution:options.resolution,photoDevice:options.device,platform:options.platform},'loaded');
     loaded.original?.close();

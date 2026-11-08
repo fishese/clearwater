@@ -61,4 +61,9 @@ describe('batch photo processing',()=>{
     await expect(processor.process(new File(['a'],'a.jpg'),options)).rejects.toThrow(/^Could not read photo\.$/);
     processor.close();
   });
+  it('materializes only the current Android photo before passing it to the worker',async()=>{
+    const worker=new FakeWorker(),processor=new BatchPhotoProcessor(worker as unknown as Worker),file=new File(['picker bytes'],'a.jpg',{type:'image/jpeg',lastModified:42});
+    await processor.process(file,{...options,platform:'android-apk',autoEnhance:false});
+    const copied=worker.messages[0].blob as File;expect(copied).not.toBe(file);expect(await copied.text()).toBe('picker bytes');expect(copied.name).toBe('a.jpg');expect(copied.lastModified).toBe(42);processor.close();
+  });
 });
