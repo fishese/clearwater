@@ -202,7 +202,7 @@ ctx.onmessage=async({data})=>{
       const rendered=await canvas.convertToBlob(blobOptions);
       const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,crop.width,crop.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
-      send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
+      send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning&&data.batchDiagnostic===true&&'diagnostic' in result&&result.diagnostic?`${result.warning} (${result.diagnostic})`:result.warning});
       }finally{canvas.width=1;canvas.height=1;strip.width=1;}
       }finally{decodedForExport?.close();}
     } else if(type==='cancel') {generation=gen;decoding?.abort();}

@@ -68,6 +68,7 @@ describe('photo EXIF preservation',()=>{
  it('does not fabricate capture metadata when absent, and fails open on invalid metadata',async()=>{
   expect(await readPhotoExif(jpeg(),1,1)).toEqual({});
   expect((await readPhotoExif(bytes('invalid'),1,1)).warning).toContain('could not be preserved');
+  expect((await readPhotoExif(bytes('invalid'),1,1)).diagnostic).toBe('CW/meta/parse');
   const rendered=new Blob([jpeg()],{type:'image/jpeg'}),result=await preservePhotoMetadata(new Blob([bytes('invalid')]),rendered,1,1);
   expect(result.blob).toBe(rendered);expect(result.warning).toBeDefined();
  });
