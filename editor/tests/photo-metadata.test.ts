@@ -16,6 +16,18 @@ class Reader {
 Object.assign(globalThis,{FileReader:Reader});
 function png(){const data=new Uint8Array(33);data.set([137,80,78,71,13,10,26,10]);const v=new DataView(data.buffer);v.setUint32(8,13);data.set(bytes('IHDR'),12);v.setUint32(16,32);v.setUint32(20,64);data.set([8,2,0,0,0],24);v.setUint32(29,crc32(data.subarray(12,29)));return data;}
 describe('photo EXIF preservation',()=>{
+ it('does not warn for empty EXIF text fields while preserving other metadata',async()=>{
+  const input=jpeg(piexif.dump({'0th':{270:'',271:'Test Camera',315:'',33432:''},Exif:{36867:'2026:10:01 12:34:56'}}));
+  const result=await readPhotoExif(input,32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
+  const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});expect(output.Make).toBe('Test Camera');expect(output.DateTimeOriginal).toBe('2026:10:01 12:34:56');
+ });
+ it('omits an invalid GPS coordinate pair while preserving other EXIF',async()=>{
+  const input=fixture(),pattern=Uint8Array.from([0,0,0,33,0,0,0,1,0,0,0,12,0,0,0,1]);
+  const offset=Buffer.from(input).indexOf(pattern);expect(offset).toBeGreaterThan(0);input.fill(0,offset+4,offset+8);
+  const result=await readPhotoExif(input,32,64);expect(result.warning).toContain('could not be preserved');expect(result.diagnostic).toBe('CW/meta/tag/GPS/2');
+  const output=piexif.load(binary(result.exif!));expect(output['0th'][271]).toBe('Test Camera');expect(output.Exif[36867]).toBe('2026:10:01 12:34:56');
+  for(const tag of [1,2,3,4])expect(output.GPS[tag]).toBeUndefined();
+ });
  it('preserves capture dates, camera, author, rational settings and southern/western GPS; fixes rotation/dimensions and drops MakerNote/thumbnail',async()=>{
   const result=await readPhotoExif(fixture(),32,64);expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
   const output=await parse(jpeg(binary(result.exif!)),{translateValues:false,reviveValues:false});
@@ -63,6 +75,7 @@ describe('photo EXIF preservation',()=>{
  it('does not fabricate capture metadata when absent, and fails open on invalid metadata',async()=>{
   expect(await readPhotoExif(jpeg(),1,1)).toEqual({});
   expect((await readPhotoExif(bytes('invalid'),1,1)).warning).toContain('could not be preserved');
+  expect((await readPhotoExif(bytes('invalid'),1,1)).diagnostic).toBe('CW/meta/parse');
   const rendered=new Blob([jpeg()],{type:'image/jpeg'}),result=await preservePhotoMetadata(new Blob([bytes('invalid')]),rendered,1,1);
   expect(result.blob).toBe(rendered);expect(result.warning).toBeDefined();
  });

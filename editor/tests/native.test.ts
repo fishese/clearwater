@@ -1,14 +1,22 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
-const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),createCapture:vi.fn(),copyCameraCapture:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
+const bridge=vi.hoisted(()=>({chooseFolder:vi.fn(),chooseBatchPhotos:vi.fn(),listPhotos:vi.fn(),stat:vi.fn(),create:vi.fn(),createBatchDownload:vi.fn(),createCapture:vi.fn(),copyCameraCapture:vi.fn(),beginWrite:vi.fn(),writeChunk:vi.fn(),finishWrite:vi.fn(),drainShares:vi.fn(),releaseShare:vi.fn(),addListener:vi.fn(),getRememberedModel:vi.fn(),beginModelWrite:vi.fn(),writeModelChunk:vi.fn(),finishModelWrite:vi.fn(),readModelChunk:vi.fn(),clearRememberedModelFile:vi.fn(),forgetRememberedModel:vi.fn()}));
 const hdrBridge=vi.hoisted(()=>({beginHdrInput:vi.fn(),writeHdrInputChunk:vi.fn(),finishHdrInput:vi.fn(),convertHdrToSdr:vi.fn(),cancelHdrConversion:vi.fn(),deleteHdrWorkingCopy:vi.fn(),addListener:vi.fn()}));
 const backBridge=vi.hoisted(()=>({setEnabled:vi.fn(),exitApp:vi.fn(),addListener:vi.fn(),remove:vi.fn()}));
 vi.mock('@capacitor/core',()=>({Capacitor:{getPlatform:()=> 'android',convertFileSrc:(value:string)=>value},registerPlugin:(name:string)=>name==='ClearWaterHdr'?hdrBridge:name==='ClearWaterBack'?backBridge:bridge}));
-import {chooseAndroidFolder,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,saveAndroidCameraCapture} from '../src/native';
+import {chooseAndroidFolder,chooseAndroidBatchPhotos,openAndroidPhotoFolder,readAndroidFolderPhoto,receiveAndroidPhotos,readRememberedAndroidModel,saveRememberedAndroidModel,createAndroidHdrWorkingCopy,cancelAndroidHdrWorkingCopy,listenForAndroidBack,exitAndroidApp,saveAndroidCameraCapture,saveAndroidBatchDownload} from '../src/native';
 import {convertHdrImportRequest} from '../src/hdr-import';
 import {writeFile} from '../src/file-save';
 
 describe('Android file bridge',()=>{
  beforeEach(()=>{vi.resetAllMocks();bridge.chooseFolder.mockResolvedValue({uri:'content://folder',name:'Output'});bridge.create.mockResolvedValue({uri:'content://new',name:'photo.jpg'});bridge.createCapture.mockResolvedValue({uri:'content://media/video/42',name:'ClearWater_video.mp4',destination:'Movies/ClearWater/ClearWater_video.mp4'});bridge.copyCameraCapture.mockResolvedValue(undefined);bridge.beginWrite.mockResolvedValue({id:'write-1'});bridge.beginModelWrite.mockResolvedValue({id:'model-1'});bridge.finishModelWrite.mockResolvedValue(undefined);hdrBridge.beginHdrInput.mockResolvedValue({id:'hdr-1'});hdrBridge.writeHdrInputChunk.mockResolvedValue(undefined);hdrBridge.finishHdrInput.mockResolvedValue(undefined);hdrBridge.convertHdrToSdr.mockResolvedValue({id:'hdr-1',uri:'file:///cache/sdr-working-copy.mp4'});hdrBridge.cancelHdrConversion.mockResolvedValue(undefined);hdrBridge.deleteHdrWorkingCopy.mockResolvedValue(undefined);hdrBridge.addListener.mockResolvedValue({remove:vi.fn().mockResolvedValue(undefined)});backBridge.setEnabled.mockResolvedValue(undefined);backBridge.remove.mockResolvedValue(undefined);backBridge.addListener.mockResolvedValue({remove:backBridge.remove});});
+ it('selects only supported photos and handles picker cancellation',async()=>{
+  const photo={uri:'content://picked/1',name:'one.jpg',type:'image/jpeg',size:12};
+  bridge.chooseBatchPhotos.mockResolvedValueOnce({photos:[photo,{uri:'content://picked/2',name:'video.mp4',type:'video/mp4',size:10}]});
+  await expect(chooseAndroidBatchPhotos()).resolves.toEqual({photos:[photo],locationUnavailable:false});
+  expect(bridge.chooseBatchPhotos).toHaveBeenCalledWith({browse:false,keepLocation:false});
+  bridge.chooseBatchPhotos.mockResolvedValueOnce({photos:[photo],locationUnavailable:true});await expect(chooseAndroidBatchPhotos(true,true)).resolves.toEqual({photos:[photo],locationUnavailable:true});expect(bridge.chooseBatchPhotos).toHaveBeenLastCalledWith({browse:true,keepLocation:true});
+  bridge.chooseBatchPhotos.mockRejectedValueOnce({code:'CANCELLED'});await expect(chooseAndroidBatchPhotos()).rejects.toMatchObject({name:'AbortError'});
+ });
  it('copies an owned native video directly without uploading its bytes through JavaScript',async()=>{
   const file=new File(['archived source'],'clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4',{type:'video/mp4'});
   const saved=await saveAndroidCameraCapture(file,'file:///cache/camera-captures/clearwater-camera-01234567-89ab-4cde-8f01-23456789abcd.mp4');
@@ -42,6 +50,15 @@ describe('Android file bridge',()=>{
   const folder=await chooseAndroidFolder(),handle=await folder.getFileHandle('photo.jpg',{create:true});
   await expect(writeFile(handle,new Blob(['photo']))).rejects.toThrow('Storage full');
   expect(bridge.finishWrite).toHaveBeenCalledWith({id:'write-1',abort:true});
+ });
+ it('saves a batch ZIP in bounded chunks and aborts a failed write',async()=>{
+  bridge.createBatchDownload.mockResolvedValue({uri:'content://download/1',name:'clearwater-batch.zip'});
+  bridge.finishWrite.mockResolvedValue(undefined).mockResolvedValueOnce({name:'clearwater-batch (2).zip'});
+  const blob=new Blob([new Uint8Array(300000)],{type:'application/zip'});
+  await expect(saveAndroidBatchDownload(blob)).resolves.toBe('clearwater-batch (2).zip');
+  expect(bridge.writeChunk).toHaveBeenCalledTimes(2);expect(bridge.finishWrite).toHaveBeenCalledWith({id:'write-1',abort:false});
+  bridge.writeChunk.mockRejectedValueOnce(new Error('Storage full'));
+  await expect(saveAndroidBatchDownload(blob)).rejects.toThrow('Storage full');expect(bridge.finishWrite).toHaveBeenCalledWith({id:'write-1',abort:true});
  });
  it('lists supported folder photos in natural filename order without reading their contents',async()=>{
   bridge.listPhotos.mockResolvedValue({photos:[{uri:'content://10',name:'IMG10.JPG',size:42,type:'image/jpeg'},{uri:'content://2',name:'IMG2.JPG',size:42,type:'image/jpeg'},{uri:'content://text',name:'notes.txt',size:20,type:'text/plain'},{uri:'content://large',name:'large.png',size:61*1024*1024,type:'image/png'}]});

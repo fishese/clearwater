@@ -72,6 +72,17 @@ export async function shareWebFile(blob:Blob,name:string,nav:WebShareNavigator,i
   await nav.share({files:[file]});
 }
 
+/** A batch ZIP has its own validation path; ordinary photo/video sharing stays unchanged. */
+export async function shareWebBatchArchive(blob:Blob,name:string,nav:WebShareNavigator):Promise<void>{
+  if(!Number.isSafeInteger(blob.size)||blob.size<=0)throw new Error('The exported file is empty.');
+  assertExportBytes(blob.size,'photo',sharePlatform());
+  if(blob.type.toLowerCase()!=='application/zip'||!name.toLowerCase().endsWith('.zip')||name.length>220||/[\\/\u0000-\u001f\u007f]/.test(name)||name.trim()!==name)throw new Error('This file type cannot be shared.');
+  if(typeof nav.share!=='function')throw new Error('File sharing is not available in this browser.');
+  const file=new File([blob],name,{type:'application/zip'});
+  if(typeof nav.canShare==='function'&&!nav.canShare({files:[file]}))throw new Error('This browser cannot share this file.');
+  await nav.share({files:[file]});
+}
+
 /** Stage an immutable export in app-private storage, then hand it to Android's chooser. */
 export async function shareExport(blob:Blob,name:string):Promise<void>{
   const platform=Capacitor.getPlatform();

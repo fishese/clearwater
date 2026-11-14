@@ -3,6 +3,18 @@ import XCTest
 @testable import App
 
 final class NativeCaptureStoreTests: XCTestCase {
+    func testBatchFolderCopiesUseUniqueNamesWithoutOverwriting() throws {
+        let root = try temporaryRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.jpg"), folder = root.appendingPathComponent("folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try Data("new".utf8).write(to: source)
+        try Data("original".utf8).write(to: folder.appendingPathComponent("photo.jpg"))
+        XCTAssertEqual(try ClearWaterExportPlugin.copyBatchFile(source: source, directory: folder, name: "photo.jpg"), "photo (1).jpg")
+        XCTAssertEqual(try ClearWaterExportPlugin.copyBatchFile(source: source, directory: folder, name: "photo.jpg"), "photo (2).jpg")
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("photo.jpg")), Data("original".utf8))
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("photo (1).jpg")), Data("new".utf8))
+        XCTAssertThrowsError(try ClearWaterExportPlugin.copyBatchFile(source: source, directory: folder, name: "../photo.jpg"))
+    }
     func testCaptureFilenameUsesLocalGregorianTimestampAndCollisionSuffix() {
         var components = DateComponents(); components.year = 2026; components.month = 10; components.day = 23
         components.hour = 14; components.minute = 5; components.second = 6

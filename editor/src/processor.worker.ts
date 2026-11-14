@@ -11,6 +11,7 @@ import {enhancePixels,enhancementRadii,suggestEnhancement} from './core/enhancem
 import {pickNeutralFromPixels} from './core/white-balance';
 import {applyPhotoFinish,fitPhotoFinish,hasPhotoFinishEffect,isValidPhotoFinishSettings,preparePhotoFinish} from './core/photo-finish';
 import {classifyMediaFailure,currentMediaPlatform,isMediaPlatform,PlatformLimitError,type MediaPlatform} from './core/platform-limits';
+import {cropBounds} from './core/crop';
 
 const ctx=self as unknown as DedicatedWorkerGlobalScope;
 let source:ImageBitmap|null=null, pixels:ImageData|null=null, generation=0;
@@ -76,6 +77,7 @@ const send=(message:unknown,transfer:Transferable[]=[])=>ctx.postMessage(message
 ctx.onmessage=async({data})=>{
   const {type,gen,request}=data;
   const platform:MediaPlatform=isMediaPlatform(data.platform)?data.platform:currentMediaPlatform();
+  let diagnosticStep='start';
   if(type==='render'||type==='enhance'||type==='finish')latestPreviewRequest=request;
   try {
     if(type==='custom-model') {
@@ -86,11 +88,11 @@ ctx.onmessage=async({data})=>{
       source?.close();source=null;pixels=null;sourceFile=null;sourceInfo=null;fields=new Map();followUpSuggestions.clear();
       photoFinishKernels.clear();
       mode=data.photoResolution??'auto';device=data.photoDevice??{mobile:false};
-      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info})});
+      const decoded=await decodePhoto(data.blob,{mode,device,preview:true,platform,signal:decoding.signal,onInfo:info=>send({type:'photo-info',gen,info}),onDiagnosticStep:step=>{diagnosticStep=step;}});
       const {bitmap}=decoded;
       if(gen!==generation){bitmap.close();return;}
       source=bitmap;sourceFile=data.blob;sourceInfo=decoded.info;
-      const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
+      diagnosticStep='analysis';const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height));
       const canvas=new OffscreenCanvas(Math.round(bitmap.width*scale),Math.round(bitmap.height*scale));
       const c=canvas.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
       c.drawImage(bitmap,0,0,canvas.width,canvas.height);
@@ -167,6 +169,7 @@ ctx.onmessage=async({data})=>{
         if(gen!==generation){decoded.bitmap.close();return;}decodedForExport=decoded.bitmap;sourceInfo=decoded.info;send({type:'photo-info',gen,info:sourceInfo});
       }
       const bitmap=decodedForExport??source;
+      const crop=cropBounds(recipe.crop,bitmap.width,bitmap.height);
       const finish=currentPhotoFinish(recipe),autoContrastDisabled=finish!==undefined&&recipe.enhancement?.autoApplied===true;
       const settings=withoutAutoContrast(recipe.enhancement,finish),finishKernel=finish?photoFinishKernel(finish):undefined;
       let resolved=settings;
@@ -175,13 +178,13 @@ ctx.onmessage=async({data})=>{
         const {black,white}=suggestEnhancement(renderPixels(preview.data,recipe,previewBase,followUp));resolved={...settings,black,white};
       }
       const radii=enhancementRadii(bitmap.width,bitmap.height),halo=Math.max(settings?.clarity?radii.clarity:0,settings?.sharpness?radii.sharpness:0);
-      const canvas=new OffscreenCanvas(bitmap.width,bitmap.height);
+      const canvas=new OffscreenCanvas(crop.width,crop.height);
       const out=canvas.getContext('2d')!;
       const strip=new OffscreenCanvas(bitmap.width,Math.min(256+2*halo,bitmap.height));
       const c=strip.getContext('2d',{willReadFrequently:true,colorSpace:'srgb'})!;
-      try{for(let y=0;y<bitmap.height;y+=256) {
+      try{for(let y=crop.y;y<crop.y+crop.height;y+=256) {
         if(gen!==generation)throw new Error('Export cancelled.');
-        const height=Math.min(256,bitmap.height-y);
+        const height=Math.min(256,crop.y+crop.height-y);
         const top=Math.max(0,y-halo),bottom=Math.min(bitmap.height,y+height+halo),rows=bottom-top;
         c.clearRect(0,0,strip.width,strip.height);
         c.drawImage(bitmap,0,top,bitmap.width,rows,0,0,bitmap.width,rows);
@@ -190,16 +193,16 @@ ctx.onmessage=async({data})=>{
         const corrected=renderPixels(input.data,recipe,base,followUp);
         const finishedBase=finish?applyPhotoFinish(corrected,bitmap.width,rows,finish,finishKernel,{inPlace:true}):corrected;
         const finished=enhancePixels(finishedBase,bitmap.width,rows,resolved,bitmap.width,bitmap.height);
-        out.putImageData(new ImageData(finished,bitmap.width,rows),0,top,0,y-top,bitmap.width,height);
-        send({type:'progress',gen,request,progress:Math.round((y+height)/bitmap.height*95)});
+        out.putImageData(new ImageData(finished,bitmap.width,rows),-crop.x,top-crop.y,crop.x,y-top,crop.width,height);
+        send({type:'progress',gen,request,progress:Math.round((y+height-crop.y)/crop.height*95)});
         await new Promise(resolve=>setTimeout(resolve,0));
       }
       const blobOptions:{type:string;quality?:number}={type:data.format==='png'?'image/png':'image/jpeg'};
       if(data.format!=='png')blobOptions.quality=data.jpegQuality===0.99?0.99:0.95;
       const rendered=await canvas.convertToBlob(blobOptions);
-      const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,bitmap.width,bitmap.height):{blob:rendered};
+      const result=data.keepMetadata!==false&&originalFile?await preservePhotoMetadata(originalFile,rendered,crop.width,crop.height):{blob:rendered};
       if(gen!==generation)throw new Error('Export cancelled.');
-      send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning});
+      send({type:'exported',gen,request,blob:result.blob,metadataWarning:result.warning&&data.batchDiagnostic===true&&'diagnostic' in result&&result.diagnostic?`${result.warning} (${result.diagnostic})`:result.warning});
       }finally{canvas.width=1;canvas.height=1;strip.width=1;}
       }finally{decodedForExport?.close();}
     } else if(type==='cancel') {generation=gen;decoding?.abort();}
@@ -213,6 +216,12 @@ ctx.onmessage=async({data})=>{
     if(type==='custom-model')console.error(error);
     const classified=type==='custom-model'?error instanceof Error?error:new Error(fallback):classifyMediaFailure(error instanceof Error?error:new Error(fallback),platform,type==='export'?'export':type==='load'?'photo-load':'photo-process');
     const limit=classified instanceof PlatformLimitError?classified:undefined;
-    send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
+    let diagnostic:string|undefined;
+    if(data.batchDiagnostic===true){
+      const allowed=new Set(['AbortError','EncodingError','InvalidStateError','NotReadableError','NotSupportedError','OperationError','QuotaExceededError','RangeError','SecurityError','TypeError']);
+      let current:unknown=error,kind='Error';for(let i=0;i<5&&current&&typeof current==='object';i++){const name=(current as {name?:unknown}).name;if(typeof name==='string'&&allowed.has(name))kind=name;current=(current as {cause?:unknown}).cause;}
+      diagnostic=`CW/${type}/${diagnosticStep}/${kind}`;
+    }
+    send({type:'error',gen,request,operation:type,message:classified instanceof Error?classified.message:fallback,diagnostic,restore:data.restore===true,retryable:limit?false:undefined,...(limit?{code:limit.code,actual:limit.actual,limit:limit.limit,platform:limit.platform}:{})});
   }
 };

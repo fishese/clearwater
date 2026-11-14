@@ -24,9 +24,11 @@ export type AndroidFolderPhoto={uri:string;name:string;type:string;size:number};
 export type AndroidPhotoFolder={name:string;directory:LocalDirectoryHandle;photos:AndroidFolderPhoto[]};
 interface NativeFiles {
  chooseFolder():Promise<{uri:string;name:string}>;
+ chooseBatchPhotos(options:{browse:boolean;keepLocation:boolean}):Promise<{photos:AndroidFolderPhoto[];locationUnavailable?:boolean}>;
  stat(options:{folder:string;name:string}):Promise<{exists:boolean;directory?:boolean;uri?:string;name?:string;size?:number}>;
  listPhotos(options:{folder:string}):Promise<{photos:AndroidFolderPhoto[]}>;
  create(options:{folder:string;name:string}):Promise<{uri:string;name:string}>;
+ createBatchDownload():Promise<{uri:string;name:string}>;
  createCapture(options:{name:string;type:string}):Promise<{uri:string;name:string;destination:string}>;
  copyCameraCapture(options:{sourceUri:string;uri:string}):Promise<void>;
  beginCameraUpdate(options:{uri:string}):Promise<{id:string}>;
@@ -34,7 +36,7 @@ interface NativeFiles {
  probeAndroidSources(options:{uris:string[]}):Promise<{states:Record<string,'present'|'missing'|'unavailable'|'trashed'>}>;
  beginWrite(options:{uri:string}):Promise<{id:string}>;
  writeChunk(options:{id:string;data:string}):Promise<void>;
- finishWrite(options:{id:string;abort:boolean}):Promise<void>;
+ finishWrite(options:{id:string;abort:boolean}):Promise<{name?:string}>;
  drainShares():Promise<{photos:SharedPhoto[];error?:string}>;
  releaseShare(options:{id:string}):Promise<void>;
  addListener(name:'sharesAvailable',listener:()=>void):Promise<PluginListenerHandle>;
@@ -170,6 +172,12 @@ function fileHandle(uri:string,name:string,created=false,size?:number):LocalFile
    return {async write(blob){for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}},async close(){await files.finishWrite({id,abort:false});},async abort(){await files.finishWrite({id,abort:true});}};
  }};
 }
+export async function saveAndroidBatchDownload(blob:Blob):Promise<string>{
+ if(!isAndroid()||blob.type!=='application/zip'||!blob.size)throw new Error('Invalid ZIP download.');
+ const target=await files.createBatchDownload(),{id}=await files.beginWrite({uri:target.uri});
+ try{for(let offset=0;offset<blob.size;offset+=256*1024){const bytes=new Uint8Array(await blob.slice(offset,offset+256*1024).arrayBuffer());await files.writeChunk({id,data:base64Chunk(bytes)});}const result=await files.finishWrite({id,abort:false});return result?.name??target.name;}
+ catch(error){await files.finishWrite({id,abort:true}).catch(()=>{});throw error;}
+}
 function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
  return {name:folder.name,async getFileHandle(name,options){
    if(options?.create){const created=await files.create({folder:folder.uri,name});return fileHandle(created.uri,created.name,true);}
@@ -181,6 +189,10 @@ function directoryHandle(folder:{uri:string;name:string}):LocalDirectoryHandle {
 }
 async function pickFolder(){try{return await files.chooseFolder();}catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Folder selection cancelled.','AbortError');throw error;}}
 export async function chooseAndroidFolder():Promise<LocalDirectoryHandle>{return directoryHandle(await pickFolder());}
+export async function chooseAndroidBatchPhotos(browse=false,keepLocation=false):Promise<{photos:AndroidFolderPhoto[];locationUnavailable:boolean}>{
+ try{const result=await files.chooseBatchPhotos({browse,keepLocation});return {photos:result.photos.filter(photo=>supportedMedia(photo)&&!isVideo(photo)),locationUnavailable:result.locationUnavailable===true};}
+ catch(error){if((error as {code?:string})?.code==='CANCELLED')throw new DOMException('Photo selection cancelled.','AbortError');throw error;}
+}
 export async function openAndroidPhotoFolder():Promise<AndroidPhotoFolder>{
  const folder=await pickFolder(),result=await files.listPhotos({folder:folder.uri});
  const platform=androidPlatform();
@@ -193,9 +205,10 @@ function fileTooLarge(bytes:number,file:{name:string;type?:string},platform:Medi
  console.error(error);
  return error;
 }
-export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto):Promise<File>{
+export async function readAndroidFolderPhoto(photo:AndroidFolderPhoto,signal?:AbortSignal):Promise<File>{
  const platform=androidPlatform(),limit=mediaLimit(photo,platform);
- const response=await fetch(Capacitor.convertFileSrc(photo.uri));if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
+ if(photo.size>limit)throw fileTooLarge(photo.size,photo,platform);
+ const response=await fetch(Capacitor.convertFileSrc(photo.uri),signal?{signal}:undefined);if(!response.ok)throw new Error('Could not read this file. It may have been moved or deleted.');
  const reader=response.body?.getReader();let blob:Blob;
  if(reader){const chunks:Uint8Array<ArrayBuffer>[]=[];let bytes=0;try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>limit)throw fileTooLarge(bytes,photo,platform);chunks.push(new Uint8Array(part.value));}}catch(error){console.error(error);await reader.cancel().catch(cancelError=>{console.error(cancelError);});throw error;}finally{reader.releaseLock();}blob=new Blob(chunks);}
  else blob=await response.blob();

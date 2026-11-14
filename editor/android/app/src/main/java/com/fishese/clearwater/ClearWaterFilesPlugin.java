@@ -1,6 +1,7 @@
 package com.fishese.clearwater;
 
 import android.app.Activity;
+import android.Manifest;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
@@ -23,10 +24,10 @@ import java.util.concurrent.*;
 import org.json.JSONObject;
 
 /** User-selected SAF folders plus the app-private custom model slots. Existing SAF documents are never overwritten. */
-@CapacitorPlugin(name = "ClearWaterFiles")
+@CapacitorPlugin(name = "ClearWaterFiles", permissions = {@Permission(alias="mediaLocation", strings={Manifest.permission.ACCESS_MEDIA_LOCATION})})
 public class ClearWaterFilesPlugin extends Plugin {
     private final ExecutorService io = Executors.newSingleThreadExecutor();
-    private final Set<String> folders = new HashSet<>(), created = new HashSet<>(), captureCreated = new HashSet<>();
+    private final Set<String> folders = new HashSet<>(), created = new HashSet<>(), captureCreated = new HashSet<>(), downloadCreated = new HashSet<>();
     private final Map<String, WriteSession> writes = new HashMap<>();
     private final Map<String, ModelWriteSession> modelWrites = new HashMap<>();
     private final Map<String, File> sharedFiles = new HashMap<>();
@@ -113,6 +114,37 @@ public class ClearWaterFilesPlugin extends Plugin {
     }catch(Exception error){call.reject("Could not remove the saved model.",error);}}); }
     @Override public void load() { enqueueShare(getActivity().getIntent()); }
     @Override protected void handleOnNewIntent(Intent intent) { enqueueShare(intent); }
+    @PluginMethod public void chooseBatchPhotos(PluginCall call) {
+        if(call.getBoolean("keepLocation",false)&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q&&getPermissionState("mediaLocation")!=PermissionState.GRANTED){requestPermissionForAlias("mediaLocation",call,"batchLocationPermissionResult");return;}
+        launchBatchPhotos(call);
+    }
+    @PermissionCallback private void batchLocationPermissionResult(PluginCall call) {if(call!=null)launchBatchPhotos(call);}
+    private void launchBatchPhotos(PluginCall call) {
+        boolean browse=call.getBoolean("browse",false)||call.getBoolean("keepLocation",false);Intent intent=null;
+        if(!browse&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.TIRAMISU){
+            intent=new Intent(MediaStore.ACTION_PICK_IMAGES);intent.setType("image/*");intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX,MediaStore.getPickImagesMaxLimit());
+            if(intent.resolveActivity(getContext().getPackageManager())==null)browse=true;
+        }else browse=true;
+        if(browse){intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("image/*");intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);}
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(call,intent,"batchPhotosSelected");
+    }
+    @ActivityCallback private void batchPhotosSelected(PluginCall call,ActivityResult result) {
+        if(call==null)return;
+        if(result.getResultCode()!=Activity.RESULT_OK||result.getData()==null){call.reject("Photo selection cancelled.","CANCELLED");return;}
+        Intent data=result.getData();LinkedHashSet<Uri> uris=new LinkedHashSet<>();
+        if(data.getClipData()!=null)for(int i=0;i<data.getClipData().getItemCount();i++){Uri uri=data.getClipData().getItemAt(i).getUri();if(uri!=null)uris.add(uri);}
+        if(data.getData()!=null)uris.add(data.getData());
+        io.execute(()->{try{JSArray photos=new JSArray();boolean keepLocation=call.getBoolean("keepLocation",false),canAccess=Build.VERSION.SDK_INT<Build.VERSION_CODES.Q||getPermissionState("mediaLocation")==PermissionState.GRANTED,locationUnavailable=false;for(Uri uri:uris){
+            String type=getContext().getContentResolver().getType(uri);String name=displayName(uri,"photo.jpg");long size=-1;
+            try(Cursor cursor=getContext().getContentResolver().query(uri,new String[]{OpenableColumns.SIZE},null,null,null)){if(cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0))size=cursor.getLong(0);}
+            Uri source=uri;if(keepLocation&&Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q){
+                if(canAccess){try{Uri media=MediaStore.getMediaUri(getContext(),uri);if(media==null)throw new IOException("Original not available");Uri original=MediaStore.setRequireOriginal(media);try(android.os.ParcelFileDescriptor probe=getContext().getContentResolver().openFileDescriptor(original,"r")){if(probe==null)throw new IOException("Original not available");}source=original;}catch(Exception unavailable){locationUnavailable=true;}}
+                else locationUnavailable=true;
+            }
+            JSObject photo=new JSObject();photo.put("uri",source.toString());photo.put("name",name);photo.put("type",type==null?"":type);photo.put("size",size);photos.put(photo);
+        }JSObject output=new JSObject();output.put("photos",photos);output.put("locationUnavailable",locationUnavailable);call.resolve(output);}catch(Exception error){call.reject("Could not access the selected photos.",error);}});
+    }
     @PluginMethod public void chooseFolder(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -170,10 +202,16 @@ public class ClearWaterFilesPlugin extends Plugin {
         Uri tree=folder(call);String name=filename(call);
         if(Boolean.TRUE.equals(find(tree,name).getBool("exists")))throw new IOException("Filename already exists. Please save again.");
         Uri parent=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":name.toLowerCase(Locale.ROOT).endsWith(".mp4")?"video/mp4":"image/jpeg",name);
+        Uri document=DocumentsContract.createDocument(getContext().getContentResolver(),parent,name.toLowerCase(Locale.ROOT).endsWith(".zip")?"application/zip":name.toLowerCase(Locale.ROOT).endsWith(".png")?"image/png":name.toLowerCase(Locale.ROOT).endsWith(".json")?"application/json":name.toLowerCase(Locale.ROOT).endsWith(".mp4")?"video/mp4":"image/jpeg",name);
         if(document==null)throw new IOException("Could not create photo.");
         created.add(document.toString());JSObject value=new JSObject();value.put("uri",document.toString());value.put("name",displayName(document,name));call.resolve(value);
     }catch(Exception error){call.reject("Could not create a new photo.",error);}}); }
+    @PluginMethod public void createBatchDownload(PluginCall call) { io.execute(()->{Uri uri=null;try {
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.Q){call.reject("Downloads requires a folder on this Android version.","UNAVAILABLE");return;}
+        ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,"clearwater-batch.zip");values.put(MediaStore.MediaColumns.MIME_TYPE,"application/zip");values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS);values.put(MediaStore.MediaColumns.IS_PENDING,1);
+        uri=getContext().getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);if(uri==null)throw new IOException("Could not create download.");
+        downloadCreated.add(uri.toString());JSObject result=new JSObject();result.put("uri",uri.toString());result.put("name",displayName(uri,"clearwater-batch.zip"));call.resolve(result);
+    }catch(Exception error){if(uri!=null)deleteCapture(uri);call.reject("Could not create the ZIP download.",error);}}); }
     private final Object captureCreateLock = new Object();
     @PluginMethod public void createCapture(PluginCall call) { io.execute(()->{Uri uri=null;try { synchronized(captureCreateLock) {
         String name=call.getString("name"),type=call.getString("type");
@@ -226,10 +264,10 @@ public class ClearWaterFilesPlugin extends Plugin {
         call.resolve();
     }catch(Exception error){if(target!=null)deleteCapture(target);call.reject("Could not copy the camera video to the gallery.",error);}}); }
     @PluginMethod public void beginWrite(PluginCall call) { io.execute(()->{try {
-        String value=call.getString("uri");boolean isCapture=captureCreated.remove(value);if(!isCapture&&!created.remove(value))throw new IOException("Only newly created photos can be written.");
-        Uri uri=Uri.parse(value);boolean mediaStore=isCapture&&"content".equals(uri.getScheme());OutputStream stream;
+        String value=call.getString("uri");boolean isCapture=captureCreated.remove(value),isDownload=downloadCreated.remove(value);if(!isCapture&&!isDownload&&!created.remove(value))throw new IOException("Only newly created photos can be written.");
+        Uri uri=Uri.parse(value);boolean mediaStore=(isCapture||isDownload)&&"content".equals(uri.getScheme());OutputStream stream;
         try {stream="file".equals(uri.getScheme())?new FileOutputStream(new File(uri.getPath()),false):getContext().getContentResolver().openOutputStream(uri,"wt");if(stream==null)throw new IOException("Could not open new photo.");}
-        catch(Exception error){if(isCapture)deleteCapture(uri);else deleteDocument(uri);throw error;}
+        catch(Exception error){if(isCapture||isDownload)deleteCapture(uri);else deleteDocument(uri);throw error;}
         String id=UUID.randomUUID().toString();writes.put(id,new WriteSession(uri,stream,mediaStore,isCapture));JSObject result=new JSObject();result.put("id",id);call.resolve(result);
     }catch(Exception error){call.reject("Could not open new photo for writing.",error);}}); }
     @PluginMethod public void beginCameraUpdate(PluginCall call) { io.execute(()->{File stage=null,backup=null;try {
@@ -250,7 +288,7 @@ public class ClearWaterFilesPlugin extends Plugin {
     @PluginMethod public void finishWrite(PluginCall call) { io.execute(()->{
         WriteSession session=writes.remove(call.getString("id"));if(session==null){call.reject("Write session is closed.");return;}
         boolean abort=call.getBoolean("abort",false);
-        try {session.stream.close();if(session.cameraUpdate){if(!abort)commitCameraUpdate(session);cleanupCameraUpdate(session);}else if(abort)deleteWriteTarget(session);else if(session.mediaStore){ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.IS_PENDING,0);if(getContext().getContentResolver().update(session.uri,values,null,null)!=1)throw new IOException("Could not publish the gallery capture.");}if(!abort&&session.cameraCapture&&!rememberCameraCapture(session.uri.toString()))throw new IOException("Could not save camera capture ownership.");call.resolve();}
+        try {session.stream.close();if(session.cameraUpdate){if(!abort)commitCameraUpdate(session);cleanupCameraUpdate(session);}else if(abort)deleteWriteTarget(session);else if(session.mediaStore){ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.IS_PENDING,0);if(getContext().getContentResolver().update(session.uri,values,null,null)!=1)throw new IOException("Could not publish the gallery capture.");}if(!abort&&session.cameraCapture&&!rememberCameraCapture(session.uri.toString()))throw new IOException("Could not save camera capture ownership.");JSObject result=new JSObject();if(!abort&&session.mediaStore&&!session.cameraCapture)result.put("name",displayName(session.uri,"clearwater-batch.zip"));call.resolve(result);}
         catch(Exception error){if(session.cameraUpdate)cleanupCameraUpdate(session);else deleteWriteTarget(session);call.reject("Could not finish saving photo.",error);}
     }); }
     private void copyToUri(File source,Uri target) throws IOException {
@@ -364,5 +402,5 @@ public class ClearWaterFilesPlugin extends Plugin {
     }
     @PluginMethod public void drainShares(PluginCall call) {io.execute(()->{JSObject result=new JSObject();result.put("photos",new JSArray(shares));shares.clear();if(shareError!=null){result.put("error",shareError);shareError=null;}call.resolve(result);});}
     @PluginMethod public void releaseShare(PluginCall call) {io.execute(()->{File file=sharedFiles.remove(call.getString("id"));if(file!=null)file.delete();call.resolve();});}
-    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values())cleanupWrite(session);writes.clear();for(String uri:captureCreated)deleteCapture(Uri.parse(uri));captureCreated.clear();for(ModelWriteSession session:modelWrites.values())try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}modelWrites.clear();});io.shutdown();}
+    @Override protected void handleOnDestroy() {io.execute(()->{for(WriteSession session:writes.values())cleanupWrite(session);writes.clear();for(String uri:captureCreated)deleteCapture(Uri.parse(uri));captureCreated.clear();for(String uri:downloadCreated)deleteCapture(Uri.parse(uri));downloadCreated.clear();for(ModelWriteSession session:modelWrites.values())try{session.atomic.failWrite(session.stream);}catch(Exception ignored){}modelWrites.clear();});io.shutdown();}
 }

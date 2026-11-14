@@ -74,7 +74,8 @@ async function rawJpegUserComment(source:Blob|Uint8Array):Promise<string|undefin
  }catch{return;}
 }
 
-export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:number):Promise<{exif?:Uint8Array;warning?:string}> {
+export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:number):Promise<{exif?:Uint8Array;warning?:string;diagnostic?:string}> {
+ let phase='parse';
  try{
   const options={translateKeys:false,translateValues:false,reviveValues:false,mergeOutput:false,sanitize:false,
    ifd0:{pick:[...ifd0Tags]},exif:{pick:Object.keys(piexif.TAGS.Exif).map(Number).filter(tag=>!excludedExif.has(tag))},gps:{pick:Object.keys(piexif.TAGS.GPS).map(Number)},
@@ -83,23 +84,35 @@ export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:n
   if(!parsed)return {};
   const userComment=await rawJpegUserComment(source);
   const output:Record<string,Directory>={'0th':{},Exif:{},GPS:{}};
-  let copied=0,skipped=false;
+  let copied=0,skipped=false,diagnostic:string|undefined;phase='tags';
+  // A redacted or malformed coordinate must not leave a misleading partial
+  // latitude/longitude pair. Non-location EXIF and other valid tags survive.
+  const invalidCoordinate=[2,4].find(tag=>{const value=parsed.gps?.[tag];if(value===undefined||value===null)return false;try{valueFor(value,'Rational');return false;}catch{return true;}});
+  if(invalidCoordinate!==undefined){skipped=true;diagnostic=`CW/meta/tag/GPS/${invalidCoordinate}`;}
   for(const [block,target] of [['ifd0','0th'],['exif','Exif'],['gps','GPS']]){
    for(const [key,parsedValue] of Object.entries(parsed[block]??{})){
     const value=block==='exif'&&Number(key)===37510&&userComment!==undefined?userComment:parsedValue;
+    // exifr represents zero-length text tags as undefined; there is no
+    // metadata value to preserve or warn about in that case.
+    if(value===undefined||value===null)continue;
     const tag=Number(key),info=piexif.TAGS[target][tag];
     if(!info||(target==='0th'&&!ifd0Tags.has(tag))||(target==='Exif'&&excludedExif.has(tag)))continue;
-    try{output[target][tag]=valueFor(value,info.type);copied++;}catch{skipped=true;}
+    if(target==='GPS'&&invalidCoordinate!==undefined&&[1,2,3,4].includes(tag))continue;
+    try{output[target][tag]=valueFor(value,info.type);copied++;}catch{
+     skipped=true;const values=Array.isArray(value)||ArrayBuffer.isView(value)?Array.from(value as ArrayLike<unknown>):[value];
+     const reason=values.some(v=>typeof v==='number'&&!Number.isFinite(v))?'nonfinite':values.some(v=>typeof v==='number'&&v<0)?'negative':values.some(v=>typeof v!=='number')?'nonnumeric':'other';
+     diagnostic??=`CW/meta/tag/${target}/${tag}/${reason}`;
+    }
    }
   }
-  if(!copied)return skipped?{warning}:{};
+  if(!copied)return skipped?{warning,diagnostic}:{};
   output['0th'][274]=1; // Browser/decoder has already applied source rotation/mirroring.
   output['0th'][256]=width;output['0th'][257]=height;
   output.Exif[40961]=1;output.Exif[40962]=width;output.Exif[40963]=height; // Canvas is sRGB.
-  const exif=bytes(piexif.dump(output));
+  phase='write';const exif=bytes(piexif.dump(output));
   if(exif.length>65533)throw new Error('EXIF exceeds JPEG APP1 size');
-  return {exif,warning:skipped?warning:undefined};
- }catch{return {warning};}
+  return {exif,warning:skipped?warning:undefined,diagnostic};
+ }catch{return {warning,diagnostic:`CW/meta/${phase}`};}
 }
 
 export function crc32(data:Uint8Array):number {
@@ -107,21 +120,21 @@ export function crc32(data:Uint8Array):number {
  for(const byte of data){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
  return (crc^0xffffffff)>>>0;
 }
-export async function preservePhotoMetadata(source:Blob,rendered:Blob,width:number,height:number):Promise<{blob:Blob;warning?:string}> {
+export async function preservePhotoMetadata(source:Blob,rendered:Blob,width:number,height:number):Promise<{blob:Blob;warning?:string;diagnostic?:string}> {
  const result=await readPhotoExif(source,width,height);
- if(!result.exif)return {blob:rendered,warning:result.warning};
+ if(!result.exif)return {blob:rendered,warning:result.warning,diagnostic:result.diagnostic};
  try{
   const header=new Uint8Array(await rendered.slice(0,33).arrayBuffer());
   if(rendered.type==='image/jpeg'&&header[0]===255&&header[1]===216){
    const length=result.exif.length+2;
-   return {blob:new Blob([header.slice(0,2),new Uint8Array([255,225,length>>>8,length&255]),result.exif,rendered.slice(2)],{type:rendered.type}),warning:result.warning};
+   return {blob:new Blob([header.slice(0,2),new Uint8Array([255,225,length>>>8,length&255]),result.exif,rendered.slice(2)],{type:rendered.type}),warning:result.warning,diagnostic:result.diagnostic};
   }
   if(rendered.type==='image/png'&&header[0]===137&&binary(header.slice(1,4))==='PNG'&&binary(header.slice(12,16))==='IHDR'){
    // PNG eXIf contains the TIFF payload without JPEG's six-byte Exif prefix.
    const tiff=result.exif.slice(6),chunk=new Uint8Array(tiff.length+12),view=new DataView(chunk.buffer);
    view.setUint32(0,tiff.length);chunk.set(bytes('eXIf'),4);chunk.set(tiff,8);view.setUint32(chunk.length-4,crc32(chunk.subarray(4,chunk.length-4)));
-   return {blob:new Blob([rendered.slice(0,33),chunk,rendered.slice(33)],{type:rendered.type}),warning:result.warning};
+   return {blob:new Blob([rendered.slice(0,33),chunk,rendered.slice(33)],{type:rendered.type}),warning:result.warning,diagnostic:result.diagnostic};
   }
  }catch{/* Metadata must never prevent saving the rendered image. */}
- return {blob:rendered,warning};
+ return {blob:rendered,warning,diagnostic:'CW/meta/insert'};
 }

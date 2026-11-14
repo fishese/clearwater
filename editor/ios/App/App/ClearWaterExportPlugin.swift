@@ -1,8 +1,9 @@
 import UIKit
 import Capacitor
+import UniformTypeIdentifiers
 
 @objc(ClearWaterExportPlugin)
-public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
+public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDelegate {
     public let identifier = "ClearWaterExportPlugin"
     public let jsName = "ClearWaterExport"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -10,7 +11,10 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "writeExportChunk", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "finishExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "shareExport", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "discardExport", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "discardExport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "chooseBatchFolder", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveBatchExport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "releaseBatchFolder", returnType: CAPPluginReturnPromise)
     ]
 
     private static let maximumBytes = 512 * 1024 * 1024
@@ -29,6 +33,8 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
     private var writes: [String: WriteSession] = [:]
     private var readyExports: [String: URL] = [:]
     private var activeShareID: String?
+    private var batchFolder: (id: String, url: URL)?
+    private var pendingFolderCall: CAPPluginCall?
 
     private var exportDirectory: URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("ClearWaterExports", isDirectory: true)
@@ -215,6 +221,103 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    /// Folder access is scoped to the current batch and never exposes a path to JS.
+    @objc func chooseBatchFolder(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard self.pendingFolderCall == nil, let presenter = self.bridge?.viewController else {
+                call.reject("Could not open the output folder.")
+                return
+            }
+            let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
+            picker.allowsMultipleSelection = false
+            picker.delegate = self
+            self.pendingFolderCall = call
+            self.topViewController(from: presenter).present(picker, animated: true)
+        }
+    }
+
+    public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let call = pendingFolderCall else { return }
+        pendingFolderCall = nil
+        guard let url = urls.first, url.startAccessingSecurityScopedResource() else {
+            call.reject("Could not access the output folder.")
+            return
+        }
+        stateLock.lock()
+        let previous = batchFolder
+        let id = UUID().uuidString.lowercased()
+        batchFolder = (id, url)
+        stateLock.unlock()
+        previous?.url.stopAccessingSecurityScopedResource()
+        call.resolve(["id": id, "name": url.lastPathComponent])
+    }
+
+    public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        guard let call = pendingFolderCall else { return }
+        pendingFolderCall = nil
+        call.reject("Folder selection cancelled.", "CANCELLED")
+    }
+
+    /// Copy a staged photo under a unique name. FileManager.copyItem never
+    /// replaces an existing destination, including when another app races us.
+    @objc func saveBatchExport(_ call: CAPPluginCall) {
+        guard let folderID = call.getString("folderId"), let exportID = call.getString("id"),
+              let name = call.getString("name"), Self.validBatchName(name) else {
+            call.reject("This file name cannot be saved.")
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+        stateLock.lock()
+        guard let folder = batchFolder, folder.id == folderID, let source = readyExports[exportID] else {
+            stateLock.unlock(); call.reject("The output folder or photo is no longer available."); return
+        }
+        var coordinationError: NSError?
+        var result: Result<String, Error> = .failure(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError))
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(writingItemAt: folder.url, options: .forMerging, error: &coordinationError) { directory in
+            result = Result { try Self.copyBatchFile(source: source, directory: directory, name: name) }
+        }
+        stateLock.unlock()
+        if let coordinationError { call.reject("Could not save to the selected folder.", "EXPORT_IO", coordinationError); return }
+        switch result {
+        case .success(let name): call.resolve(["name": name])
+        case .failure(let error): call.reject("Could not save to the selected folder.", "EXPORT_IO", error)
+        }
+        }
+    }
+
+    static func validBatchName(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && name.utf8.count <= 220 &&
+        name == URL(fileURLWithPath: name).lastPathComponent &&
+        !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) || $0 == "\\" })
+    }
+
+    static func copyBatchFile(source: URL, directory: URL, name: String) throws -> String {
+        guard validBatchName(name) else { throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteInvalidFileNameError) }
+        let ext = (name as NSString).pathExtension, stem = (name as NSString).deletingPathExtension
+        for index in 0..<10000 {
+            let suffix = index == 0 ? "" : " (\(index))"
+            let candidate = ext.isEmpty ? "\(stem)\(suffix)" : "\(stem)\(suffix).\(ext)"
+            do { try FileManager.default.copyItem(at: source, to: directory.appendingPathComponent(candidate)); return candidate }
+            catch {
+                let nsError = error as NSError
+                if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileWriteFileExistsError { continue }
+                throw error
+            }
+        }
+        throw NSError(domain: NSCocoaErrorDomain, code: NSFileWriteFileExistsError)
+    }
+
+    @objc func releaseBatchFolder(_ call: CAPPluginCall) {
+        let id = call.getString("id")
+        stateLock.lock()
+        let folder = batchFolder?.id == id ? batchFolder : nil
+        if folder != nil { batchFolder = nil }
+        stateLock.unlock()
+        folder?.url.stopAccessingSecurityScopedResource()
+        call.resolve()
+    }
+
     private func topViewController(from controller: UIViewController) -> UIViewController {
         if let presented = controller.presentedViewController { return topViewController(from: presented) }
         return controller
@@ -247,6 +350,7 @@ public class ClearWaterExportPlugin: CAPPlugin, CAPBridgedPlugin {
         "image/x-adobe-dng": "dng",
         "video/mp4": "mp4",
         "video/quicktime": "mov",
-        "application/json": "json"
+        "application/json": "json",
+        "application/zip": "zip"
     ]
 }
