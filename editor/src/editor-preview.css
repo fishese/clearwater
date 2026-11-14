@@ -29,9 +29,9 @@
 .editor-preview .export-options>.export-actions{flex:1 0 100%}
 .editor-preview .preset-actions{display:flex;gap:9px;flex-wrap:wrap}
 .editor-preview .save-destination{margin-top:12px}
-.batch-dialog{width:min(540px,94vw);max-height:90dvh;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:18px;text-align:left}
+.batch-dialog{position:relative;width:min(540px,94vw);max-height:90dvh;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:18px;text-align:left}
 .batch-dialog h2{font-family:inherit;font-size:20px}.batch-dialog p,.batch-dialog small{font-size:12px;line-height:1.45;color:#abc0ba}
-.batch-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.batch-heading h2{min-width:0;margin:0}.batch-heading .batch-close{flex:none;width:44px;min-height:44px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:26px;line-height:1;cursor:pointer}.batch-heading .batch-close:hover{background:#ffffff12}.batch-heading .batch-close:focus-visible{outline:2px solid var(--jade);outline-offset:-2px}
+.batch-heading{align-self:stretch;padding-right:44px}.batch-heading h2{min-width:0;margin:0}.batch-heading .batch-close{position:absolute;top:4px;right:4px;width:44px;min-height:44px;border:0;border-radius:6px;background:transparent;color:inherit;font-size:26px;line-height:1;cursor:pointer}.batch-heading .batch-close:hover{background:#ffffff12}.batch-heading .batch-close:focus-visible{outline:2px solid var(--jade);outline-offset:-2px}
 .batch-dialog>fieldset,.batch-dialog details{display:grid;gap:10px;border:0;padding:0;margin:0;min-width:0}
 .batch-dialog>fieldset>label,.batch-dialog details>label{display:grid;gap:5px;font-size:12px}.batch-dialog select,.batch-dialog input[type=number]{width:100%;min-height:44px;background:#17262a;color:inherit;border:1px solid #34494d;border-radius:5px;padding:0 8px}
 .batch-dialog .batch-check,.batch-output label{display:flex;gap:8px;align-items:center;min-height:36px}.batch-dialog input[type=checkbox],.batch-dialog input[type=radio]{width:20px;height:20px;accent-color:var(--jade)}

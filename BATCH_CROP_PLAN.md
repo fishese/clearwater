@@ -59,3 +59,9 @@ A synthetic desktop Chromium batch processed two 4000×3000 JPEGs using Balanced
 
 - [x] Built signed Android test APK from source `1df352f`, verified signing certificate continuity, ZIP integrity and 50 packaged web asset hashes. Local ignored `editor/android/build/batch-layout-test/ClearWater-batch-layout-test.apk`, SHA-256 `3020a6939ee141c954e25c5a7ec6af90a4dd52a489fade7ccb66341592281c87`; not installed per user request.
 - [x] Hosted workflow 42493459824 built unsigned iOS IPA from `1df352f`; downloaded checksum matches `8a23b2f2dbbc9fbeee9b991ada32a5b2f47e5d34a17e77e5768824646cf5a8c6` at `editor/ios/App/output/batch-layout-test/ClearWater-unsigned.ipa`. Hosted WebKit regression, including the shared batch layout, passed; iOS simulator tests were still running when recorded. No Pages deployment.
+
+## Follow-up 14 November 2026
+
+- [x] User reported Android and iPhone generally work; iPhone showed the older batch screen with a bottom Close button. The older `cc6816c` IPA included the collection; the later `1df352f` IPA starts empty. Added mocked iOS-shell regression covering an existing editor photo, empty batch and reopening.
+- [x] Moved the batch close button into the top-right corner on shared web/iOS/Android CSS, retaining a 44px touch target and labelled control. Nine English/Traditional Chinese/Japanese layout cases and 283 shared unit tests pass; native iOS-shell behavior is mocked in local Chromium.
+- [ ] Build fresh signed Android and unsigned iOS test packages, run hosted WebKit/iOS regressions and record results. Do not deploy the website or touch unrelated working-tree changes.
