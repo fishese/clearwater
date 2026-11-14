@@ -1,5 +1,12 @@
 # Batch photos and crop — work in progress
 
+## Release completed, 14 November 2026
+
+- [x] User authorized release after the simulator passed. 1.0.15 was published from merged PR #18 (`7c2db25`); Pages run 43567423745 deployed the same tree. Both versioned packages, canonical aliases and all 12 public assets were downloaded and verified against their staged hashes. The APK is signed with the existing certificate; the IPA is unsigned.
+- [x] Versioned candidate run 43566730568 passed iOS build, 36 simulator tests and hosted WebKit checks. 283 shared tests and 11 Android tests pass. User reported Android and iPhone test builds work. Some WebKit smoke gestures were skipped and browser sharing was mocked; physical provider and accessibility coverage remains limited.
+- [ ] Investigate any further GPS/EXIF or share-provider issues reported during use. Older checklist entries below are historical and may describe superseded test states.
+
+
 Updated 8 November 2026. Source: user request and the existing editor implementation.
 
 The user additionally requested a bug, race-condition and layout review, then a signed Android test APK and an attempted unsigned iOS test IPA if GitHub permits. Do not deploy or change the public website before the user has tested the apps.

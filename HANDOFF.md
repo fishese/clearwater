@@ -1,5 +1,13 @@
 # Handoff
 
+## 1.0.15 released (14 November 2026)
+
+- [x] User accepted the Android and updated iPhone test builds and authorized release with the website after the iOS simulator passed. PR #18 merged as `7c2db253c6c1aca90442c51e92cb43f592dca1cc`; its tree matches the versioned release candidate `99a262d4c2599d14e902874bf414cec7e135e2f9`. Tag [v1.0.15](https://github.com/fishese/clearwater/releases/tag/v1.0.15) points to the merge and is latest. [Pages run 43567423745](https://github.com/fishese/clearwater/actions/runs/43567423745) deployed it to https://clearwater.fishese.cc/.
+- [x] Signed Android 1.0.15/code 34 and unsigned iOS 1.0.15/build 13 passed package integrity, certificate continuity and bundled asset/model checks. All 12 published assets match staged hashes; no debug or unsigned Android APK was published. IPA requires signing. APK SHA-256 `74f986907005611a8717fd49d0586e3de5481804a062a9319e491ef962a9c9e6`; IPA `41e487dcdf6a75e0ef6a5a59e4d0fbca620606ca0b48e56b4adb525c4db0045a`.
+- [x] 283 shared tests, 11 Android tests and 36 iOS simulator tests passed; hosted WebKit passed including iPhone-style save/share and batch layout checks. Three WebKit mobile-scroll smoke cases were skipped; share APIs were mocked. Synthetic live-site batch and mocked iPhone share checks passed. User reported Android and iPhone test builds work; this is not evidence for every device, provider or accessibility path.
+- [ ] Follow up on provider-specific GPS/EXIF availability and physical iPhone browser sharing or accessibility as needed. Preserve user media, edits, unrelated workspace changes, stashes and signing configuration. Earlier checkpoints below are historical.
+
+
 ## Batch photos and crop test branch (8 November 2026)
 
 - [x] Built Android test APK and unsigned IPA from `1df352f`; checksums and paths are recorded in `BATCH_CROP_PLAN.md`. WebKit passed in run 42493459824; iOS simulator tests were still running when recorded. Neither app installed nor website deployed.
