@@ -6,7 +6,7 @@ The user subsequently authorized the three defect fixes and explicitly deferred 
 
 - [x] Batch worker failure: terminal error state prevents posting further photos, stops the batch visibly and retains completed ZIP/folder output. Ten focused unit tests, TypeScript and Chrome failure-injection UI checks pass, including fresh retry, cancellation, custom-model preparation and partial output. The original real-worker reproduction now rejects the second request immediately. No timeout/watchdog policy added.
 - [ ] Android linked camera-video gallery saving: implementation/validation in progress.
-- [ ] Unicode PNG metadata preservation: implementation/validation in progress.
+- [x] Unicode PNG metadata preservation: bounded chunk/TIFF reads preserve raw comment bytes, including metadata after large IDAT chunks; invalid metadata still warns without blocking image saving. Twelve metadata tests cover JPEG/PNG roundtrips, byte order, no-comment photos and malformed CRC/offset/truncation. Original reproduction now preserves the comment without warning. Full suite: 294 tests pass; production build passes.
 - [ ] Final combined production build and shared regression checks; no release or deployment authorized.
 
 Review only; no application changes implemented. Reviewed local `5f0d6a1`, whose application tree matches released `7c2db253` / v1.0.15 (only two documentation files differ). Preserved the existing modified October review, IDE files and all three stashes. Root AGENTS.md is absent; user-supplied restrictions apply. Read current handoff, maintenance/implementation checkpoints and vault overview; historical passes were not treated as proof. Three bounded independent reviews used gpt-6.1-sol at the user's request.

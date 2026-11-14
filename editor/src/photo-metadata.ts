@@ -74,23 +74,82 @@ async function rawJpegUserComment(source:Blob|Uint8Array):Promise<string|undefin
  }catch{return;}
 }
 
+function rawTiffUserComment(tiff:Uint8Array):string|false|undefined {
+ try{
+  const view=new DataView(tiff.buffer,tiff.byteOffset,tiff.length),order=binary(tiff.subarray(0,2));
+  if(order!=='II'&&order!=='MM')return false;
+  const little=order==='II';
+  const u16=(at:number)=>view.getUint16(at,little),u32=(at:number)=>view.getUint32(at,little);
+  if(u16(2)!==42)return false;
+  const find=(at:number,tag:number):number|undefined=>{
+   if(at<8||at>tiff.length-2)throw new Error('Invalid IFD');
+   const count=u16(at);
+   if(count>Math.floor((tiff.length-at-2)/12))throw new Error('Truncated IFD');
+   for(let i=0;i<count;i++){const entry=at+2+i*12;if(u16(entry)===tag)return entry;}
+  };
+  const pointer=find(u32(4),34665);
+  if(pointer===undefined)return;
+  if(u16(pointer+2)!==4||u32(pointer+4)!==1)return false;
+  const comment=find(u32(pointer+8),37510);
+  if(comment===undefined)return;
+  const type=u16(comment+2),count=u32(comment+4),start=count<=4?comment+8:u32(comment+8);
+  // piexifjs writes this tag as ASCII (including a terminator); cameras
+  // normally use Undefined. Preserve both representations without decoding.
+  if(![2,7].includes(type)||count>8192+(type===2?1:0)||(count>4&&start<8)||start>tiff.length-count)return false;
+  const end=start+count;
+  return binary(tiff.subarray(start,type===2&&count>0&&tiff[end-1]===0?end-1:end));
+ }catch{return false;}
+}
+
+async function rawPngExif(source:Blob|Uint8Array):Promise<{tiff?:Uint8Array;comment?:string|false}|undefined> {
+ const length=source instanceof Blob?source.size:source.length;
+ const read=async(start:number,size:number)=>source instanceof Blob
+  ?new Uint8Array(await source.slice(start,start+size).arrayBuffer()):source.subarray(start,start+size);
+ const signature=await read(0,8);
+ if(binary(signature)!=='\x89PNG\r\n\x1a\n')return;
+ try{
+  // Seek over image data rather than reading it. Bound chunk traversal and
+  // the EXIF payload independently, including when eXIf follows a large IDAT.
+  let offset=8;
+  for(let chunks=0;chunks<4096&&offset+12<=length;chunks++){
+   const header=await read(offset,8),size=new DataView(header.buffer,header.byteOffset,8).getUint32(0);
+   if(size>length-offset-12)return {comment:false};
+   const type=binary(header.subarray(4));
+   if(type==='IEND')return {};
+   if(type==='eXIf'){
+    if(size<8||size>65527)return {comment:false};
+    const chunk=await read(offset+4,size+8),tiff=chunk.subarray(4,size+4);
+    if(crc32(chunk.subarray(0,size+4))!==new DataView(chunk.buffer,chunk.byteOffset+size+4,4).getUint32(0))return {comment:false};
+    return {tiff,comment:rawTiffUserComment(tiff)};
+   }
+   offset+=size+12;
+  }
+  return {comment:false};
+ }catch{return {comment:false};}
+}
+
 export async function readPhotoExif(source:Blob|Uint8Array,width:number,height:number):Promise<{exif?:Uint8Array;warning?:string;diagnostic?:string}> {
  let phase='parse';
  try{
   const options={translateKeys:false,translateValues:false,reviveValues:false,mergeOutput:false,sanitize:false,
    ifd0:{pick:[...ifd0Tags]},exif:{pick:Object.keys(piexif.TAGS.Exif).map(Number).filter(tag=>!excludedExif.has(tag))},gps:{pick:Object.keys(piexif.TAGS.GPS).map(Number)},
    ifd1:false,interop:false,makerNote:false,userComment:true,xmp:false,icc:false,iptc:false,jfif:false,ihdr:false,silentErrors:false};
-  const parsed=await parse(source,options);
+  const pngExif=await rawPngExif(source);
+  if(pngExif&&!pngExif.tiff)return pngExif.comment===false?{warning,diagnostic:'CW/meta/parse'}:{};
+  // Parse only the bounded TIFF for PNG: exifr's Blob scan can stop before
+  // metadata following a large image chunk. JPEG and HEIF parsing is unchanged.
+  const parsed=await parse(pngExif?.tiff??source,options);
   if(!parsed)return {};
-  const userComment=await rawJpegUserComment(source);
+  const userComment=pngExif?pngExif.comment:await rawJpegUserComment(source);
   const output:Record<string,Directory>={'0th':{},Exif:{},GPS:{}};
-  let copied=0,skipped=false,diagnostic:string|undefined;phase='tags';
+  let copied=0,skipped=userComment===false,diagnostic:string|undefined=userComment===false?'CW/meta/tag/Exif/37510/bytes':undefined;phase='tags';
   // A redacted or malformed coordinate must not leave a misleading partial
   // latitude/longitude pair. Non-location EXIF and other valid tags survive.
   const invalidCoordinate=[2,4].find(tag=>{const value=parsed.gps?.[tag];if(value===undefined||value===null)return false;try{valueFor(value,'Rational');return false;}catch{return true;}});
   if(invalidCoordinate!==undefined){skipped=true;diagnostic=`CW/meta/tag/GPS/${invalidCoordinate}`;}
   for(const [block,target] of [['ifd0','0th'],['exif','Exif'],['gps','GPS']]){
    for(const [key,parsedValue] of Object.entries(parsed[block]??{})){
+    if(block==='exif'&&Number(key)===37510&&userComment===false)continue;
     const value=block==='exif'&&Number(key)===37510&&userComment!==undefined?userComment:parsedValue;
     // exifr represents zero-length text tags as undefined; there is no
     // metadata value to preserve or warn about in that case.
