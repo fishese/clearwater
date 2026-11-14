@@ -180,7 +180,7 @@ export default function App() {
   const [jpegQuality,setJpegQuality]=useState<.95|.99>(.95);
   const [outputFolder,setOutputFolder]=useState<LocalDirectoryHandle|null>(null),[saving,setSaving]=useState(false);
   const [saveDialog,setSaveDialog]=useState(false),[saveName,setSaveName]=useState('');
-  const exportTarget=useRef<{name:string;folder?:LocalDirectoryHandle;cameraId?:string;cameraUri?:string;share?:boolean}|null>(null),librarySwitchLock=useRef(false);
+  const exportTarget=useRef<{name:string;kind:'photo'|'video';folder?:LocalDirectoryHandle;cameraId?:string;cameraUri?:string;share?:boolean}|null>(null),librarySwitchLock=useRef(false);
   const [shareReady,setShareReady]=useState<{blob:Blob;name:string}|null>(null);
   const [iosWebSave,setIosWebSave]=useState<{blob:Blob;name:string}|null>(null);
   const iosWebShareLock=useRef(false);
@@ -384,7 +384,8 @@ export default function App() {
       }
       if(target.cameraUri&&target.cameraId){
         const current=photoRef.current.find(p=>p.id===target.cameraId);if(!current?.cameraCapture)throw new Error('Camera photo is unavailable.');
-        const renderedSha256=video?undefined:await cameraFileHash(blob),thumbnail=video?current.thumbnail:await cameraThumbnail(blob);
+        // Worker callbacks outlive media selection; use the kind captured for this export.
+        const renderedSha256=target.kind==='video'?undefined:await cameraFileHash(blob),thumbnail=target.kind==='video'?current.thumbnail:await cameraThumbnail(blob);
         await replaceAndroidCameraCapture(target.cameraUri,blob);
         const updated={...current,thumbnail,cameraCapture:{...current.cameraCapture,renderedSha256}};
         await savePhoto(updated);setPhotos(all=>all.map(p=>p.id===updated.id?updated:p));notify(t('Gallery photo updated.'));
@@ -801,7 +802,7 @@ export default function App() {
     setExporting(true);setProgress(0);
     try {
       if(saveGallery&&isAndroid()&&photo.cameraCapture?.uri){
-        exportTarget.current={name:photo.cameraCapture.name??photo.file.name,cameraId:photo.id,cameraUri:photo.cameraCapture.uri};
+        exportTarget.current={name:photo.cameraCapture.name??photo.file.name,kind:video?'video':'photo',cameraId:photo.id,cameraUri:photo.cameraCapture.uri};
         exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:video?'mp4':'jpg',keepAudio,keepMetadata,exportMode,jpegQuality,platform:currentMediaPlatform()});return;
       }
       let folder=downloadOnly||shareOnly?undefined:outputFolder??undefined;
@@ -811,7 +812,7 @@ export default function App() {
         folder=chosen;setOutputFolder(chosen);
       }
       const name=saveAs&&saveDialog?restoredName(saveName,exportFormat,false):restoredName(photo.file.name,exportFormat,!folder);
-      setSaveDialog(false);exportTarget.current={name,folder,share:shareOnly};
+      setSaveDialog(false);exportTarget.current={name,kind:video?'video':'photo',folder,share:shareOnly};
       exportRequest.current=++request.current;worker.current?.postMessage({type:'export',gen:generation.current,request:exportRequest.current,recipe,format:exportFormat,keepAudio,keepMetadata,exportMode,jpegQuality,platform:currentMediaPlatform()});
     }catch(error){if(exportGeneration!==generation.current)return;setExporting(false);if(!(error instanceof DOMException&&error.name==='AbortError'))notify(error instanceof Error?error.message:t("Could not open the save folder."));}
   }

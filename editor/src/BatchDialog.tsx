@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type ChangeEvent} from 'react';
-import {BatchPhotoProcessor,type BatchPhotoOptions} from './batch-photo';
+import {BatchPhotoProcessor,BatchPhotoWorkerError,type BatchPhotoOptions} from './batch-photo';
 import {BatchZip,uniqueBatchName} from './batch-zip';
 import {chooseFolder,createUniqueFile,restoredName,supportsFolder,writeFile,type LocalDirectoryHandle} from './file-save';
 import {isIOSWebBrowser,shareWebBatchArchive} from './export-share';
@@ -87,7 +87,7 @@ export default function BatchDialog({platform,initialEngine,custom,resolution,de
     }catch(error){
      if(abort.signal.aborted||(error instanceof DOMException&&error.name==='AbortError'))break;
      resultFailures.push({name:item.name,message:error instanceof Error?error.message:'The photo could not be processed.'});
-     if(folder||nativeFolder||error instanceof Error&&error.message==='The ZIP exceeds the batch size limit.')break;
+     if(error instanceof BatchPhotoWorkerError||folder||nativeFolder||error instanceof Error&&error.message==='The ZIP exceeds the batch size limit.')break;
     }
    }
    if(archiveBuilder&&completed&&!abort.signal.aborted)setArchive(archiveBuilder.finish());

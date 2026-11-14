@@ -15,6 +15,7 @@ class Reader {
 }
 Object.assign(globalThis,{FileReader:Reader});
 function png(){const data=new Uint8Array(33);data.set([137,80,78,71,13,10,26,10]);const v=new DataView(data.buffer);v.setUint32(8,13);data.set(bytes('IHDR'),12);v.setUint32(16,32);v.setUint32(20,64);data.set([8,2,0,0,0],24);v.setUint32(29,crc32(data.subarray(12,29)));return data;}
+function pngChunk(type:string,payload:Uint8Array){const chunk=new Uint8Array(payload.length+12),v=new DataView(chunk.buffer);v.setUint32(0,payload.length);chunk.set(bytes(type),4);chunk.set(payload,8);v.setUint32(chunk.length-4,crc32(chunk.subarray(4,chunk.length-4)));return chunk;}
 describe('photo EXIF preservation',()=>{
  it('does not warn for empty EXIF text fields while preserving other metadata',async()=>{
   const input=jpeg(piexif.dump({'0th':{270:'',271:'Test Camera',315:'',33432:''},Exif:{36867:'2026:10:01 12:34:56'}}));
@@ -47,6 +48,70 @@ describe('photo EXIF preservation',()=>{
   const result=await readPhotoExif(fixture(comment),32,64);
   expect(result.warning).toBeUndefined();expect(result.exif).toBeDefined();
   expect(piexif.load(binary(result.exif!)).Exif[37510]).toBe(comment);
+ });
+ it('preserves Unicode UserComment bytes through JPEG to PNG to JPEG and PNG to PNG',async()=>{
+  const comment=String.fromCharCode(85,78,73,67,79,68,69,0,0x6f,0x5b,0xd8,0x3d,0xde,0x37);
+  const first=await preservePhotoMetadata(new Blob([fixture(comment)]),new Blob([png()],{type:'image/png'}),32,64);
+  expect(first.warning).toBeUndefined();
+  for(const type of ['image/jpeg','image/png']){
+   const result=await preservePhotoMetadata(first.blob,new Blob([type==='image/jpeg'?jpeg():png()],{type}),48,24);
+   expect(result.warning).toBeUndefined();
+   const exif=await readPhotoExif(new Uint8Array(await result.blob.arrayBuffer()),48,24);
+   expect(exif.warning).toBeUndefined();const output=piexif.load(binary(exif.exif!));
+   expect(output.Exif[37510]).toBe(comment);expect(output['0th'][271]).toBe('Test Camera');
+   expect(output['0th'][274]).toBe(1);expect(output.Exif[40962]).toBe(48);expect(output.Exif[40963]).toBe(24);
+   expect(output.GPS[1]).toBe('S');expect(output.GPS[3]).toBe('W');
+  }
+ });
+ it('finds PNG comments after large image chunks',async()=>{
+  const comment='UNICODE\0\x6f\x5b\xd8\x3d\xde\x37',tiff=bytes(piexif.dump({'0th':{271:'PNG camera'},Exif:{37510:comment}})).slice(6);
+  const idat=pngChunk('IDAT',new Uint8Array(200000));
+  class TrackedBlob extends Blob {
+   reads:Array<[number,number]>=[];
+   override slice(start=0,end=this.size,type?:string){this.reads.push([start,end]);return super.slice(start,end,type);}
+  }
+  const source=new TrackedBlob([png(),idat,pngChunk('eXIf',tiff),pngChunk('IEND',new Uint8Array())]);
+  for(const input of [source,new Uint8Array(await source.arrayBuffer())]){
+   const result=await readPhotoExif(input,32,64);
+   expect(result.warning).toBeUndefined();expect(piexif.load(binary(result.exif!)).Exif[37510]).toBe(comment);
+  }
+  expect(source.reads.length).toBeGreaterThan(0);
+  // IDAT payload starts at 41 and ends at 200041; only its header is read.
+  for(const [start,end] of source.reads)expect(end<=41||start>=200041).toBe(true);
+ });
+ it('preserves a standard Undefined UserComment from little-endian PNG TIFF',async()=>{
+  const comment=bytes('UNICODE\0\x5b\x6f\x3d\xd8\x37\xde'),tiff=new Uint8Array(44+comment.length),v=new DataView(tiff.buffer);
+  tiff.set(bytes('II'));v.setUint16(2,42,true);v.setUint32(4,8,true);
+  v.setUint16(8,1,true);v.setUint16(10,34665,true);v.setUint16(12,4,true);v.setUint32(14,1,true);v.setUint32(18,26,true);
+  v.setUint16(26,1,true);v.setUint16(28,37510,true);v.setUint16(30,7,true);v.setUint32(32,comment.length,true);v.setUint32(36,44,true);tiff.set(comment,44);
+  const result=await readPhotoExif(new Uint8Array(await new Blob([png(),pngChunk('eXIf',tiff)]).arrayBuffer()),32,64);
+  expect(result.warning).toBeUndefined();expect(piexif.load(binary(result.exif!)).Exif[37510]).toBe(binary(comment));
+ });
+ it('does not warn or invent comments in valid PNGs with no UserComment',async()=>{
+  for(const metadata of [new Uint8Array(),pngChunk('eXIf',bytes(piexif.dump({'0th':{271:'PNG camera'}})).slice(6))]){
+   const result=await readPhotoExif(new Uint8Array(await new Blob([png(),metadata,pngChunk('IEND',new Uint8Array())]).arrayBuffer()),32,64);
+   expect(result.warning).toBeUndefined();if(result.exif)expect(piexif.load(binary(result.exif)).Exif[37510]).toBeUndefined();
+  }
+ });
+ it('warns and fails open for truncated or malformed PNG EXIF',async()=>{
+  const tiff=bytes(piexif.dump({'0th':{271:'PNG camera'},Exif:{37510:'UNICODE\0\x6f\x5b'}})).slice(6);
+  const badCrc=pngChunk('eXIf',tiff);badCrc[badCrc.length-1]^=1;
+  const badOffset=tiff.slice(),view=new DataView(badOffset.buffer);
+  // The fixture is big-endian TIFF; make the Exif IFD pointer out of bounds.
+  const ifd=view.getUint32(4),count=view.getUint16(ifd);
+  for(let i=0;i<count;i++){const entry=ifd+2+12*i;if(view.getUint16(entry)===34665)view.setUint32(entry+8,0xffffffff);}
+  const badComment=tiff.slice(),commentView=new DataView(badComment.buffer);
+  for(let i=0;i<count;i++){
+   const entry=ifd+2+12*i;
+   if(commentView.getUint16(entry)===34665){const exif=commentView.getUint32(entry+8);commentView.setUint32(exif+2+8,2);}
+  }
+  const valid=pngChunk('eXIf',tiff);
+  for(const chunk of [badCrc,pngChunk('eXIf',badOffset),pngChunk('eXIf',badComment),valid.slice(0,-5)]){
+   const rendered=new Blob([jpeg()],{type:'image/jpeg'});
+   const result=await preservePhotoMetadata(new Blob([png(),chunk]),rendered,32,64);
+   expect(result.warning).toContain('could not be preserved');
+   if(result.blob!==rendered){const output=await readPhotoExif(new Uint8Array(await result.blob.arrayBuffer()),32,64);expect(piexif.load(binary(output.exif!)).Exif[37510]).toBeUndefined();}
+  }
  });
  it('extracts EXIF from an HEIF item container and writes it to a JPEG export',async()=>{
   const join=(...parts:Uint8Array[])=>new Uint8Array(Buffer.concat(parts));

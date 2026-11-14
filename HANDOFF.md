@@ -1,5 +1,27 @@
 # Handoff
 
+## Authorized 1.0.16 release (14 November 2026)
+
+- [x] User authorized merge and release of the three review fixes, including the website update. Desktop implementation remains deferred; provide a separate-session prompt after release.
+- [ ] Prepare 1.0.16 / Android code 35 / iOS build 14, preserving signing and the signed-APK/unsigned-IPA asset policy. Run hosted WebKit/native iOS and build packages from matching source; then merge, verify deployment and publish checked assets.
+- [ ] Record final provenance/checksums and release outcome. Preserve unrelated October review edits, IDE files, stashes and user media.
+
+## Review fixes implemented (14 November 2026)
+
+- [x] User authorized the three reviewed defect fixes; desktop work remains deferred. Smaller capable coding agents implemented bounded tasks, followed by source review and combined checks.
+- [x] Terminal batch-worker failure stops processing visibly and retains completed ZIP/folder output; retry uses a fresh worker. Recoverable file errors still continue.
+- [x] Gallery exports snapshot photo/video kind, fixing stale Android video classification while preserving photo hashes/thumbnails and original media.
+- [x] PNG exports/reimports retain Unicode EXIF comments with bounded TIFF/chunk reads; malformed metadata still warns without blocking saving.
+- [x] 294 shared tests and production build pass. Production Chromium regressions cover worker failure/partial ZIP/retry, folder collision/cancellation, nine translated layouts, gallery cold-load/switch/failure/retry, and mocked iPhone export/save/share. Gallery negative control reproduces the old failure. No new physical-device, WebKit or native simulator result claimed.
+- [ ] Next: user testing or requested delivery; no push, merge, release, version bump or website change performed. See `FRESH_REVIEW_2026-11-14.md` for evidence. Desktop plan and unrelated October review/IDE work/stashes preserved.
+
+## Fresh review and desktop plan (14 November 2026)
+
+- [x] Review-only audit of released application code: `FRESH_REVIEW_2026-11-14.md`. Two P2 findings (fatal batch worker continuation; stale Android video gallery-save classification) and a P3 Unicode PNG metadata roundtrip defect. Synthetic repros distinguish tested failures from source-only/device follow-up.
+- [x] Fresh 283 shared tests and production build pass; Chromium batch layout/workflow, crop parity, JPG switching and mocked iPhone export checks pass. No new physical-device, WebKit/simulator or peak-memory result claimed.
+- [x] `DESKTOP_LARGE_FILES_PLAN.md` proposes shared-code desktop I/O with video disk export first and a separate photo decode/encode go/no-go gate. No desktop or bug-fix implementation performed.
+- [ ] Next: user reviews findings and plan; obtain implementation scope before fixes/prototype. No merge, release or website change authorized by this review request. Preserve unrelated October review edits, IDE files and all three stashes.
+
 ## 1.0.15 released (14 November 2026)
 
 - [x] User accepted the Android and updated iPhone test builds and authorized release with the website after the iOS simulator passed. PR #18 merged as `7c2db253c6c1aca90442c51e92cb43f592dca1cc`; its tree matches the versioned release candidate `99a262d4c2599d14e902874bf414cec7e135e2f9`. Tag [v1.0.15](https://github.com/fishese/clearwater/releases/tag/v1.0.15) points to the merge and is latest. [Pages run 43567423745](https://github.com/fishese/clearwater/actions/runs/43567423745) deployed it to https://clearwater.fishese.cc/.

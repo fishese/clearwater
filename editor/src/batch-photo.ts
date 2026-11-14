@@ -16,19 +16,36 @@ export interface BatchPhotoOptions {
 type WorkerResponse={type:string;gen:number;request?:number;operation?:string;message?:string;diagnostic?:string;analysis?:Analysis;enhancement?:PhotoEnhancement;blob?:Blob;metadataWarning?:string;original?:ImageBitmap;progress?:number};
 type WorkerLike=Pick<Worker,'postMessage'|'terminate'|'addEventListener'|'removeEventListener'>;
 
+/** The worker cannot accept any more photos; retry requires a fresh processor. */
+export class BatchPhotoWorkerError extends Error {
+  constructor(){super('The photo processing worker stopped.');this.name='BatchPhotoWorkerError';}
+}
+
 export class BatchPhotoProcessor {
   private generation=0;
   private request=0;
   private closed=false;
   private busy=false;
+  private failure:BatchPhotoWorkerError|null=null;
   private pendingCancel:(()=>void)|null=null;
-  constructor(private worker:WorkerLike) {}
+  private pendingFailure:(()=>void)|null=null;
+  private failed=()=>{
+    if(this.closed||this.failure)return;
+    this.failure=new BatchPhotoWorkerError();
+    this.worker.terminate();
+    this.pendingFailure?.();
+  };
+  constructor(private worker:WorkerLike) {
+    // Listen between requests too: initialization or an idle worker can fail.
+    worker.addEventListener('error',this.failed);worker.addEventListener('messageerror',this.failed);
+  }
   private waitFor(message:Record<string,unknown>,expected:string,progress?:(n:number)=>void):Promise<WorkerResponse> {
     if(this.closed)return Promise.reject(new DOMException('Batch cancelled.','AbortError'));
+    if(this.failure)return Promise.reject(this.failure);
     return new Promise((resolve,reject)=>{
-      const cleanup=()=>{this.worker.removeEventListener('message',receive);this.worker.removeEventListener('error',failed);this.worker.removeEventListener('messageerror',failed);this.pendingCancel=null;};
+      const cleanup=()=>{this.worker.removeEventListener('message',receive);this.pendingCancel=null;this.pendingFailure=null;};
       const cancel=()=>{cleanup();reject(new DOMException('Batch cancelled.','AbortError'));};
-      const failed=()=>{cleanup();reject(new Error('The photo processing worker stopped.'));};
+      const failed=()=>{cleanup();reject(this.failure!);};
       const receive=(event:Event)=>{
         const data=(event as MessageEvent<WorkerResponse>).data;
         if(!data||data.gen!==message.gen)return;
@@ -37,8 +54,8 @@ export class BatchPhotoProcessor {
         if(data.type!==expected||(message.request!==undefined&&data.request!==message.request))return;
         cleanup();resolve(data);
       };
-      this.pendingCancel=cancel;
-      this.worker.addEventListener('message',receive);this.worker.addEventListener('error',failed);this.worker.addEventListener('messageerror',failed);
+      this.pendingCancel=cancel;this.pendingFailure=failed;
+      this.worker.addEventListener('message',receive);
       try{this.worker.postMessage({...message,batchDiagnostic:true});}catch(error){cleanup();reject(error);}
     });
   }
@@ -73,6 +90,6 @@ export class BatchPhotoProcessor {
     return {blob:result.blob,recipe,metadataWarning:result.metadataWarning};
     }finally{this.busy=false;}
   }
-  cancel():void {if(this.closed)return;this.closed=true;this.pendingCancel?.();this.worker.terminate();}
+  cancel():void {if(this.closed)return;this.closed=true;this.pendingCancel?.();this.worker.removeEventListener('error',this.failed);this.worker.removeEventListener('messageerror',this.failed);this.worker.terminate();}
   close():void {this.cancel();}
 }
