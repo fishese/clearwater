@@ -1,5 +1,14 @@
 # Handoff
 
+## Review fixes implemented (14 November 2026)
+
+- [x] User authorized the three reviewed defect fixes; desktop work remains deferred. Smaller capable coding agents implemented bounded tasks, followed by source review and combined checks.
+- [x] Terminal batch-worker failure stops processing visibly and retains completed ZIP/folder output; retry uses a fresh worker. Recoverable file errors still continue.
+- [x] Gallery exports snapshot photo/video kind, fixing stale Android video classification while preserving photo hashes/thumbnails and original media.
+- [x] PNG exports/reimports retain Unicode EXIF comments with bounded TIFF/chunk reads; malformed metadata still warns without blocking saving.
+- [x] 294 shared tests and production build pass. Production Chromium regressions cover worker failure/partial ZIP/retry, folder collision/cancellation, nine translated layouts, gallery cold-load/switch/failure/retry, and mocked iPhone export/save/share. Gallery negative control reproduces the old failure. No new physical-device, WebKit or native simulator result claimed.
+- [ ] Next: user testing or requested delivery; no push, merge, release, version bump or website change performed. See `FRESH_REVIEW_2026-11-14.md` for evidence. Desktop plan and unrelated October review/IDE work/stashes preserved.
+
 ## Fresh review and desktop plan (14 November 2026)
 
 - [x] Review-only audit of released application code: `FRESH_REVIEW_2026-11-14.md`. Two P2 findings (fatal batch worker continuation; stale Android video gallery-save classification) and a P3 Unicode PNG metadata roundtrip defect. Synthetic repros distinguish tested failures from source-only/device follow-up.
