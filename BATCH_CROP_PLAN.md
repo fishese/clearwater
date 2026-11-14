@@ -68,3 +68,8 @@ A synthetic desktop Chromium batch processed two 4000×3000 JPEGs using Balanced
 
 - [x] Built signed Android APK from `04a4f4d`, verified signature matches 1.0.14 and all 50 packaged assets; ignored `editor/android/build/batch-corner-test/ClearWater-batch-corner-test.apk`, SHA-256 `fa91ef38398c57f505182cc495542a022c2e9e59c0240a841fa8e3653015341f`. Not installed.
 - [x] Hosted workflow 43565742639 built unsigned iOS IPA from `04a4f4d`; checksum matches `34384b9744dbb766a84cea96e0e728552d366ab1851e438ac23020f64a95ce8e`, main JS/CSS match local build, ignored `editor/ios/App/output/batch-corner-test/ClearWater-unsigned.ipa`. Hosted WebKit checks passed, including the mocked iOS empty-batch and corner layout checks; native iOS simulator tests were still running when recorded. No Pages deployment.
+
+## Release checkpoint, 14 November 2026
+
+- [x] User confirmed the updated IPA works and authorized release with the website if the iOS simulator passed. Hosted run 43565742639 passed all jobs, including 36 simulator tests with zero failures, on `04a4f4d`. The user also reported Android testing worked.
+- [ ] Prepare 1.0.15 (Android code 34; iOS build 13) with unchanged signing; verify final release artifacts and web deployment from the same source, publish only signed APK and unsigned IPA per release policy, and preserve unrelated working-tree changes.
