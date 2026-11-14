@@ -1,5 +1,12 @@
 # Handoff
 
+## Fresh review and desktop plan (14 November 2026)
+
+- [x] Review-only audit of released application code: `FRESH_REVIEW_2026-11-14.md`. Two P2 findings (fatal batch worker continuation; stale Android video gallery-save classification) and a P3 Unicode PNG metadata roundtrip defect. Synthetic repros distinguish tested failures from source-only/device follow-up.
+- [x] Fresh 283 shared tests and production build pass; Chromium batch layout/workflow, crop parity, JPG switching and mocked iPhone export checks pass. No new physical-device, WebKit/simulator or peak-memory result claimed.
+- [x] `DESKTOP_LARGE_FILES_PLAN.md` proposes shared-code desktop I/O with video disk export first and a separate photo decode/encode go/no-go gate. No desktop or bug-fix implementation performed.
+- [ ] Next: user reviews findings and plan; obtain implementation scope before fixes/prototype. No merge, release or website change authorized by this review request. Preserve unrelated October review edits, IDE files and all three stashes.
+
 ## 1.0.15 released (14 November 2026)
 
 - [x] User accepted the Android and updated iPhone test builds and authorized release with the website after the iOS simulator passed. PR #18 merged as `7c2db253c6c1aca90442c51e92cb43f592dca1cc`; its tree matches the versioned release candidate `99a262d4c2599d14e902874bf414cec7e135e2f9`. Tag [v1.0.15](https://github.com/fishese/clearwater/releases/tag/v1.0.15) points to the merge and is latest. [Pages run 43567423745](https://github.com/fishese/clearwater/actions/runs/43567423745) deployed it to https://clearwater.fishese.cc/.
