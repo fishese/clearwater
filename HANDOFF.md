@@ -1,5 +1,11 @@
 # Handoff
 
+## Authorized 1.0.16 release (14 November 2026)
+
+- [x] User authorized merge and release of the three review fixes, including the website update. Desktop implementation remains deferred; provide a separate-session prompt after release.
+- [ ] Prepare 1.0.16 / Android code 35 / iOS build 14, preserving signing and the signed-APK/unsigned-IPA asset policy. Run hosted WebKit/native iOS and build packages from matching source; then merge, verify deployment and publish checked assets.
+- [ ] Record final provenance/checksums and release outcome. Preserve unrelated October review edits, IDE files, stashes and user media.
+
 ## Review fixes implemented (14 November 2026)
 
 - [x] User authorized the three reviewed defect fixes; desktop work remains deferred. Smaller capable coding agents implemented bounded tasks, followed by source review and combined checks.
