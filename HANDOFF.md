@@ -1,5 +1,13 @@
 # Handoff
 
+## 1.0.16 released (15 November 2026)
+
+- [x] User authorized merge/release. PR #20 merged as `453336f0f9bd80b3510358006111d8c7a7b7fbb1`; tag [v1.0.16](https://github.com/fishese/clearwater/releases/tag/v1.0.16) is latest. Candidate `b270060735f421dd646ac184a354c86d0d0d6506` and merge share tree `85d30a7d56dad8294d9c794814b2b7305fee3261`.
+- [x] Signed Android 1.0.16/code 35 and unsigned iOS 1.0.16/build 14 verified: ZIP integrity, all 50 bundled web files, three models, versions, IPA unsigned status and Android certificate continuity. All 12 uploaded/downloaded assets match staged SHA-256; no debug/unsigned Android APK. APK `dd9a24dd17c511ca6c05fb3eb85d08fa61022487b5f7a2e85b7599d47f4937ad`; IPA `d54b077b22f66ed7a644d39da12730f7429ce515fb9130c5a5e3b721131ddc56`.
+- [x] 294 shared tests, 11 Android tests, 36 iOS simulator tests and hosted WebKit pass. [Candidate run 43590793136](https://github.com/fishese/clearwater/actions/runs/43590793136) includes new batch-failure and gallery regression checks. Three WebKit mobile-scroll cases skipped; browser share APIs and Android gallery bridge mocked. No new physical-device acceptance claimed.
+- [x] [Pages run 43618457105](https://github.com/fishese/clearwater/actions/runs/43618457105) deployed the merged source. Live website passes nine batch layout cases, real JPG edit/switching, and mocked iPhone Safari/CriOS ZIP share/download checks. Canonical APK latest download resolves to 1.0.16.
+- [ ] Desktop remains unimplemented. `DESKTOP_NEXT_SESSION_PROMPT.md` gives the scoped handoff for a new session; follow `DESKTOP_LARGE_FILES_PLAN.md` and stop if substantial algorithm rewriting is needed. Preserve unrelated October review edits, IDE files, all three stashes and user media. Earlier release-in-progress checkpoints are historical.
+
 ## Authorized 1.0.16 release (14 November 2026)
 
 - [x] User authorized merge and release of the three review fixes, including the website update. Desktop implementation remains deferred; provide a separate-session prompt after release.
